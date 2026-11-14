@@ -46,8 +46,7 @@ export default function discoveryApi(ctx: RequestContext) {
       }),
 
     /** The genres of one kind; `all` has none, so the caller names movie or tv. */
-    genres: (type: TmdbKind) =>
-      ctx.get('/discover/genres', DiscoverGenres, { query: { type } }),
+    genres: (type: TmdbKind) => ctx.get('/discover/genres', DiscoverGenres, { query: { type } }),
 
     genre: (genreId: number, type: TmdbKind, page?: number) =>
       ctx.get('/discover/genre/:genreId', DiscoverResponse, {

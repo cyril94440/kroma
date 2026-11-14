@@ -3,7 +3,7 @@
 
 # Requirement index
 
-540 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
+542 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
 
 ## ACCT - [accounts](accounts/)
 
@@ -317,11 +317,11 @@
 - **MEDIA-17** (SHIPPED) - A codec being first-class states how *KROMA* handles it, never that a
 - **MEDIA-18** (AGREED) - HDR is preserved end to end or it is not offered. KROMA never
 - **MEDIA-19** (SHIPPED) - **Bit depth.** 8-bit and 10-bit are first-class, and 10-bit is
-- **MEDIA-20** (AGREED) - KROMA distinguishes **HDR10**, **HDR10+**, **Dolby Vision** and
+- **MEDIA-20** (SHIPPED) - KROMA distinguishes **HDR10**, **HDR10+**, **Dolby Vision** and
 - **MEDIA-21** (SHIPPED) - Colour primaries, transfer characteristics and matrix coefficients
 - **MEDIA-22** (AGREED) - Where dynamic metadata, HDR10+ or Dolby Vision, cannot be carried
 - **MEDIA-23** (AGREED) - The first-class audio codecs are **AAC**, **AC-3** and **E-AC-3**
-- **MEDIA-24** (AGREED) - An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos
+- **MEDIA-24** (SHIPPED) - An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos
 - **MEDIA-25** (SHIPPED) - **Passthrough** is the default for multichannel and lossless audio:
 - **MEDIA-26** (AGREED) - **Downmixing** to stereo happens only when the target cannot render
 - **MEDIA-27** (SHIPPED) - Multiple audio streams, languages and commentary alike, are all
@@ -345,6 +345,8 @@
 - **MEDIA-45** (SHIPPED) - A file that will not open at all, a truncated or corrupt container,
 - **MEDIA-46** (AGREED) - Undescribed and unreadable are distinct states. The first is "we
 - **MEDIA-47** (AGREED) - An audio stream carries the region of its language when the file says
+- **MEDIA-48** (SHIPPED) - A video copied into fragmented MP4 keeps what makes it HDR: HEVC is
+- **MEDIA-49** (SHIPPED) - A video re-encoded to 8-bit H.264 from an HDR source is tone-mapped
 
 ## MOD - [modules](modules/)
 
@@ -470,7 +472,7 @@
 - **PLAY-23** (SHIPPED) - **Remux** is shown as *repackaged*. Quality is untouched, so this is
 - **PLAY-24** (SHIPPED) - Direct play shows nothing. The absence of a notice *is* the signal
 - **PLAY-25** (AGREED) - KROMA never re-encodes video to save bandwidth unless the device
-- **PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so.
+- **PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so. The server tone-maps
 - **PLAY-27** (AGREED) - KROMA never burns in subtitles the person did not ask to see.
 - **PLAY-28** (AGREED) - When the only playable path is one a person or an admin has disabled,
 - **PLAY-29** (SHIPPED) - Under **direct play and remux**, seeking is instant and exact. The

@@ -101,25 +101,39 @@ silently flattens HDR to SDR, and a tone-mapped picture is surfaced as the compr
 by [`playback/`](../playback/).
 
 Matching a client against a variant is only a refusal where the variant has no picture of
-its own to fall back on. HDR10+ and HLG degrade cleanly, and so do Dolby Vision profiles 8
-and 9, whose base layer is a valid HDR10 or HLG picture: a device that cannot read the
-dynamic metadata still draws the film. Profiles 5 and 7 have no such base layer, so a device
-with no Dolby Vision decoder draws them in the wrong colours, and those are refused.
+its own to fall back on. HDR10+ and HLG degrade cleanly, and so does Dolby Vision whenever its
+base layer is a picture. What that base layer is comes from the stream's own
+`bl_signal_compatibility_id`, which the server sends as `dolbyVisionCompatibility`: 1 and 6 are
+an HDR10 picture, 4 is HLG, 2 is SDR, and 0 is none. A device with no Dolby Vision decoder
+draws the base layer, and a stream whose id is 0, profile 5 in practice, is refused, because
+its base layer is not a picture and the colours come out wrong. The profile number decides
+only where the probe carried no id: 5 has no base layer and 7 has an HDR10 one. Profile 7 is
+dual layer, an HDR10 base plus an enhancement layer: a device without a Dolby Vision decoder
+plays the base layer alone, and one with a decoder that takes profile 7 plays it as Dolby
+Vision. The enhancement layer is never required for a picture.
+
+A client declares the HDR systems its display shows (`hdr10`, `hdr10plus`, `hlg`, `dv`) on
+the stream request, so the server can tone-map for an SDR display and decline to copy a stream
+that has no base layer to a device with no Dolby Vision decoder. Omitting the declaration
+means the table is a guess, and the server behaves as before.
 
 - **MEDIA-19** (SHIPPED) - **Bit depth.** 8-bit and 10-bit are first-class, and 10-bit is
   retained as a property of the video stream rather than rounded away in the model.
-- **MEDIA-20** (AGREED) - KROMA distinguishes **HDR10**, **HDR10+**, **Dolby Vision** and
+- **MEDIA-20** (SHIPPED) - KROMA distinguishes **HDR10**, **HDR10+**, **Dolby Vision** and
   **HLG** as separate properties, because each has distinct client support, and it records
-  Dolby Vision's profile, because a profile a client cannot decode is not the same as one it
-  can. Three of the four are recorded, with the profile: **HDR10+ is the part not built**,
-  because its metadata is per-frame and a probe reads headers, so a file carrying it is
-  recorded as the HDR10 it also is.
+  Dolby Vision's profile, level, base-layer compatibility and enhancement layer, because a
+  profile a client cannot decode is not the same as one it can. HDR10+ is per-frame metadata,
+  so the probe reads the first frame of a stream that is already PQ; a read that fails or runs
+  long leaves the stream HDR10, and a Dolby Vision stream stays Dolby Vision whatever else it
+  carries.
 - **MEDIA-21** (SHIPPED) - Colour primaries, transfer characteristics and matrix coefficients
   travel with the video stream, and a client is matched against the exact HDR variant rather
   than a generic "HDR" flag.
 - **MEDIA-22** (AGREED) - Where dynamic metadata, HDR10+ or Dolby Vision, cannot be carried
-  to a client, the base HDR10 layer is preserved rather than HDR discarded entirely. It is a
-  fallback [`playback/`](../playback/) makes visible.
+  to a client, the base HDR10 layer is preserved rather than HDR discarded entirely, and the
+  player says so: Dolby Vision drawn as its HDR10, HLG or SDR layer, HDR10+ drawn as HDR10, and
+  HDR tone-mapped to an SDR display are each a notice, never a silent change. It is a fallback
+  [`playback/`](../playback/) makes visible.
 
 ## Audio
 
@@ -127,21 +141,36 @@ Status: **SHIPPED** in part; each requirement carries its own.
 
 **MEDIA-23** (AGREED) - The first-class audio codecs are **AAC**, **AC-3** and **E-AC-3**
 (Dolby Digital and Plus), **TrueHD**, **DTS** and **DTS-HD**, **FLAC** and **Opus**. Only the
-first three and Opus are handled first-class today; the rest are the part still AGREED.
+first three and Opus are handled first-class today; the rest are the part still AGREED,
+though TrueHD and DTS are already probed with their profile and either copied or kept as a 5.1
+transcode (MEDIA-26).
 
-**MEDIA-24** (AGREED) - An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos
-objects, is a first-class property.
+**MEDIA-24** (SHIPPED) - An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos
+objects, is a first-class property: the probe keeps ffprobe's layout and profile, and a
+profile naming Dolby Atmos or DTS:X marks the stream `spatial`. DTS-HD Master Audio stays
+`dts` in the codec and shows in the profile.
 
 - **MEDIA-25** (SHIPPED) - **Passthrough** is the default for multichannel and lossless audio:
   the bitstream reaches a device or receiver that can decode it untouched. This is direct play
   for audio and is always preferred.
 - **MEDIA-26** (AGREED) - **Downmixing** to stereo happens only when the target cannot render
-  the source layout, only as an explicit fallback, and never silently. A downmix is a
+  the source layout, only as an explicit fallback, and never silently. A client that declares
+  E-AC-3 (or AC-3) is given a surround source as 5.1 at 640 kbps instead of a stereo downmix;
+  object audio (Atmos, DTS:X) survives only a copy, because no transcode here writes it. A downmix is a
   channel-count reduction and therefore a compromise; the original stream is retained
   unchanged as the source, and telling the person is [`playback/`](../playback/)'s job.
 - **MEDIA-27** (SHIPPED) - Multiple audio streams, languages and commentary alike, are all
   enumerated and selectable. The default follows the file's own disposition flags, then the
   profile's language preference.
+
+- **MEDIA-48** (SHIPPED) - A video copied into fragmented MP4 keeps what makes it HDR: HEVC is
+  tagged `hvc1`, Dolby Vision profile 5 is tagged `dvh1` with its configuration box, profile 8
+  keeps `hvc1` with its `dvvC` box so a Dolby Vision decoder engages and everything else draws
+  the base layer, and a single-track profile 7 is cut down to its HDR10 base layer.
+- **MEDIA-49** (SHIPPED) - A video re-encoded to 8-bit H.264 from an HDR source is tone-mapped
+  and tagged BT.709, on hosts whose ffmpeg has zimg (or libplacebo with a working Vulkan
+  device); elsewhere the re-encode is as before. Dolby Vision profile 5 needs libplacebo.
+  `KROMA_TONEMAP=off` rules tone-mapping out.
 
 **MEDIA-47** (AGREED) - An audio stream carries the region of its language when the file says
 so: from its language tag in any language (`fr-CA`, `pt-BR`), else from words of its title

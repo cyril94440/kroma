@@ -161,25 +161,11 @@ fn usable(accel: HwAccel) -> Result<(), String> {
     }
     let mut cmd = std::process::Command::new("ffmpeg");
     cmd.args(["-v", "error", "-nostdin"]);
-    match accel {
-        HwAccel::Vaapi => {
-            cmd.args(["-vaapi_device", node]);
-        }
-        HwAccel::Qsv => {
-            let derive_from = format!("vaapi=va:{node}");
-            cmd.args(["-init_hw_device", derive_from.as_str()]).args([
-                "-init_hw_device",
-                "qsv=hw@va",
-                "-filter_hw_device",
-                "hw",
-            ]);
-        }
-        _ => {}
-    }
+    cmd.args(accel.upload_device_args());
     cmd.args(input::generated(TEST_SOURCE))
         .args(["-frames:v", "3"]);
-    if matches!(accel, HwAccel::Qsv | HwAccel::Vaapi) {
-        cmd.args(["-vf", "format=nv12,hwupload"]);
+    if let Some(upload) = accel.upload_filter() {
+        cmd.args(["-vf", upload]);
     }
     cmd.args(["-c:v", encoder_of(accel)]);
     if matches!(accel, HwAccel::VideoToolbox | HwAccel::Nvenc) {

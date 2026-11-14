@@ -8,23 +8,31 @@ use anyhow::Result;
 
 pub mod api;
 pub mod cache;
+pub mod creds;
 pub mod files;
+pub mod locate;
+pub mod memo;
 pub mod port;
 pub mod purge_job;
+pub mod ready;
+pub mod settings;
 pub mod types;
 
 pub use types::{ClientDef, TorrentState, TorrentStatus};
 
 mod add;
 mod lifecycle;
-mod ready;
-mod resolve;
+pub mod resolve;
 mod status;
 
 #[cfg(test)]
 mod fake_alldebrid;
 #[cfg(test)]
 mod it_engine;
+#[cfg(test)]
+mod it_locate;
+#[cfg(test)]
+mod it_ready;
 
 pub const KIND: &str = "alldebrid";
 pub const MODULE_ID: &str = "tv.kroma.engine.alldebrid";
@@ -36,7 +44,9 @@ pub const MODULE: EmbeddedModule = kroma_module_sdk::embedded_module!();
 pub struct AllDebrid {
     api: api::Api,
     cache: cache::Cache,
-    staging: std::path::PathBuf,
+    creds: creds::Creds,
+    saved: creds::Saved,
+    module_dir: std::path::PathBuf,
 }
 
 impl AllDebrid {
@@ -46,7 +56,9 @@ impl AllDebrid {
         Ok(Self {
             api: api::Api::new(&def.url, &def.password)?,
             cache: cache::Cache::new(module_dir),
-            staging: module_dir.join("torrents"),
+            creds: creds::Creds::new(module_dir),
+            saved: creds::Saved { url: def.url.trim().to_string(), key: def.password.trim().to_string() },
+            module_dir: module_dir.to_path_buf(),
         })
     }
 
@@ -55,7 +67,16 @@ impl AllDebrid {
         if !user.is_premium {
             anyhow::bail!("the AllDebrid account {} is not premium", user.username);
         }
+        self.remember(None);
         Ok(format!("{} (premium)", user.username))
+    }
+
+    pub(crate) fn remember(&self, magnet: Option<&str>) {
+        let _ = self.creds.remember(magnet, &self.saved);
+    }
+
+    pub(crate) fn stubs_folder(&self, magnet: &str) -> std::path::PathBuf {
+        self.module_dir.join("downloads").join(magnet)
     }
 
     pub fn cache(&self) -> &cache::Cache {

@@ -4,7 +4,7 @@ import { BROWSE_LISTS, browseListOf } from '#web/features/requests/discover-list
 
 describe('the browsable lists', () => {
   it('cover every list the server names, once each', () => {
-    expect(BROWSE_LISTS.map((l) => l.list).toSorted()).toEqual([...DiscoverList.options].toSorted());
+    expect(BROWSE_LISTS.map((l) => l.list).sort()).toEqual([...DiscoverList.options].sort());
   });
 
   it('give a movie title and a show title to each list', () => {

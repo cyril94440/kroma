@@ -227,6 +227,43 @@ mod tests {
     }
 
     #[test]
+    fn a_preprobed_file_keeps_its_dolby_vision_detail_and_its_audio_profile() {
+        use kroma_domain::{AudioStream, HdrFormat, SpatialAudio, VideoStream};
+
+        let p = pool();
+        let mut seeded = file("f1", "demo://m1", true);
+        seeded.video = Some(VideoStream {
+            hdr: true,
+            hdr_format: Some(HdrFormat::DolbyVision),
+            dolby_vision_profile: Some(8),
+            dolby_vision_level: Some(6),
+            dolby_vision_compatibility: Some(1),
+            ..video()
+        });
+        seeded.audio_tracks = vec![AudioStream {
+            index: 0,
+            codec: "truehd".into(),
+            channels: Some(8),
+            language: None,
+            title: None,
+            default: true,
+            region: None,
+            profile: Some("Dolby TrueHD + Dolby Atmos".into()),
+            layout: Some("7.1".into()),
+            spatial: Some(SpatialAudio::Atmos),
+        }];
+        let items = vec![movie("m1", "Demo", "lib", vec![seeded])];
+
+        sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 100)).unwrap();
+
+        let got = crate::get_item(&p, "m1").unwrap().unwrap();
+        let read = got.files[0].video.as_ref().unwrap();
+        assert_eq!(read.dolby_vision_level, Some(6));
+        assert_eq!(read.dolby_vision_compatibility, Some(1));
+        assert_eq!(got.files[0].audio_tracks[0].spatial, Some(SpatialAudio::Atmos));
+    }
+
+    #[test]
     fn a_scan_that_cannot_write_a_file_fails_on_both_the_probed_and_unprobed_paths() {
         let p = pool();
         p.get()

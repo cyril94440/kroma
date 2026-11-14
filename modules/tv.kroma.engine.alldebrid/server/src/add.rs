@@ -39,17 +39,19 @@ impl AllDebrid {
         let Some(link) = classify(magnet_or_url) else {
             bail!("AllDebrid takes a magnet link, an info hash or a link to a .torrent file");
         };
-        match link {
-            Link::Magnet(magnet) => self.api.upload_magnet(magnet),
-            Link::Web(url) => self.upload_fetched(url),
-        }
+        let id = match link {
+            Link::Magnet(magnet) => self.api.upload_magnet(magnet)?,
+            Link::Web(url) => self.upload_fetched(url)?,
+        };
+        self.remember(Some(&id));
+        Ok(id)
     }
 
     fn upload_fetched(&self, url: &str) -> Result<String> {
         let bytes = fetch_torrent(url)?;
-        std::fs::create_dir_all(&self.staging).context("create the torrent staging folder")?;
-        let file = self
-            .staging
+        let staging = self.module_dir.join("torrents");
+        std::fs::create_dir_all(&staging).context("create the torrent staging folder")?;
+        let file = staging
             .join(format!("{}.torrent", kroma_module_sdk::primitives::random_token()));
         std::fs::write(&file, &bytes).context("stage the .torrent file")?;
         let uploaded = self.api.upload_torrent(&file);

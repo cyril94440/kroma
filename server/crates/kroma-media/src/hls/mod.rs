@@ -11,6 +11,7 @@
 //! sharing a session.
 
 mod admission;
+mod args;
 mod covered;
 mod cut;
 mod ffmpeg;
@@ -24,15 +25,19 @@ mod progress;
 mod reclaim;
 mod session;
 mod software;
+mod tonemap;
 mod window;
 
 pub use admission::Refusal;
-pub use hwaccel::{prime as prime_hwaccel, Detection};
+pub use hwaccel::Detection;
 pub use live::Transcode;
-pub use mode::{AudioMode, Rung, StreamMode, VideoMode};
+pub use mode::{AudioMode, Rung, StreamMode, VideoMode, SURROUND_MIN_CHANNELS};
+pub use tonemap::{filters as tonemap_filters, Filters, ToneMap, ToneSource, SDR_TAGS};
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+use kroma_module_wire::{AudioStream, VideoStream};
 
 use key::session_key;
 use session::Sessions;
@@ -45,7 +50,9 @@ use session::Sessions;
 /// catalog knows it, which is what a re-encode has to decode before it can
 /// encode anything. Two requests carrying the same `opener` are the same player,
 /// which is how a seek is told from a second viewer on the same title; `None`
-/// is a caller that presented no credential, and matches nobody.
+/// is a caller that presented no credential, and matches nobody. `video` and
+/// `track` are what the catalog read of the stream and of the audio track asked
+/// for, which decide the flags a copy needs and what a re-encode keeps.
 pub struct Asked<'a> {
     pub item_id: &'a str,
     pub input: &'a str,
@@ -54,6 +61,15 @@ pub struct Asked<'a> {
     pub mode: StreamMode,
     pub anchor: u64,
     pub source: Option<(u32, u32)>,
+    pub video: Option<&'a VideoStream>,
+    pub track: Option<&'a AudioStream>,
+}
+
+/// Probes what this host can re-encode with, once, before the first request
+/// would pay for it: the encoder devices and the tone-mapping filters.
+pub fn prime_hwaccel() {
+    hwaccel::prime();
+    tonemap::filters();
 }
 
 pub struct HlsEngine {

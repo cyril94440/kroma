@@ -85,19 +85,19 @@ fn run(program: &str, args: &[OsString], budget: Duration) -> Option<Vec<u8>> {
         out
     });
     let started = Instant::now();
-    let finished = loop {
+    loop {
         match child.try_wait() {
-            Ok(Some(status)) => break status.success(),
+            Ok(Some(status)) => {
+                return status.success().then(|| reader.join().ok()).flatten();
+            }
             Ok(None) if started.elapsed() < budget => std::thread::sleep(POLL),
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
-                break false;
+                return None;
             }
         }
-    };
-    let out = reader.join().ok()?;
-    finished.then_some(out)
+    }
 }
 
 #[cfg(test)]

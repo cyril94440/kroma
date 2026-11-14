@@ -216,6 +216,15 @@ describe('qualityBadgeForVideo', () => {
     expect(qualityBadgeForVideo(v({ codec: 'h264' }))).toBeNull();
   });
 
+  it('names the HDR system the picture carries instead of a generic HDR', () => {
+    expect(
+      qualityBadgeForVideo(v({ hdr: true, hdrFormat: 'dolbyVision', width: 3840, codec: 'hevc' })),
+    ).toBe('Dolby Vision');
+    expect(qualityBadgeForVideo(v({ hdr: true, hdrFormat: 'hdr10Plus' }))).toBe('HDR10+');
+    expect(qualityBadgeForVideo(v({ hdr: true, hdrFormat: 'hdr10' }))).toBe('HDR10');
+    expect(qualityBadgeForVideo(v({ hdr: true, hdrFormat: 'hlg' }))).toBe('HLG');
+  });
+
   it('qualityBadge reads the item video', () => {
     expect(qualityBadge({ video: { codec: 'hevc', width: 3840 } } as unknown as MediaItem)).toBe(
       '4K',
@@ -270,10 +279,19 @@ describe('langName', () => {
 describe('audioTrackLabel', () => {
   const track = (p: Partial<AudioTrack>): AudioTrack => p as AudioTrack;
 
-  it('joins name, channel layout and upper-cased codec', () => {
+  it('joins name, then the format a viewer knows it by with its channel layout', () => {
     expect(audioTrackLabel(t, track({ language: 'fr', channels: 6, codec: 'eac3' }))).toBe(
-      'lang.fr · 5.1 · EAC3',
+      'lang.fr · Dolby Digital+ 5.1',
     );
+  });
+
+  it.each([
+    [{ codec: 'truehd', channels: 8, spatial: 'atmos' as const }, 'Dolby TrueHD Atmos 7.1'],
+    [{ codec: 'eac3', channels: 6, spatial: 'atmos' as const }, 'Dolby Digital+ Atmos 5.1'],
+    [{ codec: 'dts', channels: 6, profile: 'DTS-HD MA' }, 'DTS-HD MA 5.1'],
+    [{ codec: 'dts', channels: 8, spatial: 'dtsx' as const }, 'DTS:X 7.1'],
+  ])('names %j as %s', (fields, label) => {
+    expect(audioTrackLabel(t, track({ title: null, language: null, ...fields }))).toBe(label);
   });
 
   it('prefers a stream title over the language name', () => {
@@ -282,7 +300,7 @@ describe('audioTrackLabel', () => {
         t,
         track({ title: '  Commentary ', language: 'en', channels: 2, codec: 'aac' }),
       ),
-    ).toBe('Commentary · 2.0 · AAC');
+    ).toBe('Commentary · AAC 2.0');
   });
 
   it('drops missing parts', () => {

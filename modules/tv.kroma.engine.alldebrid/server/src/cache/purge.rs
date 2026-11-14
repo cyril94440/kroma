@@ -8,7 +8,7 @@ pub const GRACE: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    pub max_bytes: u64,
+    pub max_bytes: Option<u64>,
     pub max_age: Duration,
 }
 
@@ -26,8 +26,8 @@ pub struct Report {
 }
 
 /// The entries to delete: unprotected ones idle past `max_age`, then the least
-/// recently used unprotected ones until the rest fits `max_bytes`. A zero limit
-/// switches that limit off. An entry being fetched, or used within [`GRACE`],
+/// recently used unprotected ones until the rest fits `max_bytes`. `None` or a
+/// zero age switches that limit off; `Some(0)` allows no bytes at all. An entry being fetched, or used within [`GRACE`],
 /// is never chosen.
 pub fn victims(
     entries: &[Entry],
@@ -47,12 +47,12 @@ pub fn victims(
             kept.push(entry);
         }
     }
-    if limits.max_bytes > 0 {
+    if let Some(max_bytes) = limits.max_bytes {
         let mut total: u64 = kept.iter().map(|entry| entry.size).sum();
         let mut evictable: Vec<&Entry> = kept.into_iter().filter(|entry| !protected(entry)).collect();
         evictable.sort_by_key(|entry| entry.last_used);
         for entry in evictable {
-            if total <= limits.max_bytes {
+            if total <= max_bytes {
                 break;
             }
             total -= entry.size;

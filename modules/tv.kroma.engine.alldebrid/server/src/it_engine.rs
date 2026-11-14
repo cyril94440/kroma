@@ -1,6 +1,4 @@
 use std::path::Path;
-use std::sync::Arc;
-
 use serde_json::{json, Value};
 
 use crate::fake_alldebrid::{scripted, Fake, Resp};
@@ -178,9 +176,6 @@ fn every_status_code_maps_to_a_state_and_a_progress_in_its_half() {
         assert!(failed.progress < 0.5, "{code}");
         assert!(failed.error.unwrap().contains("Upload failed"), "{code}");
     }
-    let ready = at(4);
-    assert_eq!(ready.state, TorrentState::Completed);
-    assert_eq!(ready.progress, 1.0);
 }
 
 #[test]
@@ -214,26 +209,6 @@ fn a_single_magnet_answered_as_an_object_is_read_too() {
 }
 
 #[test]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
-fn removing_deletes_the_magnet_remotely_and_its_cache_locally() {
-    let fake = Fake::start(|req| match req.form().get("id").map(String::as_str) {
-        Some("404") => Resp::failure("MAGNET_INVALID_ID", "gone"),
-        _ => Resp::data(json!({ "message": "Magnet was successfully deleted" })),
-    });
-    let dir = kroma_module_sdk::testing::temp_dir("ad-remove");
-    let cached = dir.path().join("cache/7/a.mkv");
-    std::fs::create_dir_all(cached.parent().unwrap()).unwrap();
-    std::fs::write(&cached, "x").unwrap();
-    let alldebrid = engine(&fake, dir.path());
-
-    alldebrid.remove("7", false).unwrap();
-    alldebrid.remove("404", true).unwrap();
-
-    assert!(!cached.exists());
-    assert_eq!(fake.calls_to("/v4/magnet/delete").len(), 2);
-}
-
-#[test]
 fn pausing_and_resuming_are_refused_and_reannouncing_is_harmless() {
     let dir = kroma_module_sdk::testing::temp_dir("ad-verbs");
     let alldebrid = AllDebrid::new(
@@ -261,8 +236,4 @@ fn listing_files_flattens_and_sanitises_and_a_link_unlocks_afresh() {
     assert_eq!(listed.iter().map(|f| f.rel.as_str()).collect::<Vec<_>>(), ["_/ep1.mkv", "_/_etc_passwd"]);
     assert!(url.starts_with("http://127.0.0.1:") && url.ends_with("/dl/ep1.mkv"), "{url}");
     assert!(alldebrid.direct_url("7", "nope").is_err());
-}
-
-pub(crate) fn shared(fake: Fake) -> Arc<Fake> {
-    Arc::new(fake)
 }

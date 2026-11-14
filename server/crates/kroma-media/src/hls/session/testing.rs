@@ -64,6 +64,7 @@ pub(in crate::hls) fn fake_session(
         Pipeline {
             accel: HwAccel::Software,
             effort: Effort::Quality,
+            tonemap: None,
         },
         None,
         child.id(),

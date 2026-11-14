@@ -8,7 +8,7 @@ use super::disk;
 use crate::api::Api;
 use crate::files::Planned;
 
-const PURPOSE: &str = "download-client.transfer";
+const PURPOSE: &str = "debrid-transfer";
 pub const CHUNK_BYTES: u64 = if cfg!(test) { 64 * 1024 } else { 32 * 1024 * 1024 };
 const CHUNK_SECS: u32 = 120;
 const MAX_RELOCKS: u8 = 2;

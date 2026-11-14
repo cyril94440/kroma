@@ -1,6 +1,6 @@
 //! `/download-clients` torrent engine management: the seeded
-//! embedded engine row plus external Transmission / qBittorrent connectors,
-//! with a live connection test. Gated on `settings.manage`; passwords are
+//! embedded engine row plus a row per external engine module, with a live
+//! connection test. Gated on `settings.manage`; passwords are
 //! write-only.
 
 use std::sync::Arc;
@@ -19,11 +19,20 @@ use crate::{ClientTestResult, DownloadClientView, DownloadClientsView, SaveDownl
 use kroma_module_sdk::host::{blocking, json_error, query, service, AuthUser, HostStorage};
 use kroma_module_sdk::primitives::{now_ms, random_token, short_hash};
 
+use crate::engine::remote::DOWNLOAD_CLIENT;
 use crate::DownloadManager;
+use kroma_module_sdk::host::Contribution;
 
 // Resolve the module's download manager from the host service registry.
 fn dm<S: HostStorage>(state: &S) -> Arc<DownloadManager> {
     service::<DownloadManager>(state).expect("download manager registered")
+}
+
+fn is_external_engine(answering: &[Contribution], kind: &str) -> bool {
+    kind != crate::engine::EMBEDDED_KIND
+        && answering
+            .iter()
+            .any(|each| each.instance.as_deref() == Some(kind))
 }
 
 pub fn routes<S: HostStorage + Clone + Send + Sync + 'static>() -> Router<S> {
@@ -95,10 +104,10 @@ pub async fn create<S: HostStorage + Clone + Send + Sync + 'static>(
 ) -> Result<Response, Response> {
     state.require(&user, Permission::SettingsManage)?;
     let kind = body.kind.as_deref().unwrap_or_default().trim().to_string();
-    if !matches!(kind.as_str(), "transmission" | "qbittorrent") {
+    if !is_external_engine(&state.contributions(DOWNLOAD_CLIENT), &kind) {
         return Err(json_error(
             StatusCode::BAD_REQUEST,
-            "kind must be transmission or qbittorrent",
+            "no enabled download engine answers for this kind",
         ));
     }
     let url = body
@@ -107,9 +116,6 @@ pub async fn create<S: HostStorage + Clone + Send + Sync + 'static>(
         .map(str::trim)
         .unwrap_or_default()
         .to_string();
-    if url.is_empty() {
-        return Err(json_error(StatusCode::BAD_REQUEST, "url is required"));
-    }
     let row = DownloadClientRow {
         id: short_hash(&format!("dlclient|{url}|{}", random_token())),
         name: body
@@ -252,5 +258,52 @@ pub async fn test<S: HostStorage + Clone + Send + Sync + 'static>(
     match result {
         Some(r) => Ok(Json(r).into_response()),
         None => Err(state.lerr(&user, StatusCode::NOT_FOUND, "error.clientNotFound")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn answering(kinds: &[&str]) -> Vec<Contribution> {
+        kinds
+            .iter()
+            .map(|kind| Contribution {
+                module_id: format!("tv.kroma.engine.{kind}"),
+                instance: Some((*kind).to_string()),
+                base_url: "http://127.0.0.1:1".into(),
+                token: "t".into(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_kind_is_valid_when_an_enabled_module_answers_for_it() {
+        let answers = answering(&["rqbit", "alldebrid", "transmission"]);
+
+        assert!(is_external_engine(&answers, "alldebrid"));
+        assert!(is_external_engine(&answers, "transmission"));
+    }
+
+    #[test]
+    fn a_kind_nobody_answers_for_is_refused() {
+        let answers = answering(&["rqbit"]);
+
+        assert!(!is_external_engine(&answers, "qbittorrent"));
+        assert!(!is_external_engine(&answers, ""));
+        assert!(!is_external_engine(&[], "alldebrid"));
+    }
+
+    #[test]
+    fn the_embedded_kind_is_never_created_through_this_route() {
+        assert!(!is_external_engine(&answering(&["rqbit"]), "rqbit"));
+    }
+
+    #[test]
+    fn a_contribution_with_no_instance_answers_for_no_kind() {
+        let mut answers = answering(&["alldebrid"]);
+        answers[0].instance = None;
+
+        assert!(!is_external_engine(&answers, "alldebrid"));
     }
 }

@@ -63,6 +63,10 @@ impl Api {
         })
     }
 
+    pub fn base(&self) -> &str {
+        &self.base
+    }
+
     fn fetch(&self) -> Fetch {
         Fetch::new()
             .purpose(PURPOSE)

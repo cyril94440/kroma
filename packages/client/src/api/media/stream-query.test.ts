@@ -21,6 +21,14 @@ describe('streamQuery', () => {
     );
   });
 
+  it('keeps "SDR display" distinct from "HDR unknown", as it does for the codec lists', () => {
+    expect(encoded({ hdr: [] })).toBe('?hdr=');
+    expect(encoded({ hdr: undefined })).toBe('');
+    expect(encoded({ hdr: ['hdr10', 'hdr10plus', 'hlg', 'dv'] })).toBe(
+      '?hdr=hdr10%2Chdr10plus%2Chlg%2Cdv',
+    );
+  });
+
   it('rounds a picture ceiling, and sends none when the device never probed one', () => {
     expect(encoded({ maxFrame: { width: 1920.4, height: 1080.6 } })).toBe('?maxw=1920&maxh=1081');
     expect(encoded({ maxFrame: { width: 0, height: 0 } })).toBe('');

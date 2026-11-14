@@ -93,7 +93,7 @@ describe('the audio picker over an offline download', () => {
       t,
     );
 
-    expect(options[0].label).toBe('Français VFF · 5.1 · EAC3');
+    expect(options[0].label).toBe('Français VFF · Dolby Digital+ 5.1');
   });
 
   it('matches languages when AVPlayer returns the same tracks in another order', () => {
@@ -106,8 +106,8 @@ describe('the audio picker over an offline download', () => {
       item([track({ language: 'fra', title: 'VFF' }), track({ index: 1, language: 'eng' })]),
       t,
     );
-    expect(options[0].label).toBe('Anglais · 5.1 · EAC3');
-    expect(options[1].label).toBe('VFF · 5.1 · EAC3');
+    expect(options[0].label).toBe('Anglais · Dolby Digital+ 5.1');
+    expect(options[1].label).toBe('VFF · Dolby Digital+ 5.1');
     expect(options[1].prefCode).toBe('fr-FR');
   });
 
@@ -213,6 +213,14 @@ describe('the quality suffix on the title line', () => {
     const movie = { video: { height: 2160, codec: 'hevc', hdr: true } } as MediaItem;
 
     expect(qualityBadge(movie)).toBe(' · 2160p HEVC HDR');
+  });
+
+  it('names the HDR system the file carries', () => {
+    const movie = {
+      video: { height: 2160, codec: 'hevc', hdr: true, hdrFormat: 'dolbyVision' },
+    } as MediaItem;
+
+    expect(qualityBadge(movie)).toBe(' · 2160p HEVC Dolby Vision');
   });
 
   it('drops the parts the track does not know', () => {

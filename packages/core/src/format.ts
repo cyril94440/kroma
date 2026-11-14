@@ -79,7 +79,10 @@ export function codecLabel(codec: string): string {
 export function qualityBadgeForVideo(video: VideoTrack | null | undefined): string | null {
   if (!video) return null;
   return match(video)
-    .when((v) => v.hdr === true, (v) => hdrLabel(v) ?? 'HDR')
+    .when(
+      (v) => v.hdr === true,
+      (v) => hdrLabel(v) ?? 'HDR',
+    )
     .when((v) => (v.width ?? 0) >= 3840, '4K')
     .when((v) => v.codec === 'hevc', 'H.265')
     .otherwise(null);

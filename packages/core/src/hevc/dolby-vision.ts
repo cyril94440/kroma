@@ -48,9 +48,7 @@ export type PictureOutcome =
 type HdrVideo = Pick<VideoTrack, 'hdr' | 'hdrFormat'> & DolbyVisionTraits;
 
 function drawsOrToneMaps(drawn: boolean, as: 'hdr10' | 'hlg'): PictureOutcome {
-  return drawn
-    ? { kind: 'base', source: 'dolbyVision', as }
-    : { kind: 'toneMapped' };
+  return drawn ? { kind: 'base', source: 'dolbyVision', as } : { kind: 'toneMapped' };
 }
 
 function dolbyVisionOutcome(video: HdrVideo, caps: PlaybackCapabilities): PictureOutcome {

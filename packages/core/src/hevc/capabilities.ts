@@ -117,15 +117,15 @@ function detectHdr(): boolean {
 // metadata, and the HDR10 base layer is what actually gets drawn.
 function detectHdrFormats(): HdrCapabilities {
   const panel = detectHdr();
-  const dolbyVisionProfiles = DOLBY_VISION_PROBES.filter(([, types]) => types.some(supportsType)).map(
-    ([profile]) => profile,
-  );
+  const dolbyVisionProfiles = DOLBY_VISION_PROBES.filter(([, types]) =>
+    types.some(supportsType),
+  ).map(([profile]) => profile);
   return {
     hdr10: panel,
     hdr10Plus: false,
     dolbyVision: dolbyVisionProfiles.length > 0,
     hlg: panel,
-    dolbyVisionProfiles,
+    ...(dolbyVisionProfiles.length > 0 ? { dolbyVisionProfiles } : {}),
   };
 }
 

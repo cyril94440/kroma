@@ -15,26 +15,78 @@ mod probe;
 use std::sync::OnceLock;
 
 use super::software::Effort;
+use super::tonemap::{ToneMap, SDR_TAGS};
 
 pub use probe::{detect, detected, prime, Detection};
 
 /// What one re-encode runs on: the device that shrinks the picture and, where
 /// that device is the CPU, how hard it is allowed to work per frame. The two are
 /// one decision - the tier only means anything on the software path - so they
-/// are chosen and carried together.
+/// are chosen and carried together. `tonemap` is set when the source is HDR and
+/// this host can map it: the frames then pass through system memory, because
+/// every tone-map here runs on the CPU.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Pipeline {
     pub accel: HwAccel,
     pub effort: Effort,
+    pub tonemap: Option<ToneMap>,
 }
 
 impl Pipeline {
     /// The device this host has, and the tier this job can afford on it, from the
     /// picture going in and the box it is fitted into.
-    pub fn choose(source: Option<(u32, u32)>, target: Option<(u32, u32)>) -> Self {
+    pub fn choose(
+        source: Option<(u32, u32)>,
+        target: Option<(u32, u32)>,
+        tonemap: Option<ToneMap>,
+    ) -> Self {
         Self {
             accel: detect(),
             effort: Effort::choose(source, target),
+            tonemap,
+        }
+    }
+
+    /// Args that must precede `-i`. A tone-mapped picture is not decoded into
+    /// device memory, which the CPU filters cannot read; a device that needs an
+    /// upload afterwards is declared explicitly, the way its startup validation
+    /// declares it, and decodes on the CPU.
+    pub fn input_args(self) -> Vec<String> {
+        if self.tonemap.is_none() {
+            return owned(self.accel.input_args(self.effort));
+        }
+        match self.accel {
+            HwAccel::Qsv | HwAccel::Vaapi => {
+                let mut args = owned(HwAccel::Software.input_args(self.effort));
+                args.extend(self.accel.upload_device_args());
+                args
+            }
+            accel => without_device_frames(accel.input_args(self.effort)),
+        }
+    }
+
+    /// The `-vf` for this job: the scale and depth change the device needs, or
+    /// the scale, the tone-map and the upload to the encoder's memory.
+    pub fn video_filter(self, size: Option<(u32, u32)>) -> Option<String> {
+        let Some(map) = self.tonemap else {
+            return self.accel.video_filter(size, self.effort);
+        };
+        let scale = HwAccel::Software.video_filter(size, self.effort);
+        let upload = self.accel.upload_filter().map(str::to_owned);
+        let steps: Vec<String> = scale
+            .into_iter()
+            .chain([map.chain()])
+            .chain(upload)
+            .collect();
+        Some(steps.join(","))
+    }
+
+    /// Tags a tone-mapped picture as the SDR it now is.
+    pub fn output_tags(self) -> &'static [&'static str] {
+        if self.tonemap.is_some() {
+            &SDR_TAGS
+        } else {
+            &[]
         }
     }
 
@@ -67,6 +119,23 @@ pub(super) fn render_node() -> &'static str {
         Ok(v) if !v.trim().is_empty() => Box::leak(v.trim().to_owned().into_boxed_str()),
         _ => DEFAULT_RENDER_NODE,
     })
+}
+
+fn owned(args: Vec<&'static str>) -> Vec<String> {
+    args.into_iter().map(str::to_owned).collect()
+}
+
+fn without_device_frames(args: Vec<&'static str>) -> Vec<String> {
+    let mut kept = Vec::new();
+    let mut rest = args.into_iter();
+    while let Some(arg) = rest.next() {
+        if arg == "-hwaccel_output_format" {
+            rest.next();
+        } else {
+            kept.push(arg.to_owned());
+        }
+    }
+    kept
 }
 
 impl HwAccel {
@@ -104,6 +173,35 @@ impl HwAccel {
             ],
             Self::Nvenc => vec!["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"],
             Self::Software => effort.decoder_args().to_vec(),
+        }
+    }
+
+    /// Global args that declare the device a filter graph uploads system frames
+    /// to, empty where the encoder takes system frames itself.
+    pub fn upload_device_args(self) -> Vec<String> {
+        let node = render_node();
+        match self {
+            Self::Vaapi => vec!["-vaapi_device".to_owned(), node.to_owned()],
+            Self::Qsv => [
+                "-init_hw_device",
+                &format!("vaapi=va:{node}"),
+                "-init_hw_device",
+                "qsv=hw@va",
+                "-filter_hw_device",
+                "hw",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+            Self::VideoToolbox | Self::Nvenc | Self::Software => Vec::new(),
+        }
+    }
+
+    /// The filter that moves system-memory frames into the memory this encoder
+    /// reads, or None where it takes them as they are.
+    pub const fn upload_filter(self) -> Option<&'static str> {
+        match self {
+            Self::Qsv | Self::Vaapi => Some("format=nv12,hwupload"),
+            Self::VideoToolbox | Self::Nvenc | Self::Software => None,
         }
     }
 

@@ -1,6 +1,6 @@
 // The "Clients de téléchargement" section of the downloads page: one card per
-// engine (embedded / Transmission / qBittorrent) with enable toggle, live
-// connection test and the add/edit modal.
+// configured engine (the embedded one and each external engine module's) with
+// enable toggle, live connection test and the add/edit modal.
 
 import { apiErrorText, useAddEngine, useEnabledEngines, usePoll, useT } from '@kromatv/module-sdk';
 import {
@@ -142,9 +142,11 @@ export function DownloadClientsSection() {
                   </Row>
                   {/* A sentence wraps; an address does not, because a URL has
                       no spaces to wrap at and would push the row open again. */}
-                  <Text variant="meta" color="textDim" lines={c.builtin ? undefined : 1} mt={2}>
-                    {c.builtin ? t('dlclients.embeddedSub') : c.url}
-                  </Text>
+                  {c.builtin || c.url ? (
+                    <Text variant="meta" color="textDim" lines={c.builtin ? undefined : 1} mt={2}>
+                      {c.builtin ? t('dlclients.embeddedSub') : c.url}
+                    </Text>
+                  ) : null}
                 </Box>
               </Row>
               <Switch checked={c.enabled} onCheckedChange={(v) => toggle(c, v)} label={c.name} />

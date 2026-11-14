@@ -123,5 +123,6 @@ fn the_pass_reads_one_frame_of_the_stream_it_was_asked_about() {
 
     assert!(joined.contains("-select_streams 2"), "{joined}");
     assert!(joined.contains("-read_intervals %+#1"), "{joined}");
-    assert!(joined.contains("-protocol_whitelist file"), "{joined}");
+    let named: Vec<OsString> = input::file("/media/x.mkv").into();
+    assert!(args(Path::new("/media/x.mkv"), 2).ends_with(&named), "{joined}");
 }

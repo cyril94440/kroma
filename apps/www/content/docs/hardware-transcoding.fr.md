@@ -110,6 +110,17 @@ un problème, définissez `KROMA_HWACCEL` sur `qsv`, `vaapi`, `nvenc`,
 graphiques, `KROMA_RENDER_NODE` choisit celui à utiliser. Consultez la
 [référence de configuration](configuration.md#transcodage).
 
+## Films HDR
+
+Quand KROMA convertit un film HDR pour un écran qui ne sait pas l'afficher, il
+convertit aussi les couleurs en couleurs standard, pour que l'image ne soit ni
+sombre ni grisâtre. Cette étape s'exécute sur le processeur, même quand une puce
+graphique fait le reste, et demande plus de puissance qu'une conversion simple.
+Sur un petit NAS, un film HDR en 4K peut ne pas suivre. Définissez
+`KROMA_TONEMAP` sur `off` pour ignorer cette étape. Les films Dolby Vision
+profil 5 demandent pour cette étape une carte graphique compatible Vulkan ; sans
+elle, ils gardent leurs couleurs d'origine.
+
 ## Sans puce graphique
 
 Sans matériel dédié, KROMA convertit avec le processeur. Cela fonctionne pour du

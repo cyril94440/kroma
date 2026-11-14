@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use kroma_module_sdk::host::{port_reply, run_blocking, HostCtx};
 
+use crate::settings::CacheSettings;
 use crate::{AllDebrid, ClientDef, DATA_DIR};
 
 pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
@@ -24,6 +25,30 @@ pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
             post(reannounce::<S>),
         )
         .route("/_port/tv.kroma.torrents/client/remove", post(remove::<S>))
+        .route("/_port/source/locate", post(locate::<S>))
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct Locating {
+    #[serde(rename = "ref")]
+    reference: String,
+    warm: bool,
+}
+
+async fn locate<S: HostCtx + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+    Json(call): Json<Locating>,
+) -> Json<Result<crate::locate::Located, String>> {
+    port_reply(move || {
+        crate::locate::locate(
+            &host.data_dir().join(DATA_DIR),
+            CacheSettings::read(&host),
+            &call.reference,
+            call.warm,
+        )
+    })
+    .await
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

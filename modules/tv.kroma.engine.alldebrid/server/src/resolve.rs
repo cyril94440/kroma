@@ -1,13 +1,36 @@
+use std::time::Instant;
+
 use anyhow::{anyhow, Result};
 
+use crate::api::{self, Api};
 use crate::cache::Availability;
 use crate::files::{self, Planned};
+use crate::memo;
 use crate::AllDebrid;
+
+/// The files of a ready magnet, flattened and made safe, remembered for a few
+/// minutes.
+pub fn plan_with(api: &Api, magnet: &str) -> Result<Vec<Planned>> {
+    crate::ensure_magnet_id(magnet)?;
+    let key = format!("{}|{magnet}", api.base());
+    if let Some(known) = memo::plans().get(&key, Instant::now()) {
+        return Ok(known);
+    }
+    let listed = api.files(magnet).map_err(|error| {
+        if api::is_unknown_magnet(&error) {
+            anyhow!("this magnet is no longer on AllDebrid")
+        } else {
+            error
+        }
+    })?;
+    let plan = files::flatten(&listed)?;
+    memo::plans().put(key, plan.clone(), Instant::now());
+    Ok(plan)
+}
 
 impl AllDebrid {
     pub fn list_files(&self, magnet: &str) -> Result<Vec<Planned>> {
-        crate::ensure_magnet_id(magnet)?;
-        files::flatten(&self.api.files(magnet)?)
+        plan_with(&self.api, magnet)
     }
 
     fn find(&self, magnet: &str, rel: &str) -> Result<Planned> {

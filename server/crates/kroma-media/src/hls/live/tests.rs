@@ -11,6 +11,7 @@ fn plan(key: &str, mode: StreamMode, accel: HwAccel) -> Plan {
         Pipeline {
             accel,
             effort: Effort::Realtime,
+            tonemap: None,
         },
         Some((3840, 2160)),
         Some(4242),

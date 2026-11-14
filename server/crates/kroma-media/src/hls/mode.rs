@@ -82,13 +82,25 @@ impl VideoMode {
 /// AAC transcode with a loudness filter (night-mode volume leveling for clients
 /// with no local audio DSP, e.g. Tizen AVPlay). A filter always transcodes - a
 /// stream copy cannot be filtered - so the filtered variants subsume `Aac`.
+///
+/// `Eac3` and `Ac3` keep the 5.1 bed of a surround source a client cannot decode
+/// as it is: 640 kbps E-AC-3 or AC-3, for a client that declared the codec. A
+/// source with fewer than five channels is still encoded as stereo AAC, so the
+/// mode is safe to ask for on any track. The loudness variants stay stereo AAC:
+/// their compressor is tuned for a downmix, and they exist for clients that
+/// cannot run one themselves.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AudioMode {
     Copy,
     Aac,
     AacStandard,
     AacNight,
+    Eac3,
+    Ac3,
 }
+
+/// The fewest channels a source has for its surround bed to be worth keeping.
+pub const SURROUND_MIN_CHANNELS: u32 = 5;
 
 impl AudioMode {
     const fn token(self) -> &'static str {
@@ -97,7 +109,13 @@ impl AudioMode {
             Self::Aac => "aac",
             Self::AacStandard => "aac-standard",
             Self::AacNight => "aac-night",
+            Self::Eac3 => "eac3",
+            Self::Ac3 => "ac3",
         }
+    }
+
+    pub(super) const fn label(self) -> &'static str {
+        self.token()
     }
 
     pub(super) fn transcode(self) -> bool {
@@ -108,7 +126,7 @@ impl AudioMode {
     // `audio-filter.ts`) so every engine sounds the same.
     pub(super) fn filter_chain(self) -> Option<&'static str> {
         match self {
-            Self::Copy | Self::Aac => None,
+            Self::Copy | Self::Aac | Self::Eac3 | Self::Ac3 => None,
             Self::AacStandard => {
                 Some("acompressor=threshold=0.063:ratio=4:attack=10:release=250:knee=6:makeup=1.4")
             }
@@ -153,6 +171,8 @@ impl StreamMode {
             "aac" => AudioMode::Aac,
             "aac-standard" => AudioMode::AacStandard,
             "aac-night" => AudioMode::AacNight,
+            "eac3" => AudioMode::Eac3,
+            "ac3" => AudioMode::Ac3,
             _ => return None,
         };
         Some(Self::new(video, audio))
@@ -174,11 +194,13 @@ mod tests {
         VideoMode::H264At(Rung::P1080),
         VideoMode::H264At(Rung::P720),
     ];
-    const AUDIO_MODES: [AudioMode; 4] = [
+    const AUDIO_MODES: [AudioMode; 6] = [
         AudioMode::Copy,
         AudioMode::Aac,
         AudioMode::AacStandard,
         AudioMode::AacNight,
+        AudioMode::Eac3,
+        AudioMode::Ac3,
     ];
 
     #[test]
@@ -201,6 +223,8 @@ mod tests {
             ("aac", AudioMode::Aac),
             ("aac-standard", AudioMode::AacStandard),
             ("aac-night", AudioMode::AacNight),
+            ("eac3", AudioMode::Eac3),
+            ("ac3", AudioMode::Ac3),
         ] {
             assert_eq!(
                 StreamMode::parse(token),
@@ -219,6 +243,30 @@ mod tests {
             StreamMode::new(VideoMode::H264, AudioMode::AacNight).token(),
             "h264-aac-night"
         );
+    }
+
+    #[test]
+    fn the_surround_targets_are_named_after_their_codec_and_carry_the_video_prefix() {
+        assert_eq!(
+            StreamMode::new(VideoMode::Copy, AudioMode::Eac3).token(),
+            "eac3"
+        );
+        assert_eq!(
+            StreamMode::new(VideoMode::H264At(Rung::P1080), AudioMode::Ac3).token(),
+            "h264-1080-ac3"
+        );
+        assert_eq!(
+            StreamMode::parse("h264-720-eac3"),
+            Some(StreamMode::new(VideoMode::H264At(Rung::P720), AudioMode::Eac3))
+        );
+    }
+
+    #[test]
+    fn the_surround_targets_transcode_without_a_loudness_filter() {
+        for mode in [AudioMode::Eac3, AudioMode::Ac3] {
+            assert!(mode.transcode());
+            assert!(mode.filter_chain().is_none());
+        }
     }
 
     #[test]

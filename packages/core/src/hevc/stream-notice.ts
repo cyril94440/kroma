@@ -47,7 +47,10 @@ function audioNotice(track: AudioTrack, caps: PlaybackCapabilities): StreamNotic
       messageVars: { codec, target: DOLBY_NAMES[target] },
     };
   }
-  return { messageKey: atmos ? 'player.atmosAdjusted' : 'player.audioAdjusted', messageVars: { codec } };
+  return {
+    messageKey: atmos ? 'player.atmosAdjusted' : 'player.audioAdjusted',
+    messageVars: { codec },
+  };
 }
 
 function replacedAudioTrack(
@@ -59,7 +62,9 @@ function replacedAudioTrack(
   const forced = [selected, ...audioTracksOf(item)].find(
     (track) =>
       track &&
-      (!track.codec || !canDecodeAudioCodec(track.codec, caps) || !FMP4_COPY_CODECS.has(track.codec)),
+      (!track.codec ||
+        !canDecodeAudioCodec(track.codec, caps) ||
+        !FMP4_COPY_CODECS.has(track.codec)),
   );
   return forced?.codec ? forced : null;
 }
@@ -77,7 +82,9 @@ export function pictureNotice(
   if (outcome.kind !== 'base') return null;
   if (outcome.source === 'hdr10Plus') return { messageKey: 'player.hdr10PlusAsHdr10' };
   if (outcome.as === 'hlg') return { messageKey: 'player.dolbyVisionAsHlg' };
-  return { messageKey: outcome.as === 'sdr' ? 'player.dolbyVisionAsSdr' : 'player.dolbyVisionAsHdr10' };
+  return {
+    messageKey: outcome.as === 'sdr' ? 'player.dolbyVisionAsSdr' : 'player.dolbyVisionAsHdr10',
+  };
 }
 
 /** Every compromise the viewer is owed a word about, picture first. */

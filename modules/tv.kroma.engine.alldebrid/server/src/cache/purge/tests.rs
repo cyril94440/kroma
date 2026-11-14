@@ -13,7 +13,7 @@ fn entry(name: &str, size: u64, last_used: SystemTime) -> Entry {
 }
 
 fn limits(max_bytes: u64, days: u64) -> Limits {
-    Limits { max_bytes, max_age: DAY * days as u32 }
+    Limits { max_bytes: (max_bytes > 0).then_some(max_bytes), max_age: DAY * days as u32 }
 }
 
 fn names(paths: Vec<PathBuf>) -> Vec<String> {
@@ -107,4 +107,13 @@ fn purging_a_folder_deletes_the_victims_and_the_directories_they_emptied() {
     assert!(root.join("7/keep/b.mkv").exists());
     assert!(root.join("8/c.mkv.part").exists());
     assert!(root.exists());
+}
+
+#[test]
+fn a_budget_of_nothing_evicts_everything_that_is_not_in_use() {
+    let now = SystemTime::now();
+    let all = [entry("a", 1, at(now, DAY)), entry("busy", 1, at(now, Duration::from_secs(5)))];
+    let none = Limits { max_bytes: Some(0), max_age: Duration::ZERO };
+
+    assert_eq!(names(victims(&all, now, none, &HashSet::new())), ["a"]);
 }

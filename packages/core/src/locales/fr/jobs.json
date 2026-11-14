@@ -13,6 +13,8 @@
   "jobs.acquisition.rss.name": "Synchronisation RSS",
   "jobs.acquisition.search.desc": "Cherche sur les indexeurs ce qui manque aux titres suivis, puis de meilleures versions de ce qu'ils ont, et lance les téléchargements.",
   "jobs.acquisition.search.name": "Recherche des manquants et des améliorations",
+  "jobs.alldebrid.cache.desc": "Supprime du cache local les fichiers streamés depuis AllDebrid lorsqu'ils restent inutilisés trop longtemps ou que le cache dépasse sa limite.",
+  "jobs.alldebrid.cache.name": "Cache de streaming",
   "jobs.cache.cleanup.desc": "Vide le cache de transcodage HLS (régénéré à la lecture) et limite le cache d'affiches à la taille configurée (plus anciennes supprimées d'abord).",
   "jobs.cache.cleanup.name": "Nettoyage du cache",
   "jobs.cancel": "Annuler",

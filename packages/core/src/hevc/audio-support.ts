@@ -32,9 +32,7 @@ export const FMP4_COPY_CODECS = new Set<string>(['aac', 'ac3', 'eac3']);
 /** The track a title plays first: the one asked for, else the file's own default. */
 export function selectedAudioTrack(item: MediaItem, audioIndex?: number): AudioTrack | undefined {
   const tracks = audioTracksOf(item);
-  return (
-    tracks.find((t) => t.index === audioIndex) ?? tracks.find((t) => t.default) ?? tracks[0]
-  );
+  return tracks.find((t) => t.index === audioIndex) ?? tracks.find((t) => t.default) ?? tracks[0];
 }
 
 /** Whether the track a title plays first is one this device decodes, so direct
@@ -89,7 +87,9 @@ export function surroundTargetFor(
 }
 
 function copyable(track: AudioTrack, caps: PlaybackCapabilities): boolean {
-  return !!track.codec && canDecodeAudioCodec(track.codec, caps) && FMP4_COPY_CODECS.has(track.codec);
+  return (
+    !!track.codec && canDecodeAudioCodec(track.codec, caps) && FMP4_COPY_CODECS.has(track.codec)
+  );
 }
 
 /**
@@ -107,7 +107,10 @@ export function masterNeedsAac(
   const tracks = audioTracksOf(item);
   if (tracks.length === 0) return true;
   return !tracks.every(
-    (t) => !!t.codec && t.codec !== UNNAMED_CODEC && (copyable(t, caps) || surroundTargetFor(t, caps) !== null),
+    (t) =>
+      !!t.codec &&
+      t.codec !== UNNAMED_CODEC &&
+      (copyable(t, caps) || surroundTargetFor(t, caps) !== null),
   );
 }
 

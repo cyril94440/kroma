@@ -8,6 +8,7 @@ use kroma_module_sdk::host::HostCtx;
 use kroma_module_sdk::primitives::external_subtitles::beside;
 
 use super::place::{place, Placement};
+use super::remote::named;
 
 /// Place `src` in the library, then every subtitle file beside it, renamed to
 /// the stem the video landed under so the catalogue matches the two again.
@@ -38,7 +39,8 @@ fn subtitles_beside(
         return 0;
     };
     let folder = at.parent().unwrap_or_else(|| Path::new("."));
-    beside(src, around)
+    let around: Vec<PathBuf> = around.iter().map(|path| named(path)).collect();
+    beside(&named(src), &around)
         .iter()
         .filter(|found| {
             let to = folder.join(found.named_after(stem));

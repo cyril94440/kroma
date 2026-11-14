@@ -7,7 +7,7 @@ use axum::response::Response;
 use kroma_module_wire::{AudioStream, VideoStream};
 use serde::Deserialize;
 
-use crate::hls::{Asked, HlsEngine, Refusal, StreamMode};
+use crate::hls::{Asked, HlsEngine, Refusal, StreamMode, ToneMap};
 use crate::json_error::json_error;
 use crate::stream::metered_body;
 use crate::{playlist, ByteMeter, Credential};
@@ -19,11 +19,16 @@ use crate::{playlist, ByteMeter, Credential};
 /// Absent means no declared capability (the requested mode is trusted); present
 /// but empty means the client decodes none, so any copied stream is transcoded.
 /// `maxw` / `maxh` are the largest picture its decoder accepts, both axes, and
-/// absent leaves the source's own size standing.
+/// absent leaves the source's own size standing. `hdr` names the dynamic-range
+/// formats its display shows, from `hdr10`, `hdr10plus`, `hlg` and `dv`: absent
+/// means undeclared (the requested mode is trusted), present but empty means
+/// SDR only, so an HDR source is tone-mapped down and a Dolby Vision profile 5
+/// stream is never sent to a client without `dv`.
 #[derive(Debug, Default, Deserialize)]
 pub struct ClientDecoders {
     pub copy: Option<String>,
     pub video: Option<String>,
+    pub hdr: Option<String>,
     pub maxw: Option<u32>,
     pub maxh: Option<u32>,
 }
@@ -52,6 +57,10 @@ impl Program<'_> {
         self.video.and_then(|v| v.width.zip(v.height))
     }
 
+    fn track(&self, audio: u32) -> Option<&AudioStream> {
+        self.audio_tracks.iter().find(|t| t.index == audio)
+    }
+
     /// The mode whose picture and sound will actually play on the client, for the
     /// `audio`-th track. Both axes are resolved before a caller compares it with
     /// the asked mode, so one answer settles them together.
@@ -61,18 +70,23 @@ impl Program<'_> {
         audio: u32,
         declared: &ClientDecoders,
     ) -> StreamMode {
-        let selected_codec = self
-            .audio_tracks
-            .iter()
-            .find(|t| t.index == audio)
-            .map(|t| t.codec.as_str());
-        mode.for_client_audio(selected_codec, declared.copy.as_deref())
-            .for_client_video(
-                self.video.map(|v| v.codec.as_str()),
-                self.video.and_then(|v| v.bit_depth),
-                declared.video.as_deref(),
-            )
-            .for_client_frame(self.frame(), declared.maxw.zip(declared.maxh))
+        let selected = self.track(audio);
+        mode.for_client_track(
+            selected.map(|t| t.codec.as_str()),
+            selected.and_then(|t| t.channels),
+            declared.copy.as_deref(),
+        )
+        .for_client_video(
+            self.video.map(|v| v.codec.as_str()),
+            self.video.and_then(|v| v.bit_depth),
+            declared.video.as_deref(),
+        )
+        .for_client_hdr(
+            self.video,
+            declared.hdr.as_deref(),
+            declared.hdr.is_some() && self.video.is_some_and(|v| ToneMap::for_video(v).is_some()),
+        )
+        .for_client_frame(self.frame(), declared.maxw.zip(declared.maxh))
     }
 
     /// The media playlist of `session`, starting it over the file when none
@@ -104,6 +118,8 @@ impl Program<'_> {
                 mode,
                 anchor,
                 source: self.frame(),
+                video: self.video,
+                track: self.track(audio),
             })
             .await?;
         let body = playlist::with_credential(&body, credential);

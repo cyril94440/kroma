@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Req {
+    #[allow(dead_code)]
     pub method: String,
     pub path: String,
     pub query: HashMap<String, String>,
@@ -180,24 +181,64 @@ pub(crate) fn scripted(
     files: Vec<(&'static str, Vec<u8>)>,
     honour_range: bool,
 ) -> Fake {
-    let files: HashMap<&'static str, Vec<u8>> = files.into_iter().collect();
-    Fake::start(move |req| match req.path.as_str() {
-        "/v4/magnet/files" => Resp::data(json!({ "magnets": [{ "id": "7", "files": tree }] })),
-        "/v4/link/unlock" => {
-            let link = req.query.get("link").cloned().unwrap_or_default();
-            let name = link.rsplit('/').next().unwrap_or_default().to_string();
-            match files.get(name.as_str()) {
-                Some(body) => Resp::data(json!({
-                    "link": format!("http://{}/dl/{name}", host_of(req)),
-                    "filesize": body.len(),
-                })),
-                None => Resp::failure("LINK_DOWN", "gone"),
-            }
+    Script::new(tree, files, honour_range).start()
+}
+
+pub(crate) struct Script {
+    tree: Value,
+    files: HashMap<&'static str, Vec<u8>>,
+    honour_range: bool,
+    pub status_code: Arc<std::sync::atomic::AtomicU8>,
+    pub valid_key: Arc<Mutex<Option<String>>>,
+}
+
+impl Script {
+    pub(crate) fn new(tree: Value, files: Vec<(&'static str, Vec<u8>)>, honour_range: bool) -> Self {
+        Self {
+            tree,
+            files: files.into_iter().collect(),
+            honour_range,
+            status_code: Arc::new(std::sync::atomic::AtomicU8::new(4)),
+            valid_key: Arc::new(Mutex::new(None)),
         }
-        path if path.starts_with("/dl/") => match files.get(&path[4..]) {
-            Some(body) => Resp::bytes(req, body, honour_range),
-            None => Resp::raw(404, Vec::new()),
-        },
-        _ => Resp::failure("NOPE", "unexpected call"),
-    })
+    }
+
+    pub(crate) fn start(self) -> Fake {
+        let Script { tree, files, honour_range, status_code, valid_key } = self;
+        Fake::start(move |req| {
+            let path = req.path.as_str();
+            if let Some(name) = path.strip_prefix("/dl/") {
+                return match files.get(name) {
+                    Some(body) => Resp::bytes(req, body, honour_range),
+                    None => Resp::raw(404, Vec::new()),
+                };
+            }
+            let wanted = valid_key.lock().unwrap().clone();
+            let sent = req.headers.get("authorization").map(String::as_str).unwrap_or_default();
+            if wanted.is_some_and(|key| sent != format!("Bearer {key}")) {
+                return Resp::failure("AUTH_BAD_APIKEY", "The apikey is invalid");
+            }
+            match path {
+                "/v4.1/magnet/status" => Resp::data(json!({ "magnets": [{
+                    "id": 7, "filename": "Pack", "size": files.values().map(Vec::len).sum::<usize>(),
+                    "status": "s", "statusCode": status_code.load(std::sync::atomic::Ordering::SeqCst),
+                    "downloaded": 0, "downloadSpeed": 0, "seeders": 0 }] })),
+                "/v4/magnet/files" => Resp::data(json!({ "magnets": [{ "id": "7", "files": tree }] })),
+                "/v4/user" => Resp::data(json!({ "user": { "username": "neo", "isPremium": true } })),
+                "/v4/magnet/delete" => Resp::data(json!({ "message": "deleted" })),
+                "/v4/link/unlock" => {
+                    let link = req.query.get("link").cloned().unwrap_or_default();
+                    let name = link.rsplit('/').next().unwrap_or_default().to_string();
+                    match files.get(name.as_str()) {
+                        Some(body) => Resp::data(json!({
+                            "link": format!("http://{}/dl/{name}", host_of(req)),
+                            "filesize": body.len(),
+                        })),
+                        None => Resp::failure("LINK_DOWN", "gone"),
+                    }
+                }
+                _ => Resp::failure("NOPE", "unexpected call"),
+            }
+        })
+    }
 }

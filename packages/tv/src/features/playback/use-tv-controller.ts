@@ -63,10 +63,17 @@ export function useTvController(
   const qualities = useMemo(() => {
     const badge = pictureBadge(item.video);
     const badgeSuffix = badge ? ` · ${badge}` : '';
-    const note = streamNotices(item, pb.playbackMode, surfaceCapabilities(pb.surface), pb.audioIndex)
+    const note = streamNotices(
+      item,
+      pb.playbackMode,
+      surfaceCapabilities(pb.surface),
+      pb.audioIndex,
+    )
       .map((n) => t(n.messageKey, n.messageVars))
       .join(' · ');
-    return [{ id: 'auto', label: `${t('player.qualityAuto')}${badgeSuffix}`, note: note || undefined }];
+    return [
+      { id: 'auto', label: `${t('player.qualityAuto')}${badgeSuffix}`, note: note || undefined },
+    ];
   }, [item, pb.playbackMode, pb.surface, pb.audioIndex, t]);
 
   // Only what this build actually compiled in: an engine the shell has no native

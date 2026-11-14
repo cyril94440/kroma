@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use axum::body::to_bytes;
-use kroma_module_wire::{AudioStream, VideoStream};
+use kroma_module_wire::{AudioStream, HdrFormat, VideoStream};
 
 use super::*;
 use crate::hls::{AudioMode, Rung, VideoMode};
@@ -26,10 +26,14 @@ fn video(codec: &str, width: u32, height: u32, bit_depth: Option<u32>) -> VideoS
 }
 
 fn audio(index: u32, codec: &str) -> AudioStream {
+    surround(index, codec, 2)
+}
+
+fn surround(index: u32, codec: &str, channels: u32) -> AudioStream {
     AudioStream {
         index,
         codec: codec.into(),
-        channels: Some(2),
+        channels: Some(channels),
         language: Some("eng".into()),
         title: None,
         default: index == 0,
@@ -66,6 +70,56 @@ fn a_client_that_declares_nothing_is_served_the_mode_it_asked_for() {
     let mode = program(Some(&hevc), &tracks).effective_mode(COPY, 0, &ClientDecoders::default());
 
     assert_eq!(mode, COPY);
+}
+
+#[test]
+fn a_client_that_declares_no_hdr_formats_is_never_sent_to_a_re_encode_for_its_picture() {
+    let tracks = [audio(0, "aac")];
+    let mut dolby = video("hevc", 3840, 2160, Some(10));
+    dolby.hdr = true;
+    dolby.hdr_format = Some(HdrFormat::DolbyVision);
+    dolby.dolby_vision_profile = Some(5);
+    dolby.dolby_vision_compatibility = Some(0);
+    let declared = ClientDecoders {
+        copy: Some("aac".into()),
+        video: Some("hevc".into()),
+        ..Default::default()
+    };
+
+    let mode = program(Some(&dolby), &tracks).effective_mode(COPY, 0, &declared);
+
+    assert_eq!(mode, COPY);
+}
+
+#[test]
+fn a_surround_track_the_device_cannot_decode_keeps_its_bed_where_it_declares_eac3() {
+    let tracks = [surround(0, "truehd", 8), surround(1, "dts", 2)];
+    let h264 = video("h264", 1920, 1080, Some(8));
+    let declared = ClientDecoders {
+        copy: Some("aac,eac3".into()),
+        ..Default::default()
+    };
+
+    let surround = program(Some(&h264), &tracks).effective_mode(COPY, 0, &declared);
+    let stereo = program(Some(&h264), &tracks).effective_mode(COPY, 1, &declared);
+
+    assert_eq!(surround.audio, AudioMode::Eac3);
+    assert_eq!(stereo.audio, AudioMode::Aac);
+}
+
+#[test]
+fn the_mode_a_surround_redirect_names_resolves_to_itself_with_no_query() {
+    let tracks = [surround(0, "truehd", 8)];
+    let h264 = video("h264", 1920, 1080, Some(8));
+    let redirected = StreamMode::new(VideoMode::Copy, AudioMode::Eac3);
+
+    let mode = program(Some(&h264), &tracks).effective_mode(
+        redirected,
+        0,
+        &ClientDecoders::default(),
+    );
+
+    assert_eq!(mode, redirected);
 }
 
 #[test]

@@ -58,7 +58,7 @@ async fn a_status_that_could_not_be_asked_is_a_bad_gateway_not_a_vanished_magnet
 async fn status_answers_null_for_a_forgotten_magnet_and_the_pinned_keys_otherwise() {
     let fake = Fake::start(|req| match req.query["id"].as_str() {
         "1" => Resp::failure("MAGNET_INVALID_ID", "gone"),
-        _ => Resp::data(json!({ "magnets": [{ "id": 2, "filename": "n", "size": 10, "statusCode": 4 }] })),
+        _ => Resp::data(json!({ "magnets": [{ "id": 2, "filename": "n", "size": 10, "statusCode": 1 }] })),
     });
     let client = json!({ "url": fake.base, "password": "k" });
 
@@ -76,7 +76,7 @@ async fn status_answers_null_for_a_forgotten_magnet_and_the_pinned_keys_otherwis
             "size_bytes", "state", "up_bps"
         ]
     );
-    assert_eq!(found["state"], "completed");
+    assert_eq!(found["state"], "downloading");
 }
 
 #[tokio::test]

@@ -1,3 +1,5 @@
+use kroma_module_wire::{HdrFormat, VideoStream};
+
 use super::*;
 
 const fn copy() -> StreamMode {
@@ -264,5 +266,180 @@ fn a_video_declaration_alone_never_moves_the_audio_axis() {
     assert_eq!(
         copy().for_client_audio(Some("dts"), Some("aac")).video,
         VideoMode::Copy
+    );
+}
+
+fn hdr_video(
+    format: Option<HdrFormat>,
+    profile: Option<u32>,
+    compatibility: Option<u8>,
+) -> VideoStream {
+    VideoStream {
+        codec: "hevc".into(),
+        width: Some(3840),
+        height: Some(2160),
+        hdr: format.is_some(),
+        bit_depth: Some(10),
+        hdr_format: format,
+        dolby_vision_profile: profile,
+        dolby_vision_level: None,
+        dolby_vision_compatibility: compatibility,
+        dolby_vision_enhancement_layer: false,
+        color: None,
+    }
+}
+
+fn hdr(video: &VideoStream, shows: Option<&str>, can_tone_map: bool) -> VideoMode {
+    copy().for_client_hdr(Some(video), shows, can_tone_map).video
+}
+
+const HDR10: fn() -> VideoStream = || hdr_video(Some(HdrFormat::Hdr10), None, None);
+const HLG: fn() -> VideoStream = || hdr_video(Some(HdrFormat::Hlg), None, None);
+const PROFILE_5: fn() -> VideoStream = || hdr_video(Some(HdrFormat::DolbyVision), Some(5), Some(0));
+const PROFILE_8_1: fn() -> VideoStream =
+    || hdr_video(Some(HdrFormat::DolbyVision), Some(8), Some(1));
+const PROFILE_8_2: fn() -> VideoStream =
+    || hdr_video(Some(HdrFormat::DolbyVision), Some(8), Some(2));
+
+#[test]
+fn a_client_that_declares_no_hdr_formats_keeps_every_copy_it_asked_for() {
+    for video in [HDR10(), HLG(), PROFILE_5(), PROFILE_8_1()] {
+        assert_eq!(hdr(&video, None, true), VideoMode::Copy);
+    }
+}
+
+#[test]
+fn an_sdr_only_client_gets_every_hdr_source_re_encoded() {
+    for video in [HDR10(), HLG(), PROFILE_5(), PROFILE_8_1()] {
+        assert_eq!(hdr(&video, Some(""), true), VideoMode::H264);
+    }
+}
+
+#[test]
+fn an_sdr_source_and_an_sdr_compatible_dolby_vision_one_are_never_re_encoded_for_hdr() {
+    let sdr = hdr_video(None, None, None);
+
+    assert_eq!(hdr(&sdr, Some(""), true), VideoMode::Copy);
+    assert_eq!(hdr(&PROFILE_8_2(), Some(""), true), VideoMode::Copy);
+}
+
+#[test]
+fn profile_5_is_sent_only_to_a_client_that_declares_dolby_vision() {
+    assert_eq!(hdr(&PROFILE_5(), Some("hdr10,hlg"), true), VideoMode::H264);
+    assert_eq!(hdr(&PROFILE_5(), Some("hdr10,dv"), true), VideoMode::Copy);
+}
+
+#[test]
+fn a_dolby_vision_stream_with_a_hdr10_base_plays_as_hdr10_without_dv() {
+    assert_eq!(hdr(&PROFILE_8_1(), Some("hdr10"), true), VideoMode::Copy);
+    assert_eq!(hdr(&PROFILE_8_1(), Some("hlg"), true), VideoMode::H264);
+    assert_eq!(hdr(&PROFILE_8_1(), Some("dv"), true), VideoMode::Copy);
+}
+
+#[test]
+fn a_dolby_vision_stream_with_an_hlg_base_plays_as_hlg_without_dv() {
+    let profile_8_4 = hdr_video(Some(HdrFormat::DolbyVision), Some(8), Some(4));
+
+    assert_eq!(hdr(&profile_8_4, Some("hlg"), true), VideoMode::Copy);
+    assert_eq!(hdr(&profile_8_4, Some("hdr10"), true), VideoMode::H264);
+}
+
+#[test]
+fn hdr10_plus_plays_on_a_client_that_only_declares_hdr10() {
+    let plus = hdr_video(Some(HdrFormat::Hdr10Plus), None, None);
+
+    assert_eq!(hdr(&plus, Some("hdr10"), true), VideoMode::Copy);
+    assert_eq!(hdr(&plus, Some("hlg"), true), VideoMode::H264);
+}
+
+#[test]
+fn each_format_needs_its_own_declaration() {
+    assert_eq!(hdr(&HDR10(), Some("hlg,dv"), true), VideoMode::H264);
+    assert_eq!(hdr(&HLG(), Some("hdr10,dv"), true), VideoMode::H264);
+    assert_eq!(hdr(&HDR10(), Some(" HDR10 , hlg"), true), VideoMode::Copy);
+}
+
+#[test]
+fn no_re_encode_is_ordered_where_it_could_not_come_out_in_sdr() {
+    for video in [HDR10(), PROFILE_5()] {
+        assert_eq!(hdr(&video, Some(""), false), VideoMode::Copy);
+    }
+}
+
+#[test]
+fn only_a_copy_is_overridden_for_hdr() {
+    let rung = StreamMode::new(VideoMode::H264At(Rung::P720), AudioMode::Aac);
+
+    assert_eq!(rung.for_client_hdr(Some(&HDR10()), Some(""), true), rung);
+    assert_eq!(
+        re_encoded().for_client_hdr(Some(&HDR10()), Some(""), true),
+        re_encoded()
+    );
+    assert_eq!(copy().for_client_hdr(None, Some(""), true), copy());
+}
+
+fn surround(codec: &str, channels: u32, set: &str) -> AudioMode {
+    copy()
+        .for_client_track(Some(codec), Some(channels), Some(set))
+        .audio
+}
+
+#[test]
+fn an_undecodable_surround_track_keeps_its_bed_as_eac3_when_the_client_declares_it() {
+    assert_eq!(surround("truehd", 8, "aac,eac3"), AudioMode::Eac3);
+    assert_eq!(surround("dts", 6, "aac,ac3,eac3"), AudioMode::Eac3);
+    assert_eq!(surround("flac", 6, "eac3"), AudioMode::Eac3);
+}
+
+#[test]
+fn it_falls_back_on_ac3_when_that_is_the_only_dolby_codec_declared() {
+    assert_eq!(surround("dts", 6, "aac,ac3"), AudioMode::Ac3);
+}
+
+#[test]
+fn it_falls_back_on_stereo_aac_when_the_client_declares_neither() {
+    assert_eq!(surround("dts", 6, "aac"), AudioMode::Aac);
+    assert_eq!(surround("dts", 6, ""), AudioMode::Aac);
+}
+
+#[test]
+fn a_stereo_or_unprobed_track_is_never_upmixed_into_surround() {
+    assert_eq!(surround("flac", 2, "aac,eac3"), AudioMode::Aac);
+    assert_eq!(surround("dts", 1, "eac3"), AudioMode::Aac);
+    assert_eq!(
+        copy()
+            .for_client_track(Some("dts"), None, Some("eac3"))
+            .audio,
+        AudioMode::Aac
+    );
+}
+
+#[test]
+fn a_codec_the_client_declares_is_copied_whatever_its_channel_count() {
+    assert_eq!(surround("eac3", 6, "aac,eac3"), AudioMode::Copy);
+    assert_eq!(surround("truehd", 8, "truehd,eac3"), AudioMode::Copy);
+}
+
+#[test]
+fn the_older_audio_entry_point_still_means_stereo_aac() {
+    assert_eq!(
+        copy()
+            .for_client_audio(Some("dts"), Some("aac,eac3"))
+            .audio,
+        AudioMode::Aac
+    );
+}
+
+#[test]
+fn only_a_copy_request_is_turned_into_a_surround_transcode() {
+    let night = audio(AudioMode::AacNight);
+
+    assert_eq!(
+        night.for_client_track(Some("dts"), Some(6), Some("aac,eac3")),
+        night
+    );
+    assert_eq!(
+        audio(AudioMode::Eac3).for_client_track(Some("dts"), Some(6), Some("aac")),
+        audio(AudioMode::Eac3)
     );
 }

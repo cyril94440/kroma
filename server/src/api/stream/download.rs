@@ -7,6 +7,7 @@ use axum::body::Body;
 use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
+use kroma_media::hls::ToneMap;
 use kroma_media::input;
 use serde::Deserialize;
 
@@ -19,9 +20,11 @@ use crate::state::SharedState;
 use tokio::io::AsyncReadExt;
 
 mod audio_args;
+mod video_args;
 
 use super::byte_sink;
 use audio_args::download_audio_args;
+use video_args::video_args;
 
 /// `?copy=` and `?video=` name codecs the client decodes natively. Absent means
 /// the default (`copy` → `aac,ac3,eac3`; `video` → stream-copy the source);
@@ -75,20 +78,8 @@ pub async fn download_item(
     cmd.args(["-v", "error", "-nostdin"])
         .args(input::file(&abs))
         .args(["-map", "0:v:0"]);
-    if video_copy {
-        cmd.args(["-c:v", "copy"]);
-        if source_video == Some("hevc") {
-            // Apple decoders require the `hvc1` sample-entry tag; stream-copied
-            // HEVC defaults to `hev1`, which plays AUDIO ONLY on iOS local files.
-            cmd.args(["-tag:v", "hvc1"]);
-        }
-    } else {
-        // H.264 8-bit because every download target decodes it; offline has no
-        // fallback. HDR sources are not tone-mapped (no zimg) and read washed-out.
-        cmd.args([
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
-        ]);
-    }
+    let tone_map = item.video.as_ref().and_then(ToneMap::for_video);
+    cmd.args(video_args(item.video.as_ref(), video_copy, tone_map));
     cmd.args(download_audio_args(
         &item.audio_tracks,
         item.audio.as_ref().map(|a| a.codec.as_str()),

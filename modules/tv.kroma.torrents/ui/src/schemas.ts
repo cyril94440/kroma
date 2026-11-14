@@ -11,7 +11,8 @@ export const DownloadClientId = brandedId('DownloadClientId');
 export type DownloadClientId = z.infer<typeof DownloadClientId>;
 
 /** One configured download client (password write-only). `kind` is an open
- * string on the wire (`rqbit` | `transmission` | `qbittorrent`). */
+ * string on the wire: `rqbit`, or the instance id of an engine module. `url`
+ * is empty for an engine that declares none. */
 export const DownloadClientView = z.object({
   id: DownloadClientId,
   kind: z.string(),

@@ -1,10 +1,10 @@
-// Edit modal for an existing external download client (Transmission RPC or
-// qBittorrent WebUI). The kind is fixed once a client exists, so this is edit-only
-// (name / URL / credentials); adding a client goes through the generic
-// add-engine dialog, driven by the enabled download-client engines. The embedded
-// engine has no form (configured from the Acquisition settings page).
+// Edit modal for an existing external download client. The kind is fixed once a
+// client exists, so this is edit-only (name / URL / credentials, only the ones
+// its engine declares); adding a client goes through the generic add-engine
+// dialog, driven by the enabled download-client engines. The embedded engine has
+// no form (configured from the Acquisition settings page).
 
-import { apiErrorText, useAsyncAction, useT } from '@kromatv/module-sdk';
+import { apiErrorText, useAsyncAction, useEnabledEngines, useT } from '@kromatv/module-sdk';
 import { Box, Button, Dialog, Field, Text } from '@kromatv/ui/kit';
 import { useState } from 'react';
 import { createCallable } from 'react-call';
@@ -22,6 +22,12 @@ export const DownloadClientModal = createCallable<
   const [url, setUrl] = useState(client.url);
   const [username, setUsername] = useState(client.username);
   const [password, setPassword] = useState('');
+  const declared = useEnabledEngines('tv.kroma.torrents/client').find((e) => e.id === client.kind)
+    ?.fields;
+  const field = (key: string) => declared?.find((f) => f.key === key);
+  const shows = (key: string) => declared === undefined || field(key) !== undefined;
+  const urlRequired = declared === undefined || field('url')?.required === true;
+  const passwordLabel = field('password')?.label ?? 'dlclients.password';
 
   const save = () =>
     run(
@@ -55,18 +61,22 @@ export const DownloadClientModal = createCallable<
       <Field.Root label={t('dlclients.name')} value={name} onValueChange={setName}>
         <Field.Input placeholder={client.kind} />
       </Field.Root>
-      <Field.Root label={t('dlclients.url')} value={url} onValueChange={setUrl}>
-        <Field.Hint>{t('dlclients.urlHint')}</Field.Hint>
-      </Field.Root>
+      {shows('url') ? (
+        <Field.Root label={t('dlclients.url')} value={url} onValueChange={setUrl}>
+          <Field.Hint>{t('dlclients.urlHint')}</Field.Hint>
+        </Field.Root>
+      ) : null}
       <Box row={{ base: false, md: true }} gap={16}>
+        {shows('username') ? (
+          <Field.Root
+            label={t('dlclients.username')}
+            value={username}
+            onValueChange={setUsername}
+            flex={{ base: 0, md: 1 }}
+          />
+        ) : null}
         <Field.Root
-          label={t('dlclients.username')}
-          value={username}
-          onValueChange={setUsername}
-          flex={{ base: 0, md: 1 }}
-        />
-        <Field.Root
-          label={t('dlclients.password')}
+          label={t(passwordLabel)}
           value={password}
           onValueChange={setPassword}
           flex={{ base: 0, md: 1 }}
@@ -86,7 +96,7 @@ export const DownloadClientModal = createCallable<
         onConfirm={save}
         confirmLabel={busy ? t('common.saving') : t('common.save')}
         busy={busy}
-        disabled={!url.trim()}
+        disabled={urlRequired && !url.trim()}
       >
         {client.builtin ? null : (
           <Button

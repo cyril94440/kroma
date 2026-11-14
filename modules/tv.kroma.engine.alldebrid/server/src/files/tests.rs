@@ -51,7 +51,7 @@ fn a_parent_directory_component_cannot_climb_out() {
 fn separators_and_absolute_names_are_neutralised() {
     let tree = [file("/etc/passwd", 1), file("..\\..\\boot.ini", 1), file("a/../b", 1)];
 
-    assert_eq!(rels(&tree), ["_etc_passwd", "_.._boot.ini", "a_.._b"]);
+    assert_eq!(rels(&tree), ["_etc_passwd", ".._.._boot.ini", "a_.._b"]);
 }
 
 #[test]
@@ -111,4 +111,14 @@ fn a_tree_nested_past_the_limit_is_refused() {
     }
 
     assert!(flatten(&tree).is_err());
+}
+
+#[test]
+fn files_are_told_apart_by_what_the_library_will_do_with_them() {
+    assert_eq!(kind_of("a/b.MKV"), Kind::Video);
+    assert_eq!(kind_of("b.srt"), Kind::Subtitle);
+    assert_eq!(kind_of("b.WebVTT"), Kind::Subtitle);
+    assert_eq!(kind_of("b.sub"), Kind::Other);
+    assert_eq!(kind_of("b.nfo"), Kind::Other);
+    assert_eq!(kind_of("mkv"), Kind::Other);
 }

@@ -11,6 +11,29 @@ const MAX_DEPTH: usize = 16;
 const MAX_FILES: usize = 5_000;
 const MAX_NAME_BYTES: usize = 200;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    Video,
+    Subtitle,
+    Other,
+}
+
+const SUBTITLE_EXTENSIONS: &[&str] = &["srt", "ass", "ssa", "vtt", "webvtt"];
+
+pub fn kind_of(rel: &str) -> Kind {
+    let Some((_, extension)) = rel.rsplit_once('.') else {
+        return Kind::Other;
+    };
+    let extension = extension.to_ascii_lowercase();
+    if kroma_module_sdk::primitives::video::VIDEO_EXTENSIONS.contains(&extension.as_str()) {
+        Kind::Video
+    } else if SUBTITLE_EXTENSIONS.contains(&extension.as_str()) {
+        Kind::Subtitle
+    } else {
+        Kind::Other
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Planned {
     pub rel: String,

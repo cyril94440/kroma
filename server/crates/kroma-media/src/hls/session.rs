@@ -21,12 +21,14 @@ use tracing::{info, warn};
 use super::admission::{max_live_transcodes, Refusal};
 use super::Asked;
 use super::covered::Serving;
+use super::args::Spec;
 use super::ffmpeg::{detect_burst, keyframe_before, spawn_stream};
 use super::hwaccel::Pipeline;
 use super::live::Plan;
 use super::naming::{contains, content_type, is_safe_name, seg_index, session_dir};
+use super::tonemap::ToneMap;
 use super::window::Window;
-use super::{StreamMode, VideoMode};
+use super::VideoMode;
 use crate::ffmpeg_gate;
 
 const FILE_WAIT: Duration = Duration::from_secs(20);
@@ -204,9 +206,17 @@ impl Sessions {
         // Off the reactor: the first call makes every candidate device encode a
         // test frame, and this one runs inside the request that starts a session.
         let target = mode.video.box_size();
-        let pipeline = tokio::task::spawn_blocking(move || Pipeline::choose(source, target))
+        let tone = asked
+            .video
+            .filter(|_| !matches!(mode.video, VideoMode::Copy))
+            .cloned();
+        let choose = move || {
+            let tonemap = tone.as_ref().and_then(ToneMap::for_video);
+            Pipeline::choose(source, target, tonemap)
+        };
+        let pipeline = tokio::task::spawn_blocking(choose.clone())
             .await
-            .unwrap_or_else(|_| Pipeline::choose(source, target));
+            .unwrap_or_else(|_| choose());
         // The one case worth taking the box away from background work: no device,
         // and a picture that has to be rebuilt frame by frame while someone waits.
         let on_the_cpu = pipeline.on_the_cpu() && !matches!(mode.video, VideoMode::Copy);
@@ -224,7 +234,17 @@ impl Sessions {
         let dir = self.root.join(session_dir(key));
         super::reclaim::discard_dir(&dir);
         let child = match self
-            .spawn_into(&dir, input, audio, mode, start_secs, pipeline)
+            .spawn_into(Spec {
+                input,
+                dir: &dir,
+                audio,
+                mode,
+                start_secs,
+                burst: self.burst,
+                pipeline,
+                video: asked.video,
+                track: asked.track,
+            })
             .await
         {
             Ok(child) => child,
@@ -249,17 +269,9 @@ impl Sessions {
         Ok(session)
     }
 
-    async fn spawn_into(
-        &self,
-        dir: &Path,
-        input: &Path,
-        audio: u32,
-        mode: StreamMode,
-        start_secs: f64,
-        pipeline: Pipeline,
-    ) -> std::io::Result<Child> {
-        tokio::fs::create_dir_all(dir).await?;
-        spawn_stream(input, dir, audio, mode, start_secs, self.burst, pipeline)
+    async fn spawn_into(&self, spec: Spec<'_>) -> std::io::Result<Child> {
+        tokio::fs::create_dir_all(spec.dir).await?;
+        spawn_stream(&spec)
     }
 
     async fn retire_superseded(&self, key: &str, opener: Option<&str>) -> bool {

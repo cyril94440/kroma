@@ -12,7 +12,12 @@ import type { KromaClient } from '@kromatv/client';
 import { MediaItem } from '@kromatv/client/media';
 import * as FileSystem from 'expo-file-system/legacy';
 import { z } from 'zod';
-import { canRawDownload, downloadCopyCodecs, mobileHdr, mobileVideoCodecs } from '#mobile/player/caps';
+import {
+  canRawDownload,
+  downloadCopyCodecs,
+  mobileHdr,
+  mobileVideoCodecs,
+} from '#mobile/player/caps';
 import { fetchSidecars } from './sidecars';
 import { type DownloadEntry, ensureDir, mediaPath } from './store';
 

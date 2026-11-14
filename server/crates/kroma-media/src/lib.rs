@@ -16,6 +16,7 @@ pub mod probe;
 pub mod program;
 pub mod storyboard;
 pub mod stream;
+pub mod stream_copy;
 pub mod subtitles;
 pub mod tmp_file;
 pub mod video;

@@ -21,10 +21,11 @@ import {
   downloadCopyCodecs,
   IOS_CAPS,
   mobileCaps,
+  mobileHdr,
   mobileVideoCodecs,
 } from './caps';
 
-type Track = { codec: string; default?: boolean };
+type Track = { codec: string; default?: boolean; channels?: number };
 interface Over {
   container?: string;
   video?: { codec: string; bitDepth?: number };
@@ -60,10 +61,9 @@ describe('the capability tables', () => {
     expect(ANDROID_CAPS.av1).toBe(false);
   });
 
-  it('gives Dolby to AVPlayer and not to ExoPlayer', () => {
-    // AC3/EAC3 decoders are TV licences an Android phone usually lacks.
+  it('gives Dolby to both: AVPlayer natively, ExoPlayer through the bundled FFmpeg decoders', () => {
     expect(IOS_CAPS.audio.ac3 && IOS_CAPS.audio.eac3).toBe(true);
-    expect(ANDROID_CAPS.audio.ac3 || ANDROID_CAPS.audio.eac3).toBe(false);
+    expect(ANDROID_CAPS.audio.ac3 && ANDROID_CAPS.audio.eac3).toBe(true);
   });
 
   it('gives VP9 and Opus to ExoPlayer and not to AVPlayer', () => {
@@ -71,21 +71,36 @@ describe('the capability tables', () => {
     expect(IOS_CAPS.vp9 || IOS_CAPS.audio.opus).toBe(false);
   });
 
-  it('claims neither DTS nor TrueHD anywhere', () => {
-    for (const caps of [IOS_CAPS, ANDROID_CAPS]) {
-      expect(caps.audio.dts).toBe(false);
-      expect(caps.audio.truehd).toBe(false);
-    }
+  it('gives DTS and TrueHD to ExoPlayer alone, which carries the FFmpeg decoders AVPlayer lacks', () => {
+    expect(IOS_CAPS.audio.dts || IOS_CAPS.audio.truehd).toBe(false);
+    expect(ANDROID_CAPS.audio.dts && ANDROID_CAPS.audio.truehd).toBe(true);
+  });
+
+  it('claims Dolby Vision on iOS only, because nothing can ask an Android handset', () => {
+    expect(IOS_CAPS.hdr.dolbyVision).toBe(true);
+    expect(ANDROID_CAPS.hdr.dolbyVision).toBe(false);
+  });
+
+  it('claims HDR10+ nowhere on iOS, which applies no dynamic metadata, and declares both tables', () => {
+    expect(IOS_CAPS.hdr.hdr10Plus).toBe(false);
+    expect(IOS_CAPS.hdrDeclared && ANDROID_CAPS.hdrDeclared).toBe(true);
+  });
+
+  it('declares each runtime display to the server', () => {
+    rn.os = 'ios';
+    expect(mobileHdr()).toEqual(['hdr10', 'hlg', 'dv']);
+    rn.os = 'android';
+    expect(mobileHdr()).toEqual(['hdr10', 'hdr10plus', 'hlg']);
   });
 });
 
 describe('the download codec sets', () => {
-  it('asks only for audio this runtime decodes', () => {
+  it('asks only for audio this runtime decodes and ffmpeg can copy into fMP4', () => {
     rn.os = 'android';
     const copy = downloadCopyCodecs();
-    expect(copy).not.toContain('ac3');
-    expect(copy).not.toContain('eac3');
-    expect(copy).toContain('aac');
+    expect(copy).toEqual(['aac', 'ac3', 'eac3']);
+    expect(copy).not.toContain('dts');
+    expect(copy).not.toContain('truehd');
   });
 
   it('keeps surround where the runtime really decodes it', () => {
@@ -112,6 +127,22 @@ describe('the download codec sets', () => {
       rn.os = os;
       expect(downloadCopyCodecs().every((c) => typeof c === 'string' && c.length > 0)).toBe(true);
     }
+  });
+});
+
+describe('the master for audio the runtime cannot copy', () => {
+  it('leaves surround DTS to the server E-AC-3 transcode where the runtime decodes Dolby', () => {
+    const dts = item({ container: 'mkv', audio: [{ codec: 'dts', default: true, channels: 6 }] });
+    for (const os of ['ios', 'android'] as const) {
+      rn.os = os;
+      expect(decideSource(dts).aacMaster).toBe(false);
+    }
+  });
+
+  it('keeps a stereo track outside the copy set on AAC', () => {
+    rn.os = 'ios';
+    const flac = item({ audio: [{ codec: 'flac', default: true, channels: 2 }] });
+    expect(decideSource(flac).aacMaster).toBe(true);
   });
 });
 
@@ -160,8 +191,8 @@ describe('deciding the streaming source', () => {
 
   it('always reports whether the master would need AAC', () => {
     rn.os = 'android';
-    const surround = item({ container: 'mkv', audio: [{ codec: 'eac3', default: true }] });
-    expect(decideSource(surround).aacMaster).toBe(true);
+    const unnamed = item({ container: 'mkv', audio: [{ codec: 'unknown', default: true }] });
+    expect(decideSource(unnamed).aacMaster).toBe(true);
     expect(decideSource(item()).aacMaster).toBe(false);
   });
 
@@ -191,7 +222,7 @@ describe('deciding whether the raw file can be downloaded', () => {
 
   it('is STRICTER than the streaming decision', () => {
     rn.os = 'android';
-    const undecodable = item({ container: 'mkv', audio: [{ codec: 'dts', default: true }] });
+    const undecodable = item({ container: 'mkv', audio: [{ codec: 'wmapro', default: true }] });
     expect(decideSource(undecodable).direct).toBe(true);
     expect(canRawDownload(undecodable)).toBe(false);
   });
@@ -230,7 +261,7 @@ describe('deciding whether the raw file can be downloaded', () => {
     rn.os = 'android';
     const mixed = item({
       container: 'mkv',
-      audio: [{ codec: 'aac', default: true }, { codec: 'truehd' }],
+      audio: [{ codec: 'aac', default: true }, { codec: 'wmapro' }],
     });
     expect(canRawDownload(mixed)).toBe(false);
   });

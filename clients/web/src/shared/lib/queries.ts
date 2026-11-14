@@ -1,7 +1,12 @@
 // Central query-options factory: one place for every query key + fetcher, so
 // route loaders (`ensureQueryData`) and components (`useSuspenseQuery`/`useQuery`)
 // share the exact same cache entry.
-import type { DiscoverDetail, DiscoverList, DiscoverType, TmdbKind } from '@kromatv/client/discovery';
+import type {
+  DiscoverDetail,
+  DiscoverList,
+  DiscoverType,
+  TmdbKind,
+} from '@kromatv/client/discovery';
 import type { ItemId, Show, ShowDetail, ShowId, UpNext } from '@kromatv/client/media';
 import type { QueryClient } from '@kromatv/client/query';
 import { genreSlugs } from '@kromatv/core';

@@ -18,6 +18,7 @@ mod ledger;
 mod naming;
 mod place;
 mod recycle;
+mod remote;
 mod replace;
 mod subtitles;
 
@@ -175,13 +176,14 @@ fn import_one<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<Vec<String
     let mut placed: Vec<(Replaced, String)> = Vec::new();
     match row.kind.as_str() {
         "movie" => {
-            let ctx = movie_ctx(&meta, largest_video);
+            let ctx = movie_ctx(&meta, &remote::named(largest_video));
             let dest = lib_root.join(tpl.movie_rel_path(&ctx, ext_of(largest_video)));
             let at = place_with_subtitles(state, largest_video, content.files(), &dest, mode)?;
             placed.push((Replaced::Movie, at.to_string_lossy().into_owned()));
         }
         "episode" => {
-            let parsed = kroma_scene::parse_release_name(stem_of(largest_video));
+            let named = remote::named(largest_video);
+            let parsed = kroma_scene::parse_release_name(stem_of(&named));
             let episode = row
                 .episodes
                 .as_ref()
@@ -200,7 +202,7 @@ fn import_one<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<Vec<String
         "season" => {
             let mut skipped_other_season = 0usize;
             for src in &videos {
-                let parsed = kroma_scene::parse_release_name(stem_of(src));
+                let parsed = kroma_scene::parse_release_name(stem_of(&remote::named(src)));
                 let Some(episode) = parsed.episode else {
                     tracing::debug!(file = %src.display(), "season pack: no episode marker, skipped");
                     continue;

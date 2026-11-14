@@ -6,7 +6,12 @@ import type { MediaItem } from '@kromatv/client/media';
 import { resolveMasterStart } from '@kromatv/core';
 import { type AudioTrack, useVideoPlayer, type VideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { decideSource, downloadCopyCodecs, mobileHdr, mobileVideoCodecs } from '#mobile/player/caps';
+import {
+  decideSource,
+  downloadCopyCodecs,
+  mobileHdr,
+  mobileVideoCodecs,
+} from '#mobile/player/caps';
 import { usePlaybackOwner } from '#mobile/player/playback-owner';
 import { useEngineControls } from './controls';
 import { useEngineFailure } from './failure';

@@ -16,6 +16,7 @@ impl AllDebrid {
         let Some(magnet) = self.api.magnet(client_ref)? else {
             return Ok(None);
         };
+        self.remember(Some(client_ref));
         let reported = match magnet.status_code {
             0..=3 => remote(client_ref, &magnet),
             4 => self.ready_status(client_ref, &magnet)?,

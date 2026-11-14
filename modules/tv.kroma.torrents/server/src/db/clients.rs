@@ -7,7 +7,7 @@ use super::Pool;
 #[derive(Debug, Clone)]
 pub struct DownloadClientRow {
     pub id: String,
-    // `rqbit` | `transmission` | `qbittorrent`.
+    // `rqbit`, or the instance id of the engine module that answers for it.
     pub kind: String,
     pub name: String,
     pub url: String,

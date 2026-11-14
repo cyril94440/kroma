@@ -209,3 +209,58 @@ fn every_step_has_a_unique_name_that_starts_with_its_version() {
     }
     assert_eq!(names.iter().collect::<BTreeSet<_>>().len(), names.len());
 }
+
+#[test]
+fn the_hdr_and_audio_step_queues_the_files_it_can_say_more_about_for_a_re_probe() {
+    const STEP: &str = "0015_hdr_audio_facts";
+    let at = CORE
+        .steps
+        .iter()
+        .position(|step| step.name == STEP)
+        .unwrap();
+    let before = kroma_sqlite::Schema {
+        steps: &CORE.steps[..at],
+        ..CORE
+    };
+    let mut conn = Connection::open_in_memory().unwrap();
+    kroma_sqlite::migrate(&mut conn, &before, None).unwrap();
+    conn.execute_batch(
+        "INSERT INTO libraries (id,name,kind,path,added_at) VALUES ('lib','L','movies','/x','t');
+         INSERT INTO items (id,kind,title,container,library,added_at) VALUES ('m','movie','T','mkv','lib','t');
+         INSERT INTO files (id,item_id,abs_path,container,probed,v_hdr,a_codec,audio_tracks) VALUES
+           ('hdr','m','/hdr','mkv',1,1,'aac','[]'),
+           ('dolby','m','/dolby','mkv',1,0,'aac','[{\"index\":0,\"codec\":\"aac\"},{\"index\":1,\"codec\":\"truehd\"}]'),
+           ('dts','m','/dts','mkv',1,0,'dts','[]'),
+           ('plain','m','/plain','mkv',1,0,'aac','[{\"index\":0,\"codec\":\"aac\"}]'),
+           ('broken','m','/broken','mkv',1,1,NULL,'[]');
+         UPDATE files SET unreadable = 'moov atom not found' WHERE id = 'broken';",
+    )
+    .unwrap();
+
+    kroma_sqlite::migrate(&mut conn, &CORE, None).unwrap();
+
+    let queued: BTreeSet<String> = conn
+        .prepare("SELECT id FROM files WHERE probed = 0")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    assert_eq!(
+        queued,
+        ["dolby", "dts", "hdr"].map(String::from).into_iter().collect()
+    );
+    let columns: Vec<String> = conn
+        .prepare("SELECT name FROM pragma_table_info('files') WHERE name LIKE 'v_dv_%'")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    assert!(
+        ["v_dv_level", "v_dv_compat", "v_dv_el"]
+            .iter()
+            .all(|c| columns.iter().any(|f| f == c)),
+        "{columns:?}"
+    );
+}

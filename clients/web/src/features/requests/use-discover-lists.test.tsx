@@ -14,9 +14,8 @@ vi.mock('#web/shared/lib/web-runtime', async (importOriginal) => {
   return { ...original, useWebRuntime: () => runtime, useKromaClient: () => runtime.client };
 });
 
-const { useDiscoverRail, useDiscoverListPage, useGenres, useGenrePage } = await import(
-  '#web/features/requests/use-discover-lists'
-);
+const { useDiscoverRail, useDiscoverListPage, useGenres, useGenrePage } =
+  await import('#web/features/requests/use-discover-lists');
 
 const ENTRY: DiscoverEntry = {
   kind: 'movie',

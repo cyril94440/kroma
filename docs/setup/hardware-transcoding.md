@@ -103,6 +103,16 @@ To force a method, or to rule hardware out while you look for a problem, set
 computer with more than one graphics device, `KROMA_RENDER_NODE` selects the
 one to use. See the [configuration reference](configuration.md#transcoding).
 
+## HDR films
+
+When KROMA converts an HDR film for a screen that cannot show HDR, it also
+converts the colours to standard ones, so the picture is not dark and grey.
+This step runs on the processor, even when a graphics chip does the rest, and
+it needs more power than a plain conversion. On a small NAS a 4K HDR film may
+not keep up. Set `KROMA_TONEMAP` to `off` to skip the step. Dolby Vision
+profile 5 films need a graphics card with Vulkan support for this step, and
+without it keep their colours as they are.
+
 ## When there is no graphics chip
 
 Without hardware, KROMA converts on the processor. That works for 1080p on

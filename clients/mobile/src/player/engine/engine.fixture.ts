@@ -67,6 +67,7 @@ vi.doMock('expo-video', async () => {
 vi.doMock('#mobile/player/caps', () => ({
   decideSource: () => ({ direct: true, aacMaster: false }),
   mobileVideoCodecs: () => ['hevc', 'h264'],
+  mobileHdr: () => ['hdr10', 'hlg', 'dv'],
   downloadCopyCodecs: () => ['aac', 'ac3', 'eac3'],
 }));
 

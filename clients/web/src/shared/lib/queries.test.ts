@@ -146,7 +146,8 @@ describe('the plain reads', () => {
     endpoint.mockResolvedValue('payload');
     await run(build());
     expect(endpoint).toHaveBeenCalledTimes(1);
-    if (arg !== undefined) expect(endpoint).toHaveBeenCalledWith(...(Array.isArray(arg) ? arg : [arg]));
+    if (arg !== undefined)
+      expect(endpoint).toHaveBeenCalledWith(...(Array.isArray(arg) ? arg : [arg]));
   });
 });
 

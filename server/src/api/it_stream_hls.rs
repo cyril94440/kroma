@@ -61,6 +61,52 @@ async fn both_axes_move_in_one_redirect() {
 }
 
 #[tokio::test]
+async fn a_surround_track_the_client_cannot_decode_is_redirected_to_eac3_when_it_declares_it() {
+    let t = test_app();
+    let id = demo_item_id("Blade Runner 2049"); // truehd 7.1 on track 0
+
+    let (status, location) = location(&t, &master(&id, "copy", "copy=aac,eac3")).await;
+
+    assert_eq!(status, StatusCode::TEMPORARY_REDIRECT);
+    assert_eq!(location, format!("/api/items/{id}/hls/eac3/0/0/index.m3u8"));
+}
+
+#[tokio::test]
+async fn the_redirect_to_a_surround_mode_is_not_redirected_again() {
+    let t = test_app();
+    let id = demo_item_id("Blade Runner 2049");
+
+    let (status, _) = location(&t, &master(&id, "eac3", "")).await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_client_declaring_no_hdr_systems_has_its_hdr_picture_tone_mapped_where_the_host_can() {
+    let t = test_app();
+    let id = demo_item_id("Blade Runner 2049"); // hevc HDR10
+
+    let (status, location) = location(&t, &master(&id, "copy", "hdr=")).await;
+
+    if kroma_media::hls::tonemap_filters().zimg {
+        assert_eq!(status, StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(location, format!("/api/items/{id}/hls/h264-copy/0/0/index.m3u8"));
+    } else {
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+}
+
+#[tokio::test]
+async fn a_client_declaring_hdr10_keeps_its_hdr10_copy() {
+    let t = test_app();
+    let id = demo_item_id("Blade Runner 2049");
+
+    let (status, _) = location(&t, &master(&id, "copy", "hdr=hdr10,hlg")).await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn a_client_that_declares_nothing_is_never_sent_to_a_re_encode() {
     let t = test_app();
     let id = demo_item_id("Blade Runner 2049");

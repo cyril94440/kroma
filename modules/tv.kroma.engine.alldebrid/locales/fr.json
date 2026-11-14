@@ -1,0 +1,4 @@
+{
+  "config.cacheMaxDays": "Supprimer les fichiers du cache inutilisés depuis ce nombre de jours (0 = jamais)",
+  "config.cacheMaxGb": "Taille maximale du cache en Go (0 = pas de cache)"
+}

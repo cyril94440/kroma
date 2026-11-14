@@ -26,9 +26,14 @@ A file direct-plays when **all** of the following hold:
 - **PLAY-2** (AGREED) - The client declares it can demux the **container**
   ([`surfaces/`](../surfaces/)).
 - **PLAY-3** (AGREED) - The client can decode the **video stream**, meaning codec, profile,
-  level, bit depth and HDR variant, in hardware, as declared for that device generation.
+  level, bit depth and HDR variant, in hardware, as declared for that device generation. On a
+  stream request a client may declare the HDR systems its display shows as `hdr=` (`hdr10`,
+  `hdr10plus`, `hlg`, `dv`; empty means SDR only; absent means undeclared, and the request
+  stands). The server then re-encodes, tone-mapped, a source the display cannot show.
 - **PLAY-4** (AGREED) - Every **audio stream the person might select** is decodable by the
-  client at its native channel layout, or is passthrough-capable to a connected receiver.
+  client at its native channel layout, or is passthrough-capable to a connected receiver. A
+  copy is always preferred when the client declares the codec; otherwise a surround track is
+  re-encoded to E-AC-3 or AC-3 5.1 when the client declares one, else to stereo AAC.
 - **PLAY-5** (AGREED) - The chosen **subtitle**, if any, is either a format the client renders
   itself or a sidecar it can fetch alongside.
 - **PLAY-6** (AGREED) - The **link** sustains the file's peak bitrate. On a local network this
@@ -110,7 +115,8 @@ than a buried log line.
 **PLAY-25** (AGREED) - KROMA never re-encodes video to save bandwidth unless the device
 profile forces it.
 
-**PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so.
+**PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so. The server tone-maps
+every HDR re-encode it can, so the notice is the client's to show.
 
 **PLAY-27** (AGREED) - KROMA never burns in subtitles the person did not ask to see.
 

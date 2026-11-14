@@ -101,6 +101,8 @@ async fn a_host_with_no_slot_left_refuses_a_master_before_it_spawns_anything() {
         mode: StreamMode::new(VideoMode::H264At(Rung::P1080), AudioMode::Copy),
         anchor: 0,
         source: None,
+        video: None,
+        track: None,
     };
 
     let answer = s.master("itB:h264-1080-copy:0:a0", &asked).await;

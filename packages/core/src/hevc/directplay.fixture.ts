@@ -8,6 +8,9 @@ export function track(p: Partial<AudioTrack> & { index: number }): AudioTrack {
     language: p.language ?? null,
     title: p.title ?? null,
     default: p.default ?? false,
+    profile: p.profile ?? null,
+    layout: p.layout ?? null,
+    spatial: p.spatial ?? null,
   };
 }
 
@@ -19,6 +22,7 @@ export function makeItem(p: {
   height?: number;
   hdrFormat?: HdrFormat;
   dolbyVisionProfile?: number;
+  dolbyVisionCompatibility?: number;
   audio: AudioTrack[];
 }): MediaItem {
   return {
@@ -31,6 +35,7 @@ export function makeItem(p: {
       hdr: p.hdrFormat != null,
       hdrFormat: p.hdrFormat ?? null,
       dolbyVisionProfile: p.dolbyVisionProfile ?? null,
+      dolbyVisionCompatibility: p.dolbyVisionCompatibility ?? null,
     },
     audio: p.audio[0] ?? null,
     audioTracks: p.audio,

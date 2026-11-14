@@ -21,6 +21,7 @@ mod job;
 mod pull;
 pub mod purge;
 
+pub use disk::dest as within;
 pub use pull::Progress;
 pub use purge::{Limits, Report};
 
@@ -82,16 +83,20 @@ impl Cache {
         })
     }
 
-    pub fn evict_magnet(&self, magnet: &str) -> Result<()> {
-        let folder = self.root.join(magnet);
-        if magnet.is_empty() || !magnet.bytes().all(|b| b.is_ascii_digit()) {
-            bail!("not an AllDebrid magnet id");
+    /// Like [`Cache::ensure_cached`] for a file that belongs at `dest` instead:
+    /// it is not part of the cache, so nothing purges it and nothing touches it.
+    pub fn ensure_at(api: &Api, dest: &Path, file: &Planned) -> Availability {
+        if disk::is_complete(dest, file.size) {
+            return Availability::Cached(dest.to_path_buf());
         }
-        pull::forget_under(&folder);
-        match std::fs::remove_dir_all(&folder) {
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.into()),
-            _ => Ok(()),
+        match pull::join_or_start(dest, file, api.clone()) {
+            Progress::Running { done, total, bps } => Availability::Fetching { done, total, bps },
+            Progress::Failed(reason) => Availability::Failed(reason),
         }
+    }
+
+    pub fn stop_fetching_under(folder: &Path) {
+        pull::forget_under(folder);
     }
 
     pub fn purge(&self, limits: Limits) -> Report {

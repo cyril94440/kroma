@@ -17,6 +17,8 @@ fn asked<'a>(input: &'a Path, anchor: u64) -> Asked<'a> {
         mode: COPY,
         anchor,
         source: Some((320, 180)),
+        video: None,
+        track: None,
     }
 }
 

@@ -141,6 +141,19 @@ describe('canDirectPlay', () => {
     expect(canDirectPlay(profile5, NATIVE_TV_CAPS).canDirectPlay).toBe(true);
   });
 
+  it('plays Dolby Vision from its signalled base layer, not from the profile number', () => {
+    const base = { videoCodec: 'hevc', bitDepth: 10, hdrFormat: 'dolbyVision' as const, audio: [] };
+    const p7 = makeItem({ ...base, dolbyVisionProfile: 7, dolbyVisionCompatibility: 6 });
+    const p7NoId = makeItem({ ...base, dolbyVisionProfile: 7 });
+    const p5WithBase = makeItem({ ...base, dolbyVisionProfile: 5, dolbyVisionCompatibility: 1 });
+    const p8NoBase = makeItem({ ...base, dolbyVisionProfile: 8, dolbyVisionCompatibility: 0 });
+
+    expect(canDirectPlay(p7, MSE_CAPS).canDirectPlay).toBe(true);
+    expect(canDirectPlay(p7NoId, MSE_CAPS).canDirectPlay).toBe(true);
+    expect(canDirectPlay(p5WithBase, MSE_CAPS).canDirectPlay).toBe(true);
+    expect(canDirectPlay(p8NoBase, MSE_CAPS).messageKey).toBe('player.dolbyVisionUnsupported');
+  });
+
   it('lets every variant that degrades to a picture through', () => {
     const base = { videoCodec: 'hevc', bitDepth: 10, audio: [] };
     const profile8 = makeItem({ ...base, hdrFormat: 'dolbyVision', dolbyVisionProfile: 8 });
