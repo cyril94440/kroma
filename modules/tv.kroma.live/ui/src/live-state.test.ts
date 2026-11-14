@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { applyEvent, badges, progressOf, shouldReloadPlayer } from './live-state';
 import { Status } from './schemas';
 
-const base = Status.parse({ state: 'running', channel: { id: 'p:1', name: 'TF1' }, provider: 'primary', playlist: 'a/index.m3u8' });
+const base = Status.parse({
+  state: 'running',
+  channel: { id: 'p:1', name: 'TF1' },
+  provider: 'primary',
+  playlist: 'a/index.m3u8',
+});
 
 describe('applying events', () => {
   it('takes the whole status from a status event', () => {
@@ -13,7 +18,10 @@ describe('applying events', () => {
   });
 
   it('replaces only the viewers on a presence event and only the health on a health event', () => {
-    const viewers = applyEvent(base, { type: 'live.presence', viewers: [{ userId: 'u1', name: 'Ann', since: 1 }] });
+    const viewers = applyEvent(base, {
+      type: 'live.presence',
+      viewers: [{ userId: 'u1', name: 'Ann', since: 1 }],
+    });
     const health = applyEvent(base, { type: 'live.health', sourceKbps: 3000, stutter: true });
 
     expect(viewers?.viewers.map((v) => v.name)).toEqual(['Ann']);
@@ -35,7 +43,11 @@ describe('what the page shows', () => {
   });
 
   it('names the backup, black and frozen states as badges', () => {
-    const status = { ...base, onBackup: true, health: { ...base.health, black: true, frozen: true } };
+    const status = {
+      ...base,
+      onBackup: true,
+      health: { ...base.health, black: true, frozen: true },
+    };
 
     expect(badges(status)).toEqual(['backup', 'black', 'frozen']);
   });

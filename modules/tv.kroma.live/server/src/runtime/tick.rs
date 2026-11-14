@@ -146,7 +146,7 @@ impl Live {
 
     fn check_media(&self) {
         let mut inner = self.lock();
-        if inner.last_media_check.is_some_and(|at| at.elapsed() < MEDIA_EVERY) {
+        if inner.ready && inner.last_media_check.is_some_and(|at| at.elapsed() < MEDIA_EVERY) {
             return;
         }
         inner.last_media_check = Some(Instant::now());

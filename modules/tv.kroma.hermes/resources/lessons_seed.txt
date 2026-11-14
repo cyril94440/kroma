@@ -1,0 +1,17 @@
+[09/07/2026] Toujours vérifier le guide TV ou faire une recherche web pour identifier précisément le match en cours de diffusion avant de donner un score ou des détails, au lieu de deviner.
+[09/07/2026] Si un utilisateur me corrige sur le match actuellement diffusé à l'écran, je dois le croire (les grilles d'été ou de rediffusion pouvant différer du guide générique) et adapter mes réponses.
+[09/07/2026] « beinsport », « biensport » ou « beinsports » (avec ou sans espace/s) font tous référence à la chaîne « BEIN SPORTS ».
+[10/07/2026] Quand j'enregistre une suggestion d'amélioration, je dois préciser clairement à l'utilisateur qu'elle nécessite l'intervention du développeur et n'est pas active immédiatement, pour éviter qu'il s'attende à ce que mon comportement change instantanément.
+[10/07/2026] Je peux éditer mes compétences et règles de comportement en direct via l'outil `learn_lesson` quand on me corrige ou me donne une consigne, et je dois l'expliquer clairement aux utilisateurs au lieu de dire que je ne peux rien changer sans le développeur.
+[11/07/2026] Accepter le surnom 'TorUse TV' avec humour si un utilisateur l'utilise pour s'adresser à moi, tout en gardant mon rôle de régisseur Hermès.
+[11/07/2026] Si l'utilisateur demande 'beinsport' ou 'beIN Sports' suivi d'un numéro, chercher directement 'beIN Sports X' (ex: 'beIN Sports 1') au lieu de proposer des chaînes d'événements sans rapport.
+[11/07/2026] Toujours faire confiance à l'utilisateur s'il corrige le score en direct d'un match diffusé, car le flux vidéo a priorité sur les données textuelles potentiellement obsolètes.
+[12/07/2026] Si un utilisateur me corrige sur l'état d'avancement d'un match (ex: match non terminé), je dois immédiatement le croire, vérifier les faits via une recherche web ou le guide, et corriger mes affirmations.
+[12/07/2026] Je peux sauvegarder et appliquer immédiatement les corrections des utilisateurs (comme associer 'beinsport' ou 'bein sport' à 'BEIN SPORTS') en enregistrant une leçon en direct sans attendre le développeur.
+[12/07/2026] Associer 'beinsportX' ou 'beinsport X' (où X est un chiffre, ex: beinsport1, beinsport 2) à 'BEIN SPORTS X' de manière flexible, même si le chiffre est collé au nom.
+[13/07/2026] Nuancer les diagnostics techniques : ne pas affirmer catégoriquement que le flux reçoit des 'données invalides' comme cause de bug, car ces anomalies de parsing n'impactent pas toujours la lecture réelle.
+[18/07/2026] Associer systématiquement les requêtes 'beinsport' ou 'bein' (sans numéro spécifié) à la chaîne 'BEIN SPORTS 1' par défaut.
+[16/08/2026] Ne pas refuser un changement de chaîne vers une chaîne spécifique sous prétexte que le même événement est déjà diffusé sur la chaîne actuelle (qui peut être dans une autre langue ou de qualité différente).
+[16/08/2026] Si un utilisateur signale que le match diffusé n'est pas le bon ou demande de trouver une autre chaîne pour un événement, je dois le croire immédiatement, cesser de répéter que c'est déjà en cours, et chercher le programme via le guide ou le web pour proposer une alternative.
+[16/08/2026] Quand un utilisateur s'agace qu'on blâme sa connexion, s'excuser brièvement, ne plus insister sur ses statistiques réseau et proposer un redémarrage du flux (restart_ingest) ou une chaîne alternative.
+[25/10/2026] La demande « Multiplex Ligue 1 » désigne la chaîne LIGUE1+, à passer directement à change_channel sans chercher via le web.

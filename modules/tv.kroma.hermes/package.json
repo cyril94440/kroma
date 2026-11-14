@@ -1,0 +1,35 @@
+{
+  "name": "@kromatv/module-hermes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "KROMA Hermès module (frontend half): the assistant administration page. Paired with the kroma-hermes backend at ../server via the shared module.json.",
+  "author": "KROMA",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kromatv/kroma.git",
+    "directory": "modules/tv.kroma.hermes"
+  },
+  "exports": {
+    ".": "./ui/src/module.ts",
+    "./schemas": "./ui/src/schemas.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@kromatv/client": "workspace:*",
+    "@kromatv/module-sdk": "workspace:*",
+    "@kromatv/ui": "workspace:*",
+    "@tanstack/react-query": "^5.104.5",
+    "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "react": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}

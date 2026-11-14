@@ -1,7 +1,7 @@
 import { KromaEvents } from '@kromatv/client/events';
 import type { KromaHost } from '@kromatv/module-sdk';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiOrigin, bearer, createLiveApi } from './live-api';
+import { apiOrigin, createLiveApi } from './live-api';
 import { applyEvent } from './live-state';
 import type { Status } from './schemas';
 
@@ -40,10 +40,10 @@ export function useLive(host: KromaHost, watching: boolean) {
 
   useEffect(() => {
     const events = new KromaEvents<{ type: string }>(apiOrigin(), {
-      token: bearer,
+      token: () => host.api.sessionToken(),
       refresh: async () => {
         await host.api.get('/modules').catch(() => undefined);
-        return bearer();
+        return host.api.sessionToken();
       },
       onOpen: refresh,
       onEvent: (raw) => setStatus((current) => applyEvent(current, raw)),
@@ -68,9 +68,12 @@ export function useLive(host: KromaHost, watching: boolean) {
         });
     };
     beat();
+    const leave = () => void api.leave().catch(() => undefined);
+    window.addEventListener('pagehide', leave);
     return () => {
       clearTimeout(timer);
-      void api.leave().catch(() => undefined);
+      window.removeEventListener('pagehide', leave);
+      leave();
     };
   }, [api, watching]);
 

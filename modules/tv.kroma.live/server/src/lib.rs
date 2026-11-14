@@ -50,5 +50,5 @@ use kroma_module_sdk::EmbeddedModule;
 pub const MODULE: EmbeddedModule = kroma_module_sdk::embedded_module!();
 
 pub use module::{server_module, LiveModule};
-pub use routes::routes;
+pub use routes::{point_routes, routes};
 pub use runtime::{Live, Programs};

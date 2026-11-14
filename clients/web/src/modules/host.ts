@@ -55,6 +55,7 @@ export function useModuleHost(revision = 0, provided?: ModuleRuntime): KromaHost
       api: {
         get: <T>(path: string) => apiGet<T>(latest.current.auth.client, path),
         listModules: () => apiGet<ModuleManifest[]>(latest.current.auth.client, '/modules'),
+        sessionToken: () => latest.current.auth.client.sessionToken,
         moduleFileUrl: (moduleId, path) =>
           latest.current.auth.client.modules.fileUrl(ModuleId.parse(moduleId), path),
       },

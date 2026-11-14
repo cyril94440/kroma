@@ -1,0 +1,117 @@
+{
+  "$schema": "https://modules.kroma.tv/schemas/3/manifest.json",
+  "schemaVersion": 3,
+  "id": "tv.kroma.hermes",
+  "name": "Hermès",
+  "version": "0.1.0",
+  "description": "The assistant of the family chat: understands requests in natural language, finds channels, starts votes and polls, answers questions about what is on, diagnoses the stream and learns the house preferences. Governance stays in code, never in the model.",
+  "engines": {
+    "server": ">=0.1.39"
+  },
+  "dependencies": {
+    "tv.kroma.party": ">=0.1.0",
+    "tv.kroma.live": ">=0.1.0"
+  },
+  "feRemote": {
+    "module": "./remoteEntry.js"
+  },
+  "definesPoints": [
+    {
+      "name": "tools",
+      "methods": ["list", "call"]
+    }
+  ],
+  "consumes": [
+    { "point": "tv.kroma.party/room" },
+    { "point": "tv.kroma.live/control" },
+    { "point": "tv.kroma.hermes/tools", "optional": true }
+  ],
+  "config": [
+    { "key": "enabled", "label": "config.enabled", "type": "bool", "default": "true" },
+    {
+      "key": "provider",
+      "label": "config.provider",
+      "type": "select",
+      "default": "gemini",
+      "options": ["gemini", "openai"]
+    },
+    { "key": "geminiApiKey", "label": "config.geminiApiKey", "type": "string", "secret": true },
+    {
+      "key": "geminiModel",
+      "label": "config.geminiModel",
+      "type": "string",
+      "default": "gemini-3.8-flash"
+    },
+    {
+      "key": "geminiServiceTier",
+      "label": "config.geminiServiceTier",
+      "type": "string",
+      "default": "priority"
+    },
+    {
+      "key": "geminiBaseUrl",
+      "label": "config.geminiBaseUrl",
+      "type": "string",
+      "default": "https://generativelanguage.googleapis.com"
+    },
+    {
+      "key": "openaiBaseUrl",
+      "label": "config.openaiBaseUrl",
+      "type": "string",
+      "default": "https://api.openai.com/v1"
+    },
+    { "key": "openaiApiKey", "label": "config.openaiApiKey", "type": "string", "secret": true },
+    { "key": "openaiModel", "label": "config.openaiModel", "type": "string", "default": "" },
+    { "key": "temperature", "label": "config.temperature", "type": "string", "default": "0" },
+    {
+      "key": "language",
+      "label": "config.language",
+      "type": "select",
+      "default": "fr",
+      "options": ["fr", "en"]
+    },
+    { "key": "maxSteps", "label": "config.maxSteps", "type": "number", "default": "10" },
+    {
+      "key": "turnBudgetSeconds",
+      "label": "config.turnBudgetSeconds",
+      "type": "number",
+      "default": "150"
+    },
+    {
+      "key": "modelTimeoutSeconds",
+      "label": "config.modelTimeoutSeconds",
+      "type": "number",
+      "default": "40"
+    },
+    {
+      "key": "engageWindowSeconds",
+      "label": "config.engageWindowSeconds",
+      "type": "number",
+      "default": "90"
+    },
+    {
+      "key": "hourlyCallLimit",
+      "label": "config.hourlyCallLimit",
+      "type": "number",
+      "default": "200"
+    },
+    {
+      "key": "userTurnsPerMinute",
+      "label": "config.userTurnsPerMinute",
+      "type": "number",
+      "default": "4"
+    },
+    { "key": "visionEnabled", "label": "config.visionEnabled", "type": "bool", "default": "true" },
+    { "key": "auditDays", "label": "config.auditDays", "type": "number", "default": "30" }
+  ],
+  "storage": {},
+  "permissions": {
+    "net": {
+      "connect": [
+        { "purpose": "llm", "to": ["generativelanguage.googleapis.com"], "ports": [443] },
+        { "purpose": "llm-search", "to": ["generativelanguage.googleapis.com"], "ports": [443] },
+        { "purpose": "llm-compatible", "to": ["public", "lan"] }
+      ]
+    }
+  }
+}

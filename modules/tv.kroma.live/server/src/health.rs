@@ -283,7 +283,8 @@ impl StreamHealth {
                 .iter()
                 .filter(|e| e.class == Class::Lost && self.blocks.saturating_sub(e.at) <= LOSS_WINDOW)
                 .map(|e| e.magnitude)
-                .sum(),
+                .sum::<f64>()
+                + 0.0,
         )
     }
 

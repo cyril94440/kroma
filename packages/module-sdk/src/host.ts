@@ -15,6 +15,10 @@ export interface HostApi {
    *  carrying the account's media ticket: what a `<video>`, hls.js or a native
    *  player fetches, since none of them can send a header. */
   moduleFileUrl(moduleId: string, path: string): string;
+  /** The account's current session bearer, for a module page that must send a
+   *  request `get` cannot (a POST) or open a socket of its own. Read it per call:
+   *  the client refreshes it. */
+  sessionToken(): string | undefined;
 }
 
 export interface HostAuth {

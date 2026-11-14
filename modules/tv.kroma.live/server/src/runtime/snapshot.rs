@@ -30,7 +30,7 @@ impl Live {
             .unwrap_or((None, None));
         let inner = self.lock();
         let standby = inner.presence.idle_for_ms(now).filter(|_| phase != Phase::Paused).map(|idle| (settings.standby_seconds as i64 - idle / 1000).max(0) as u64);
-        let playlist = inner.run.as_ref().filter(|_| phase != Phase::Paused).map(|run| format!("{}/{PLAYLIST_FILE}", run.folder));
+        let playlist = inner.run.as_ref().filter(|_| phase != Phase::Paused && inner.ready).map(|run| format!("{}/{PLAYLIST_FILE}", run.folder));
         Status {
             state: phase,
             channel: channel.as_ref().map(|c| ChannelRef { id: c.id(), name: c.name.clone() }),

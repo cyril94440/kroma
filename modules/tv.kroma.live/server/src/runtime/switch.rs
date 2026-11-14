@@ -246,7 +246,7 @@ impl Live {
     fn route_around_outage(&self, target: Channel) -> Channel {
         let outage = {
             let inner = self.lock();
-            inner.policy.zap_provider() != target.provider && inner.policy.has_backup
+            target.provider == ProviderId::Primary && inner.policy.zap_provider() == ProviderId::Backup
         };
         if !outage {
             return target;

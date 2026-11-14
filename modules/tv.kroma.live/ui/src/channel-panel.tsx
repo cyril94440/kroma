@@ -27,13 +27,18 @@ export function ChannelPanel({ api, current, onSwitched }: Readonly<ChannelPanel
     const q = query.trim();
     if (!q) return;
     const timer = setTimeout(() => {
-      api.channels({ q }).then((page) => setFound(page.channels), () => setFound([]));
+      api.channels({ q }).then(
+        (page) => setFound(page.channels),
+        () => setFound([]),
+      );
     }, SETTLE_MS);
     return () => clearTimeout(timer);
   }, [api, query]);
 
   const watch = async (channel: ChannelView) => {
-    const outcome = await api.switchTo(channel.id).catch((error: { code?: string }) => ({ status: error.code ?? 'error' }));
+    const outcome = await api
+      .switchTo(channel.id)
+      .catch((error: { code?: string }) => ({ status: error.code ?? 'error' }));
     setMessage(t(`live.switch.${outcome.status}`));
     if (outcome.status === 'switched' || outcome.status === 'already') {
       setQuery('');
@@ -47,7 +52,12 @@ export function ChannelPanel({ api, current, onSwitched }: Readonly<ChannelPanel
       <Section.Header>
         <Section.Title>{t('live.channels.title')}</Section.Title>
       </Section.Header>
-      <Field.Root label={t('live.channels.search')} hideLabel value={query} onValueChange={setQuery}>
+      <Field.Root
+        label={t('live.channels.search')}
+        hideLabel
+        value={query}
+        onValueChange={setQuery}
+      >
         <Field.Input type="search" icon="search" placeholder={t('live.channels.search')} />
       </Field.Root>
       <Box mt={8}>
@@ -65,7 +75,9 @@ export function ChannelPanel({ api, current, onSwitched }: Readonly<ChannelPanel
                   </Text>
                 ) : null}
                 <Button
-                  label={channel.id === current ? t('live.channels.playing') : t('live.channels.watch')}
+                  label={
+                    channel.id === current ? t('live.channels.playing') : t('live.channels.watch')
+                  }
                   variant="glass"
                   size="sm"
                   disabled={channel.id === current}
@@ -75,7 +87,11 @@ export function ChannelPanel({ api, current, onSwitched }: Readonly<ChannelPanel
             </ListRow.Trailing>
           </ListRow.Root>
         ))}
-        {rows.length === 0 ? <Text variant="meta" color="textDim">{t('live.channels.empty')}</Text> : null}
+        {rows.length === 0 ? (
+          <Text variant="meta" color="textDim">
+            {t('live.channels.empty')}
+          </Text>
+        ) : null}
         {message ? <Text variant="meta">{message}</Text> : null}
       </Box>
     </Section.Root>

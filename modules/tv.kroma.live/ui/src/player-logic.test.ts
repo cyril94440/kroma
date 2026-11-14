@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { HLS_CONFIG, isBehindLive, latencyOf, pauseWasDeliberate, recoveryFor, wantsNative } from './player-logic';
+import {
+  HLS_CONFIG,
+  isBehindLive,
+  latencyOf,
+  pauseWasDeliberate,
+  recoveryFor,
+  wantsNative,
+} from './player-logic';
 
 describe('recovering a player', () => {
   it('retries the network, then reloads the source', () => {

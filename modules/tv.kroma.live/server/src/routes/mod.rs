@@ -14,7 +14,7 @@ use crate::runtime::Live;
 pub use points::point_routes;
 
 pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
-    viewer::routes::<S>().merge(admin::routes::<S>()).merge(point_routes::<S>())
+    viewer::routes::<S>().merge(admin::routes::<S>())
 }
 
 pub(crate) fn live<S: HostCtx>(host: &S) -> Result<Arc<Live>, Response> {

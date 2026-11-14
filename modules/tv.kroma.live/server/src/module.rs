@@ -29,6 +29,10 @@ impl<S: HostCtx + Clone + Send + Sync + 'static> ServerModule<S> for LiveModule 
         db::MIGRATIONS
     }
 
+    fn admin_routes(&self, _host: &S) -> Option<axum::Router<S>> {
+        Some(crate::routes::routes::<S>())
+    }
+
     fn jobs(&self) -> Vec<ModuleJob<S>> {
         vec![
             ModuleJob { key: CATALOGUE_JOB, category: "maintenance", schedule: Some("19 * * * *"), run: refresh_catalogue::<S> },

@@ -1,4 +1,3 @@
-import { loadSession } from '@kromatv/client/accounts';
 import type { KromaHost } from '@kromatv/module-sdk';
 import type { z } from 'zod';
 import {
@@ -38,10 +37,6 @@ export function apiOrigin(): string {
   return origin();
 }
 
-export function bearer(): string | undefined {
-  return loadSession()?.accessToken;
-}
-
 type Query = Record<string, string | number | undefined>;
 
 function withQuery(path: string, query?: Query): string {
@@ -64,7 +59,7 @@ export function createLiveApi(host: Pick<KromaHost, 'api'>) {
       fetch(`${origin()}/api/module/${MODULE_ID}${path}`, {
         method,
         headers: {
-          authorization: `Bearer ${bearer() ?? ''}`,
+          authorization: `Bearer ${host.api.sessionToken() ?? ''}`,
           ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -94,8 +89,7 @@ export function createLiveApi(host: Pick<KromaHost, 'api'>) {
     pause: () => call('POST', '/pause', undefined, null),
     resume: () => call('POST', '/resume', undefined, SwitchOutcome),
     overview: () => call('GET', '/overview', undefined, Overview),
-    history: (minutes = 60) =>
-      call('GET', withQuery('/history', { minutes }), undefined, History),
+    history: (minutes = 60) => call('GET', withQuery('/history', { minutes }), undefined, History),
     metrics: () => call('GET', '/metrics', undefined, Metrics),
     refresh: () => call('POST', '/refresh', undefined, Refreshed),
     startScan: (query: string, provider: string) =>

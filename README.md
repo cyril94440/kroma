@@ -106,6 +106,7 @@ independently of the server.
 | VPN | a managed WireGuard bridge with a live seal test and a kill switch |
 | Embeddings | the rows picked for you, themed rows and search by meaning |
 | Whisper | on-device subtitle transcription |
+| Live TV | one IPTV connection restreamed to everyone at home, with standby, off-air detection and a backup provider |
 | Remote access | a public HTTPS share URL, optionally through a managed tunnel |
 | mDNS | the server advertises itself on the LAN |
 

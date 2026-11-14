@@ -21,13 +21,27 @@ export function AdminHealth({ api, history, metrics, onChanged }: Readonly<Admin
       <Row gap={8} wrap>
         <Badge>{t('live.admin.kbps', { kbps: last?.kbps ?? 0 })}</Badge>
         <Badge>{t('live.admin.zaps', { count: metrics.zaps })}</Badge>
-        {metrics.p50Ms !== null ? <Badge>{t('live.admin.zapP50', { ms: metrics.p50Ms })}</Badge> : null}
-        {metrics.p95Ms !== null ? <Badge>{t('live.admin.zapP95', { ms: metrics.p95Ms })}</Badge> : null}
+        {metrics.p50Ms !== null ? (
+          <Badge>{t('live.admin.zapP50', { ms: metrics.p50Ms })}</Badge>
+        ) : null}
+        {metrics.p95Ms !== null ? (
+          <Badge>{t('live.admin.zapP95', { ms: metrics.p95Ms })}</Badge>
+        ) : null}
         <Badge>{t('live.admin.restarts', { count: metrics.restartsTotal })}</Badge>
       </Row>
       <Row gap={8} mt={8}>
-        <Button label={t('live.admin.pause')} variant="glass" size="sm" onPress={() => void api.pause().then(onChanged)} />
-        <Button label={t('live.admin.resume')} variant="glass" size="sm" onPress={() => void api.resume().then(onChanged)} />
+        <Button
+          label={t('live.admin.pause')}
+          variant="glass"
+          size="sm"
+          onPress={() => void api.pause().then(onChanged)}
+        />
+        <Button
+          label={t('live.admin.resume')}
+          variant="glass"
+          size="sm"
+          onPress={() => void api.resume().then(onChanged)}
+        />
       </Row>
       {history.providerEvents.map((event) => (
         <ListRow.Root key={event.id}>

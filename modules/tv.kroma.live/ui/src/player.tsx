@@ -1,5 +1,5 @@
 import { useT } from '@kromatv/module-sdk';
-import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { useHls } from './use-hls';
 
 interface LivePlayerProps {
@@ -8,14 +8,47 @@ interface LivePlayerProps {
   onLost: () => void;
 }
 
-const FRAME: CSSProperties = { position: 'relative', background: '#000', width: '100%', aspectRatio: '16 / 9', borderRadius: 12, overflow: 'hidden' };
-const IMMERSIVE: CSSProperties = { position: 'fixed', inset: 0, zIndex: 1000, background: '#000', width: '100vw', height: '100vh', borderRadius: 0 };
-const BAR: CSSProperties = { position: 'absolute', left: 0, right: 0, bottom: 0, display: 'flex', gap: 8, alignItems: 'center', padding: 10, background: 'linear-gradient(transparent, rgba(0,0,0,.7))' };
-const BUTTON: CSSProperties = { background: 'rgba(255,255,255,.16)', color: '#fff', border: 0, borderRadius: 8, padding: '6px 12px', cursor: 'pointer', font: 'inherit' };
+const FRAME: CSSProperties = {
+  position: 'relative',
+  background: '#000',
+  width: '100%',
+  aspectRatio: '16 / 9',
+  borderRadius: 12,
+  overflow: 'hidden',
+};
+const IMMERSIVE: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000,
+  background: '#000',
+  width: '100vw',
+  height: '100vh',
+  borderRadius: 0,
+};
+const BAR: CSSProperties = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  display: 'flex',
+  gap: 8,
+  alignItems: 'center',
+  padding: 10,
+  background: 'linear-gradient(transparent, rgba(0,0,0,.7))',
+};
+const BUTTON: CSSProperties = {
+  background: 'rgba(255,255,255,.16)',
+  color: '#fff',
+  border: 0,
+  borderRadius: 8,
+  padding: '6px 12px',
+  cursor: 'pointer',
+  font: 'inherit',
+};
 
 export function LivePlayer({ url, title, onLost }: Readonly<LivePlayerProps>) {
   const t = useT();
-  const video = useRef<HTMLVideoElement>(null);
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const [immersive, setImmersive] = useState(false);
   const [muted, setMuted] = useState(false);
   const state = useHls(video, url, onLost);
@@ -33,7 +66,7 @@ export function LivePlayer({ url, title, onLost }: Readonly<LivePlayerProps>) {
   return (
     <div style={{ ...FRAME, ...(immersive ? IMMERSIVE : null) }} data-testid="live-player">
       <video
-        ref={video}
+        ref={setVideo}
         aria-label={title}
         playsInline
         muted={muted}
@@ -41,13 +74,23 @@ export function LivePlayer({ url, title, onLost }: Readonly<LivePlayerProps>) {
         onDoubleClick={toggleImmersive}
         onClick={state.toggle}
         style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
-      />
+      >
+        <track kind="captions" />
+      </video>
       {state.blocked ? (
-        <button type="button" style={{ ...BUTTON, position: 'absolute', inset: 'auto', top: '45%', left: '45%' }} onClick={state.goLive}>
+        <button
+          type="button"
+          style={{ ...BUTTON, position: 'absolute', inset: 'auto', top: '45%', left: '45%' }}
+          onClick={state.goLive}
+        >
           {t('live.player.play')}
         </button>
       ) : null}
-      {state.failed ? <div style={{ position: 'absolute', top: 12, left: 12, color: '#fff' }}>{t('live.player.failed')}</div> : null}
+      {state.failed ? (
+        <div style={{ position: 'absolute', top: 12, left: 12, color: '#fff' }}>
+          {t('live.player.failed')}
+        </div>
+      ) : null}
       <div style={BAR}>
         <button type="button" style={BUTTON} onClick={state.toggle}>
           {state.playing ? t('live.player.pause') : t('live.player.play')}

@@ -37,7 +37,11 @@ describe('the events', () => {
 
 describe('a scan', () => {
   it('keeps each captured channel with its picture and verdict', () => {
-    const scan = ScanState.parse({ running: true, total: 2, items: [{ id: 'p:1', name: 'A', ok: true, frame: 'scan-x/1.jpg' }] });
+    const scan = ScanState.parse({
+      running: true,
+      total: 2,
+      items: [{ id: 'p:1', name: 'A', ok: true, frame: 'scan-x/1.jpg' }],
+    });
 
     expect(scan.items[0]?.black).toBe(false);
     expect(scan.items[0]?.frame).toBe('scan-x/1.jpg');

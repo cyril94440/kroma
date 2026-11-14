@@ -23,7 +23,9 @@ export function AdminProviders({ api, overview, onChanged }: Readonly<AdminProvi
             <Row gap={8}>
               {provider.singleConnection ? <Badge>{t('live.admin.singleConnection')}</Badge> : null}
               <Text variant="meta" color="textDim">
-                {provider.configured ? t('live.admin.channels', { count: provider.channels }) : t('live.admin.notConfigured')}
+                {provider.configured
+                  ? t('live.admin.channels', { count: provider.channels })
+                  : t('live.admin.notConfigured')}
               </Text>
               {provider.error ? <Text variant="meta">{t('live.admin.failing')}</Text> : null}
             </Row>
@@ -34,7 +36,12 @@ export function AdminProviders({ api, overview, onChanged }: Readonly<AdminProvi
         <Text variant="meta" color="textDim">
           {t('live.admin.guide', { count: overview.guideProgrammes })}
         </Text>
-        <Button label={t('live.admin.refresh')} variant="glass" size="sm" onPress={() => void api.refresh().then(onChanged)} />
+        <Button
+          label={t('live.admin.refresh')}
+          variant="glass"
+          size="sm"
+          onPress={() => void api.refresh().then(onChanged)}
+        />
       </Row>
       {overview.ffmpegHttps ? null : (
         <Callout.Root>

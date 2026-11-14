@@ -23,17 +23,29 @@ export default function LivePage({ host }: Readonly<{ host: KromaHost }>) {
       <Row wrap gap={24} mt={24} align="flex-start">
         <Box flex minW={320} style={{ flexBasis: 640 }}>
           {url ? (
-            <LivePlayer url={url} title={status.channel?.name ?? t('live.title')} onLost={refresh} />
+            <LivePlayer
+              url={url}
+              title={status.channel?.name ?? t('live.title')}
+              onLost={refresh}
+            />
           ) : (
             <Callout.Root>
-              <Text>{t(status.state === 'paused' ? 'live.standby.resuming' : 'live.player.idle')}</Text>
+              <Text>
+                {t(status.state === 'paused' ? 'live.standby.resuming' : 'live.player.idle')}
+              </Text>
             </Callout.Root>
           )}
           <Box mt={12}>
             <StatusBadges status={status} />
           </Box>
-          {status.lastError ? <Text variant="meta" color="textDim">{t('live.error.last')}</Text> : null}
-          {status.offAir ? <Text variant="meta">{t('live.offAir.notice', { name: status.offAir.name })}</Text> : null}
+          {status.lastError ? (
+            <Text variant="meta" color="textDim">
+              {t('live.error.last')}
+            </Text>
+          ) : null}
+          {status.offAir ? (
+            <Text variant="meta">{t('live.offAir.notice', { name: status.offAir.name })}</Text>
+          ) : null}
           <Box mt={12}>
             <NowNext now={status.now} next={status.next} clock={clock} />
           </Box>

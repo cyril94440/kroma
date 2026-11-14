@@ -455,6 +455,24 @@
         "react": "^19.3.0",
       },
     },
+    "modules/tv.kroma.hermes": {
+      "name": "@kromatv/module-hermes",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kromatv/client": "workspace:*",
+        "@kromatv/module-sdk": "workspace:*",
+        "@kromatv/ui": "workspace:*",
+        "@tanstack/react-query": "^5.104.5",
+        "zod": "^4.6.7",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "typescript": "^7.0.2",
+      },
+      "peerDependencies": {
+        "react": "^19.3.0",
+      },
+    },
     "modules/tv.kroma.indexer": {
       "name": "@kromatv/module-indexer",
       "version": "0.0.0",
@@ -1761,6 +1779,8 @@
     "@kromatv/mobile": ["@kromatv/mobile@workspace:clients/mobile"],
 
     "@kromatv/module-acquisition": ["@kromatv/module-acquisition@workspace:modules/tv.kroma.acquisition"],
+
+    "@kromatv/module-hermes": ["@kromatv/module-hermes@workspace:modules/tv.kroma.hermes"],
 
     "@kromatv/module-indexer": ["@kromatv/module-indexer@workspace:modules/tv.kroma.indexer"],
 

@@ -362,6 +362,11 @@ a curated library has no need to carry any of it.
   is out of scope for the library, which only *observes* what appears, [`library/`](../library/).
   This stack carries the heaviest and most legally sensitive native code in the product; it
   is exactly what should be optional, isolated and removable.
+- **Live television** (`tv.kroma.live`). One IPTV provider connection read by a helper
+  `ffmpeg` and restreamed as HLS from the module's public folder to every signed-in viewer
+  (`publish: ["files"]`), with standby when nobody watches, off-air detection, a guide and
+  an automatic backup provider. Live streaming is not part of the library, and a server
+  without an IPTV subscription has no use for it.
 - **Transcription** (`tv.kroma.whisper`). A speech-to-text ML runtime, a large dependency
   most servers will never enable.
 - **Semantic search** (`tv.kroma.vector`). Vector embeddings and search, again an ML stack,

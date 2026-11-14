@@ -8,7 +8,8 @@ import { useAdmin } from './use-admin';
 export default function LiveAdminPage({ host }: Readonly<{ host: KromaHost }>) {
   const t = useT();
   const { api, overview, history, metrics, failed, load } = useAdmin(host);
-  if (!overview || !history || !metrics) return failed ? <ModuleFailed /> : <ModuleLoading panels={3} />;
+  if (!overview || !history || !metrics)
+    return failed ? <ModuleFailed /> : <ModuleLoading panels={3} />;
   return (
     <>
       <PageHeader.Root>

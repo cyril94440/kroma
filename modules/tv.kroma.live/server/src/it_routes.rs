@@ -36,7 +36,7 @@ fn api(party: bool) -> Api {
         host = host.with_point("tv.kroma.party/room", None, "http://127.0.0.1:1", "t");
     }
     let rig = Rig { host: host.clone(), ..rig };
-    let app = crate::routes::routes::<StubHost>().with_state(host);
+    let app = crate::routes::routes::<StubHost>().merge(crate::routes::point_routes::<StubHost>()).with_state(host);
     Api { app, rig }
 }
 

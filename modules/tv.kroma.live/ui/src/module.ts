@@ -11,7 +11,12 @@ const liveModule = defineModule({
     {
       path: 'live-admin',
       component: lazy(() => import('./LiveAdminPage')),
-      nav: { label: 'nav.liveAdmin', icon: 'tv', section: 'acquisition', requires: 'settings.manage' },
+      nav: {
+        label: 'nav.liveAdmin',
+        icon: 'tv',
+        section: 'acquisition',
+        requires: 'settings.manage',
+      },
     },
   ],
 });
