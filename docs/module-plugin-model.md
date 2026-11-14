@@ -339,6 +339,16 @@ the core scheduler over `/api/_host/register-job` when the module starts, and
 the core fires them by POSTing `/_job/run/{key}`, so they appear in the admin
 job list like an in-core one. And **events are two-way now**, see below.
 
+**Files a module publishes.** A component answers buffered requests and cannot
+stream, so a module whose helper program writes files clients must fetch (the
+segments of a live HLS stream) declares `publish: ["files"]` and writes under the
+`public` folder of its data directory. The core serves that folder at
+`/api/module-files/<id>/*` to signed-in accounts, for an official module only,
+with the media routes' credentials. It names no module and no kind of file: the
+mechanism is "serve this module's public folder", and who may fetch what is the
+module's own concern (an unguessable folder name in the path it hands out).
+See [module security](module-security.md#published-files).
+
 ## Extending a module's frontend
 
 The backend recursion above has no frontend half yet. A module ships a Module

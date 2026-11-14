@@ -112,6 +112,12 @@ export const Permissions = z
       .describe(
         'The server\'s own media tools this module may have run on files it holds, under the server\'s ffmpeg budget: "decode" turns an audio track into raw PCM.',
       ),
+    publish: z
+      .array(z.enum(['files']))
+      .optional()
+      .describe(
+        'What the server may hand to signed-in clients for this module: "files" serves the `public` folder under its first data directory at /api/module-files/<id>/. Only a module the official registry shipped is served.',
+      ),
     env: z
       .array(z.string().regex(/^[A-Z_][A-Z0-9_]*$/))
       .optional()

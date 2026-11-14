@@ -28,6 +28,7 @@ mod invites;
 mod mail;
 mod media;
 pub mod media_ticket;
+mod module_files;
 mod metadata;
 mod modules;
 mod monitoring;
@@ -103,6 +104,8 @@ mod it_mail_relay;
 mod it_account_identifiers;
 #[cfg(test)]
 mod it_media;
+#[cfg(test)]
+mod it_module_files;
 #[cfg(test)]
 mod it_module_frontend;
 #[cfg(test)]
@@ -263,6 +266,7 @@ pub fn router(state: SharedState, supervisor: Arc<Supervisor>) -> Router {
         .merge(server_status::public_routes())
         .merge(direct::public_routes())
         .merge(stream::routes())
+        .merge(module_files::routes())
         .merge(online_subs::public_routes())
         .merge(themes::routes())
         .merge(trailers::public_routes())

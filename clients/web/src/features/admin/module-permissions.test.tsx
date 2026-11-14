@@ -49,6 +49,15 @@ describe('permissionGroups', () => {
     });
   });
 
+  it('says a module serves files to signed-in viewers, inside its isolation', () => {
+    const publish = group({ permissions: { publish: ['files'] } }, 'publish');
+
+    expect(publish).toMatchObject({
+      summary: 'Serves files it writes to signed-in viewers, such as a live stream',
+      extended: false,
+    });
+  });
+
   it('says where a connection goes and why when it has one purpose', () => {
     const internet = group(
       {

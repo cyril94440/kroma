@@ -430,6 +430,17 @@ lacks the route gets `None` for every key, so it runs on its defaults; raise
 `engines.server` to the first server with the route when the defaults would be
 wrong.
 
+### Publishing files to clients
+
+A first-party module that writes files a client must stream, the segments of a
+live HLS stream for one, declares `"permissions": { "publish": ["files"] }` and
+writes them under `<data>/<first dataDir>/public/`. The server serves them at
+`/api/module-files/<id>/<path>` to signed-in accounts holding `playback`, with
+Range, the right content types, a media ticket accepted in `?t=` and no
+directory listing (details in [module security](../docs/module-security.md#published-files)).
+A frontend builds the URL with `client.modules.fileUrl(id, path)`, which
+carries the ticket. Gate who may fetch by handing out an unguessable folder name.
+
 ### Notifications
 
 A module tells people through the core's inbox, never one of its own. Declare

@@ -36,7 +36,7 @@ use download::download_item;
 use external_subtitles::nth_beside;
 use hls::{hls_file, hls_master};
 
-fn byte_sink(
+pub(crate) fn byte_sink(
     state: &SharedState,
     headers: &HeaderMap,
     addr: &SocketAddr,

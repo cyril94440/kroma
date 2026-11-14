@@ -2450,6 +2450,7 @@ dependencies = [
  "kroma-primitives",
  "kroma-requests",
  "kroma-testing",
+ "libc",
  "libmimalloc-sys",
  "mimalloc",
  "openssl",

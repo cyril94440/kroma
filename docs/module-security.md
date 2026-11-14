@@ -54,6 +54,7 @@ Its `storage` and `settings` are not yet held to the row.
   "fs": { "read": ["media", "downloads"], "write": ["module", "downloads"] },
   "run": ["rqbit"],
   "media": ["decode"],
+  "publish": ["files"],
   "env": ["KROMA_EMBED_MODEL_DIR"]
 }
 ```
@@ -68,6 +69,7 @@ Its `storage` and `settings` are not yet held to the row.
 | `run` | programs it may start, by name | first-party modules only. What starts is a process of the host, see [below](#what-the-component-does-not-contain). Marked as extended access |
 | `env` | environment variables beyond the allowlist | the server's own variables, secrets included, are never passed |
 | `media` | the core's media tools, by name: `decode` turns an audio track into raw PCM | the core's ffmpeg runs it under its budget, on a file the module holds and cannot write |
+| `publish` | `files` lets the server hand the module's `public` folder to signed-in clients | official modules only. See [published files](#published-files) |
 
 These sit beside the declarations that already exist and keep working:
 
@@ -299,6 +301,30 @@ None of them lies inside or above one of the server's own folders: one the
 operator names there is not held, and the module's log says so when it starts.
 They are writable when `fs.write` names `downloads`. A download saved anywhere
 else does not import, and the queue says which folder to add.
+
+### Published files
+
+A component serves no bytes of its own: a route answers one buffered response.
+A module that produces files clients must stream (an HLS live stream written by
+a helper program) declares `publish: ["files"]` and writes under the `public`
+folder of its first data directory. The core serves
+`GET /api/module-files/<module id>/<path>` from `<data>/<dataDir>/public/<path>`:
+
+- Authentication is the media routes': the session bearer, or a media ticket
+  in `?t=` for a `<video>`, hls.js or a native player. The account needs
+  `playback`. A playlist (`.m3u8`) fetched with a ticket comes back with the
+  ticket on every URI, as the core's own HLS does.
+- Only a module the official registry shipped, enabled, that declares `publish`
+  is served; any other answer is `404`.
+- A path is plain segments: no `..`, no absolute path, no segment starting with
+  `.`. It is resolved with symlinks followed and must stay under the public
+  root, is opened without following a link, and must be a regular file. A folder
+  is never listed.
+- Range is honoured, playlists carry `Cache-Control: no-store`, other files
+  `private, max-age=30`, bytes are metered as the media routes' are.
+- Who of the signed-in accounts may fetch is the module's business. A module that
+  must gate it puts an unguessable folder name in the path it hands only to the
+  people it authorises, and never lists that folder anywhere else.
 
 ### What the component does not contain
 

@@ -80,6 +80,8 @@ fn held(dir: impl Into<PathBuf>, writable: bool) -> Preopen {
     }
 }
 
+const PUBLIC_FOLDER: &str = "public";
+
 impl Supervisor {
     /// The data directories module `id` keeps under the server's data directory,
     /// which only a module the official registry shipped may hold.
@@ -96,6 +98,25 @@ impl Supervisor {
             .filter(|name| is_data_dir_name(name))
             .map(|name| self.cfg.data_dir.join(name))
             .collect()
+    }
+
+    /// The folder whose files the server hands to signed-in clients for module
+    /// `id`: `public` under the module's first data directory. Only a module the
+    /// official registry shipped that declares `publish: ["files"]` has one.
+    pub fn public_root_of(&self, id: &str) -> Option<PathBuf> {
+        if !self.origin(id).official {
+            return None;
+        }
+        let manifest = self
+            .installed_manifests()
+            .into_iter()
+            .find(|manifest| manifest.id == id)?;
+        let publishes = manifest
+            .permissions
+            .as_ref()
+            .is_some_and(|p| p.publish.contains(&kroma_module_manifest::Publish::Files));
+        let name = manifest.data_dirs.iter().find(|name| is_data_dir_name(name))?;
+        publishes.then(|| self.cfg.data_dir.join(name).join(PUBLIC_FOLDER))
     }
 
     pub(super) fn component_roots(

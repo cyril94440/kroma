@@ -18,6 +18,7 @@ export type PermissionCategory =
   | 'accounts'
   | 'files'
   | 'media'
+  | 'publish'
   | 'internet'
   | 'listen'
   | 'lan'
@@ -154,6 +155,18 @@ function mediaGroup(media: ModulePermissions['media'], t: Translate): Permission
   };
 }
 
+function publishGroup(publish: ModulePermissions['publish'], t: Translate): PermissionGroup | null {
+  if (!publish?.includes('files')) return null;
+  return {
+    category: 'publish',
+    summary: t('modulePermissions.publishSummary'),
+    brief: t('modulePermissions.publishBrief'),
+    details: [],
+    extended: false,
+    access: null,
+  };
+}
+
 /** Every kind of access `source` declares, most consequential first: what
  *  reaches past the module's isolation, then the data about people, the files,
  *  the audio the server decodes for it, the internet, what may reach in, the local network, the server's data and
@@ -168,6 +181,7 @@ export function permissionGroups(source: PermissionSource, t: Translate): Permis
     accountsGroup(core, t),
     filesGroup(permissions.fs, t),
     mediaGroup(permissions.media, t),
+    publishGroup(permissions.publish, t),
     internetGroup(net?.connect ?? [], t),
     listenGroup(net?.listen ?? [], t),
     lanGroup(net, t),

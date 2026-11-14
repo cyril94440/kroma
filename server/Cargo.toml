@@ -296,6 +296,9 @@ kroma-primitives = { workspace = true }
 # musl's malloc serializes under our thread mix (tokio + rayon + candle + tantivy);
 # mimalloc removes that contention. Linux-only; macOS dev keeps the system
 # allocator. See the #[global_allocator] in main.rs.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(target_os = "linux")'.dependencies]
 mimalloc = { workspace = true }
 libmimalloc-sys = { workspace = true }

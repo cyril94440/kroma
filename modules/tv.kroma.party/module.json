@@ -1,0 +1,71 @@
+{
+  "$schema": "https://modules.kroma.tv/schemas/3/manifest.json",
+  "schemaVersion": 3,
+  "id": "tv.kroma.party",
+  "name": "Watch party",
+  "version": "0.1.0",
+  "description": "A shared room around the live television: chat, majority votes to change channel, polls, reactions, an ideas box and playback sync.",
+  "engines": {
+    "server": ">=0.1.39"
+  },
+  "dependencies": {
+    "tv.kroma.live": ">=0.1.0"
+  },
+  "feRemote": {
+    "module": "./remoteEntry.js"
+  },
+  "definesPoints": [
+    {
+      "name": "room",
+      "methods": [
+        "say",
+        "history",
+        "requestSwitch",
+        "startPoll",
+        "closePoll",
+        "kick",
+        "activity",
+        "votePoll"
+      ]
+    }
+  ],
+  "contributes": [
+    {
+      "point": "tv.kroma.party/room"
+    }
+  ],
+  "consumes": [
+    {
+      "point": "tv.kroma.live/control"
+    }
+  ],
+  "config": [
+    { "key": "voteSeconds", "label": "config.voteSeconds", "type": "number", "default": "30" },
+    {
+      "key": "presenceGraceSeconds",
+      "label": "config.presenceGraceSeconds",
+      "type": "number",
+      "default": "45"
+    },
+    { "key": "bypassUserIds", "label": "config.bypassUserIds", "type": "string", "default": "" },
+    { "key": "agentName", "label": "config.agentName", "type": "string", "default": "Hermès" },
+    { "key": "archiveDays", "label": "config.archiveDays", "type": "number", "default": "30" },
+    {
+      "key": "instabilityAlerts",
+      "label": "config.instabilityAlerts",
+      "type": "bool",
+      "default": "true"
+    }
+  ],
+  "notifications": [
+    {
+      "type": "tv.kroma.party/idea.updated",
+      "category": "system",
+      "push": false,
+      "labelKey": "notifications.ideaUpdated.label",
+      "titleKey": "notifications.ideaUpdated.title",
+      "bodyKey": "notifications.ideaUpdated.body"
+    }
+  ],
+  "storage": {}
+}

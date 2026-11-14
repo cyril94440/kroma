@@ -43,6 +43,11 @@ export const CATEGORY_VIEW: Record<PermissionCategory, CategoryView> = {
     title: 'modulePermissions.mediaTitle',
     line: 'modulePermissions.lineMedia',
   },
+  publish: {
+    icon: 'folder',
+    title: 'modulePermissions.publishTitle',
+    line: 'modulePermissions.linePublish',
+  },
   internet: {
     icon: 'world',
     title: 'modulePermissions.internetTitle',

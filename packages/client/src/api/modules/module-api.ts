@@ -26,9 +26,18 @@ export interface ModuleApi {
   ): Promise<z.output<S>>;
 }
 
-/** Bind `ctx` to the admin mount of module `id`. */
-export function moduleApi(ctx: RequestContext, id: ModuleId): ModuleApi {
-  const at = (path: string) => `/admin/m/${encodeURIComponent(id)}${path}`;
+export type ModuleMount = 'admin' | 'viewer';
+
+const MOUNTS: Record<ModuleMount, string> = { admin: '/admin/m', viewer: '/module' };
+
+/** Bind `ctx` to the admin mount of module `id`, or with `'viewer'` to the routes
+ *  it serves to any signed-in account (`/api/module/<id>/...`). */
+export function moduleApi(
+  ctx: RequestContext,
+  id: ModuleId,
+  mount: ModuleMount = 'admin',
+): ModuleApi {
+  const at = (path: string) => `${MOUNTS[mount]}/${encodeURIComponent(id)}${path}`;
   const send = (verb: 'post' | 'put') => (path: string, body?: unknown, response?: z.ZodType) =>
     response ? ctx[verb](at(path), response, { body }) : ctx[verb](at(path), { body });
   return {

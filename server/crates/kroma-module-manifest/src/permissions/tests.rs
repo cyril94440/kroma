@@ -151,6 +151,7 @@ fn a_misspelt_permission_is_refused_rather_than_ignored() {
     assert!(parse(json!({ "net": { "conect": [] } })).is_err());
     assert!(parse(json!({ "fs": { "read": ["/etc"] } })).is_err());
     assert!(parse(json!({ "media": ["transcode"] })).is_err());
+    assert!(parse(json!({ "publish": ["everything"] })).is_err());
     assert!(parse(
         json!({ "net": { "connect": [{ "purpose": "p", "to": ["public"], "proto": ["icmp"] }] } })
     )
@@ -163,6 +164,14 @@ fn a_media_tool_is_read_by_its_name() {
 
     assert_eq!(p.media, [MediaTool::Decode]);
     assert_eq!(serde_json::to_value(&p).unwrap(), json!({ "net": {}, "fs": {}, "media": ["decode"] }));
+}
+
+#[test]
+fn publishing_files_is_read_by_its_name() {
+    let p = parse(json!({ "publish": ["files"] })).unwrap();
+
+    assert_eq!(p.publish, [Publish::Files]);
+    assert_eq!(serde_json::to_value(&p).unwrap(), json!({ "net": {}, "fs": {}, "publish": ["files"] }));
 }
 
 #[test]
@@ -308,6 +317,7 @@ fn the_host_network_a_listener_a_root_a_program_a_media_tool_and_a_variable_each
         json!({ "fs": { "write": ["media"] } }),
         json!({ "run": ["ffmpeg"] }),
         json!({ "media": ["decode"] }),
+        json!({ "publish": ["files"] }),
         json!({ "env": ["X"] }),
     ] {
         assert!(block(after.clone()).widens(&before), "{after}");

@@ -22,6 +22,8 @@ pub struct Permissions {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub media: Vec<MediaTool>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub publish: Vec<Publish>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<String>,
 }
 
@@ -114,6 +116,15 @@ pub enum MediaTool {
     Decode,
 }
 
+/// What the host may hand to signed-in clients on a module's behalf. `files`
+/// serves the module's `public` folder under its first data directory at
+/// `/api/module-files/<id>/`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Publish {
+    Files,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FsPermissions {
@@ -183,6 +194,7 @@ impl Permissions {
             || roots_beyond(&self.fs.write, &before.fs.write)
             || beyond(&self.run, &before.run)
             || self.media.iter().any(|tool| !before.media.contains(tool))
+            || self.publish.iter().any(|kind| !before.publish.contains(kind))
             || beyond(&self.env, &before.env)
     }
 

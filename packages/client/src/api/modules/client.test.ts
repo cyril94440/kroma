@@ -117,3 +117,24 @@ describe('the module list', () => {
     await expect(client.modules.list()).rejects.toThrow();
   });
 });
+
+describe('a file a module published', () => {
+  const live = ModuleId.parse('tv.kroma.live');
+
+  it('is addressed per segment and carries the media ticket', () => {
+    const { client } = recordingClient(() => ({ json: [] }));
+    client.session.setSessionMediaTicket('dev.9.sig');
+
+    expect(client.modules.fileUrl(live, 'a b/index.m3u8')).toBe(
+      'http://kroma.test/api/module-files/tv.kroma.live/a%20b/index.m3u8?t=dev.9.sig',
+    );
+  });
+
+  it("mounts the viewer routes under the module's own path", async () => {
+    const { client, calls } = recordingClient(() => ({ json: { ok: true } }));
+
+    await client.modules.viewerApi(live).get('/status', z.object({ ok: z.boolean() }));
+
+    expect(calls[0]?.path).toBe('/module/tv.kroma.live/status');
+  });
+});
