@@ -101,6 +101,10 @@ impl<S: kroma_module_sdk::host::HostCtx + Clone + Send + Sync + 'static>
         MODULE_ID
     }
 
+    async fn on_enable(&self, host: S) {
+        let _ = std::fs::create_dir_all(host.data_dir().join(DATA_DIR).join("downloads"));
+    }
+
     fn jobs(&self) -> Vec<kroma_module_sdk::host::ModuleJob<S>> {
         vec![purge_job::job::<S>()]
     }
@@ -109,4 +113,30 @@ impl<S: kroma_module_sdk::host::HostCtx + Clone + Send + Sync + 'static>
 pub fn server_module<S: kroma_module_sdk::host::HostCtx + Clone + Send + Sync + 'static>(
 ) -> Box<dyn kroma_module_sdk::host::ServerModule<S>> {
     Box::new(AllDebridModule)
+}
+
+#[cfg(test)]
+mod tests {
+    use kroma_module_sdk::host::testing::StubHost;
+    use kroma_module_sdk::host::{HostCtx, ServerModule};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn enabling_creates_the_download_folder_the_core_must_already_hold() {
+        let host = StubHost::new();
+
+        ServerModule::<StubHost>::on_enable(&AllDebridModule, host.clone()).await;
+
+        assert!(host.data_dir().join("alldebrid/downloads").is_dir());
+    }
+
+    #[test]
+    fn the_module_answers_to_its_manifest_id_and_registers_one_job() {
+        let module = server_module::<StubHost>();
+
+        assert_eq!(module.id(), MODULE_ID);
+        assert_eq!(module.jobs().len(), 1);
+        assert_eq!(KIND, "alldebrid");
+    }
 }
