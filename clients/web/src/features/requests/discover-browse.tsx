@@ -4,14 +4,15 @@
 
 import type { DiscoverEntry, DiscoverType, TmdbKind } from '@kromatv/client/discovery';
 import { useT } from '@kromatv/ui';
-import { Box, Chip, classes, Icon, Row, styles, Text, useStyles } from '@kromatv/ui/kit';
+import { Box, Button, classes, Icon, Row, styles, Text, useStyles } from '@kromatv/ui/kit';
 import type { IconName } from '@kromatv/ui/kit';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { DiscoverCard } from '#web/features/requests/discover-card';
 import { BROWSE_LISTS, type BrowseList } from '#web/features/requests/discover-lists';
 import { useDiscoverRail, useGenres } from '#web/features/requests/use-discover-lists';
 import { PosterRail, SkeletonRow } from '#web/shared/ui';
+import { RouteLink } from '#web/shared/ui/route-link';
 
 const CAPTION_H = 52;
 
@@ -107,7 +108,6 @@ function GenreChips({ type }: Readonly<{ type: TmdbKind }>) {
 
   const t = useT();
   const { genres } = useGenres(type, true);
-  const navigate = useNavigate();
   if (genres.length === 0) return null;
   return (
     <section>
@@ -117,14 +117,9 @@ function GenreChips({ type }: Readonly<{ type: TmdbKind }>) {
       />
       <div className={classes(s.chips)}>
         {genres.map((g) => (
-          <Chip
-            key={g.id}
-            variant="surface"
-            label={g.name}
-            onPress={() =>
-              navigate({ to: '/genre/$type/$genreId', params: { type, genreId: String(g.id) } })
-            }
-          />
+          <Button key={g.id} variant="glass" size="sm" label={g.name} asChild>
+            <RouteLink to="/genre/$type/$genreId" params={{ type, genreId: String(g.id) }} />
+          </Button>
         ))}
       </div>
     </section>
