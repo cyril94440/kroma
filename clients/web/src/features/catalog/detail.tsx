@@ -29,7 +29,6 @@ import {
 } from '#web/features/catalog/detail-hero-parts';
 import { HeroBackdrop } from '#web/features/catalog/hero-backdrop';
 import { wash } from '#web/shared/lib/art-styles';
-import type { QualityTone } from '#web/shared/lib/quality-badges';
 import { Image } from '#web/shared/ui';
 import { CastButton } from '#web/shared/ui/cast-button';
 
@@ -41,7 +40,6 @@ export {
   langName,
   subString,
 } from '#web/features/catalog/media-labels';
-export type { QualityTone } from '#web/shared/lib/quality-badges';
 export { qualityBadges } from '#web/shared/lib/quality-badges';
 
 // The text column is an element rather than a <Box>, and a flex column at
@@ -84,7 +82,7 @@ export interface DetailHeroProps {
   title: string;
   rating?: number | null;
   meta: string;
-  badges: QualityTone[];
+  badges: string[];
   audioFlag?: string | null;
   directors?: CrewMember[];
   tagline?: string | null;
