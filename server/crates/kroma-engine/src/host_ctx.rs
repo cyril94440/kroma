@@ -80,6 +80,10 @@ impl HostCtx for AppState {
         self.settings.get_i64(key, default)
     }
 
+    fn module_config(&self, module: &str) -> serde_json::Map<String, serde_json::Value> {
+        crate::modules::module_config(&self.settings, module)
+    }
+
     fn set_settings(&self, patch: std::collections::BTreeMap<String, serde_json::Value>) {
         self.settings.set_patch(&self.db, patch);
     }

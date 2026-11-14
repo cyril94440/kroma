@@ -22,6 +22,22 @@ fn settings_are_asked_of_the_core_by_kind() {
 }
 
 #[test]
+fn config_is_asked_of_the_core_by_key_and_read_typed() {
+    let running = running();
+
+    let limit = running.host.config_i64("cacheMaxGb", 50);
+    let unset = running.host.config_value("region");
+
+    assert_eq!(limit, 12);
+    assert_eq!(unset, None);
+    assert!(running
+        .core
+        .to("/api/_host/config")
+        .iter()
+        .any(|c| c.query.contains("key=cacheMaxGb")));
+}
+
+#[test]
 fn a_settings_patch_and_events_are_posted_to_the_core() {
     let running = running();
     let patch = [("theme".to_string(), serde_json::json!("dark"))].into();

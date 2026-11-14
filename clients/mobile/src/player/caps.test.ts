@@ -3,6 +3,7 @@
 // stronger than `decideSource`.
 
 import type { MediaItem } from '@kromatv/client/media';
+import { recordingClient } from '@kromatv/client/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const rn = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
@@ -144,6 +145,43 @@ describe('the master for audio the runtime cannot copy', () => {
     const flac = item({ audio: [{ codec: 'flac', default: true, channels: 2 }] });
     expect(decideSource(flac).aacMaster).toBe(true);
   });
+});
+
+describe('the exact master a phone asks for', () => {
+  const { client } = recordingClient();
+  const masterFor = (source: MediaItem) =>
+    client.media
+      .hlsMasterUrl(source.id, decideSource(source).aacMaster, 0, 0, {
+        videoCodecs: mobileVideoCodecs(),
+        hdr: mobileHdr(),
+        copyCodecs: downloadCopyCodecs(),
+      })
+      .replace('http://kroma.test/api', '');
+
+  it.each(['ios', 'android'] as const)(
+    'asks %s for the copy program with Dolby declared and no TrueHD, so a TrueHD 7.1 track comes back as E-AC-3',
+    (os) => {
+      rn.os = os;
+      const truehd = item({
+        container: 'mkv',
+        audio: [{ codec: 'truehd', default: true, channels: 8 }],
+      });
+
+      expect(masterFor(truehd)).toContain('/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3&');
+    },
+  );
+
+  it.each(['ios', 'android'] as const)(
+    'asks %s for the same copy program for DTS 5.1 and for a stereo AAC track',
+    (os) => {
+      rn.os = os;
+      const dts = item({ container: 'mkv', audio: [{ codec: 'dts', default: true, channels: 6 }] });
+      const stereo = item({ audio: [{ codec: 'aac', default: true, channels: 2 }] });
+
+      expect(masterFor(dts)).toContain('/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3&');
+      expect(masterFor(stereo)).toContain('/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3&');
+    },
+  );
 });
 
 describe('deciding the streaming source', () => {

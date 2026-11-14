@@ -94,6 +94,7 @@
   "modulePermissions.programPinned": "Verified version, shipped with the module",
   "modulePermissions.programServer": "The one installed on the server",
   "modulePermissions.purposeBinaryDownload": "download the programs it uses",
+  "modulePermissions.purposeDebridTransfer": "copy finished downloads from the debrid service",
   "modulePermissions.purposeDownloadClient": "drive the download client",
   "modulePermissions.purposeEngineApi": "drive its download engine",
   "modulePermissions.purposeFlaresolverr": "go through FlareSolverr",

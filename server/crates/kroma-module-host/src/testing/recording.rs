@@ -89,6 +89,12 @@ impl<H: HostCtx> HostCtx for Recording<H> {
     fn setting_i64(&self, key: &str, default: i64) -> i64 {
         self.inner.setting_i64(key, default)
     }
+    fn config_value(&self, key: &str) -> Option<serde_json::Value> {
+        self.inner.config_value(key)
+    }
+    fn module_config(&self, module: &str) -> serde_json::Map<String, serde_json::Value> {
+        self.inner.module_config(module)
+    }
     fn set_settings(&self, patch: BTreeMap<String, serde_json::Value>) {
         self.inner.set_settings(patch);
     }

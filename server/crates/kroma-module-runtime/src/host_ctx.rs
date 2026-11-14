@@ -82,6 +82,17 @@ impl HostCtx for RemoteHost {
             .unwrap_or(default)
     }
 
+    fn config_value(&self, key: &str) -> Option<serde_json::Value> {
+        self.callback()
+            .query("key", key)
+            .get_json::<serde_json::Value>(&self.host_url("config"))
+            .ok()
+            .and_then(|answer| match answer.get("value") {
+                Some(serde_json::Value::Null) | None => None,
+                Some(value) => Some(value.clone()),
+            })
+    }
+
     fn set_settings(&self, patch: std::collections::BTreeMap<String, serde_json::Value>) {
         let _ = self.callback().post_json(
             &self.host_url("settings"),

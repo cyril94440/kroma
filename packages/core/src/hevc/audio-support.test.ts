@@ -220,6 +220,16 @@ describe('surroundTargetFor', () => {
   });
 });
 
+describe('surroundTargetFor channel floor', () => {
+  it('keeps the floor the server keeps: four channels is a stereo AAC, five is a surround bed', () => {
+    const quad = track({ index: 0, codec: 'dts', channels: 4 });
+    const five = track({ index: 0, codec: 'dts', channels: 5 });
+
+    expect(surroundTargetFor(quad, SAFARI_CAPS)).toBeNull();
+    expect(surroundTargetFor(five, SAFARI_CAPS)).toBe('eac3');
+  });
+});
+
 describe('masterNeedsAac', () => {
   it('keeps an all-aac master as stream-copy on every engine', () => {
     const item = makeItem({ audio: [track({ index: 0, codec: 'aac', channels: 2 })] });

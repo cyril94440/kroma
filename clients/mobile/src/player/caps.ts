@@ -11,8 +11,8 @@ import {
   audioTracksOf,
   canDecodeAudioCodec,
   canDirectPlay,
+  copyableAudioCodecs,
   decodableVideoCodecs,
-  FMP4_COPY_CODECS,
   hdrDeclaration,
   masterNeedsAac,
   type PlaybackCapabilities,
@@ -100,9 +100,7 @@ export interface SourceDecision {
  * ffmpeg can stream-copy into fMP4. The rest transcode to stereo AAC
  * server-side, since offline playback has no fallback for an unplayable track. */
 export function downloadCopyCodecs(): string[] {
-  const caps = mobileCaps();
-  const decodable = decodableAudioCodecs(caps);
-  return [...FMP4_COPY_CODECS].filter((codec) => decodable.has(codec));
+  return copyableAudioCodecs(mobileCaps());
 }
 
 /** The `?video=` set this runtime declares, on a master and on `/download`

@@ -1,6 +1,6 @@
 import type { MediaItem } from '@kromatv/client/media';
-import { fakeClient } from '@kromatv/client/test';
-import { detectCapabilities } from '@kromatv/core';
+import { fakeClient, recordingClient } from '@kromatv/client/test';
+import { detectCapabilities, MSE_CAPS, type PlaybackCapabilities } from '@kromatv/core';
 import type { AudioFilterMode } from '@kromatv/ui';
 import { describe, expect, it, vi } from 'vitest';
 import { BaseTvEngine, type EngineOptions } from './baseEngine';
@@ -279,4 +279,50 @@ it('declares each engine owner decoder ceiling in its server master request', ()
     expect.objectContaining({ maxFrame: { width: 1280, height: 720 } }),
     expect.objectContaining({ maxFrame: { width: 1920, height: 1080 } }),
   ]);
+});
+
+describe('the master a native engine asks for, by what the device decodes', () => {
+  const { client: real } = recordingClient();
+  const urlFor = (audio: Partial<PlaybackCapabilities['audio']>) => {
+    const caps: PlaybackCapabilities = {
+      ...MSE_CAPS,
+      audio: {
+        aac: true,
+        ac3: false,
+        eac3: false,
+        dts: false,
+        truehd: false,
+        flac: false,
+        opus: false,
+        mp3: false,
+        vorbis: false,
+        ...audio,
+      },
+    };
+    return make({
+      client: fakeClient({ media: { hlsMasterUrl: real.media.hlsMasterUrl } }),
+      direct: false,
+      capabilities: caps,
+    })
+      .url()
+      .replace('http://kroma.test/api', '');
+  };
+
+  it('copies and declares E-AC-3 and AC-3 for a device that decodes both, so a TrueHD 7.1 track is re-encoded to E-AC-3', () => {
+    expect(urlFor({ eac3: true, ac3: true })).toBe(
+      '/items/m1/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3&video=hevc%2Ch264%2Cav1%2Cvp9',
+    );
+  });
+
+  it('declares AC-3 alone for a device that decodes only that, so a DTS 5.1 track is re-encoded to AC-3', () => {
+    expect(urlFor({ ac3: true })).toBe(
+      '/items/m1/hls/copy/0/0/index.m3u8?copy=aac%2Cac3&video=hevc%2Ch264%2Cav1%2Cvp9',
+    );
+  });
+
+  it('declares AAC alone for a device with no Dolby decoder, so any surround track becomes stereo AAC', () => {
+    expect(urlFor({})).toBe(
+      '/items/m1/hls/copy/0/0/index.m3u8?copy=aac&video=hevc%2Ch264%2Cav1%2Cvp9',
+    );
+  });
 });

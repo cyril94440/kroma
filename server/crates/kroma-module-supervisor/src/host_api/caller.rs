@@ -32,6 +32,10 @@ impl Caller {
         self.declaration().is_some_and(|scope| scope.writes(key))
     }
 
+    pub(super) fn config_field(&self, key: &str) -> Option<kroma_module_manifest::ConfigField> {
+        self.supervisor.config_field(self.module.as_deref()?, key)
+    }
+
     pub(super) fn declares_notification(&self, name: &str) -> bool {
         self.module
             .as_deref()

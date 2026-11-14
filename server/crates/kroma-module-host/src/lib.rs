@@ -23,6 +23,7 @@ pub mod testing;
 pub mod test_serve;
 
 mod auth;
+mod config_value;
 pub mod files;
 mod host_ctx;
 pub mod lan;

@@ -20,7 +20,7 @@ use super::hls_query::HlsQuery;
 use super::{byte_sink, load_item};
 
 /// `GET /api/items/:id/hls/:mode/:anchor/:audio/index.m3u8` (mode = an audio
-/// treatment `copy`|`aac`|`aac-standard`|`aac-night`, optionally prefixed `h264-`
+/// treatment `copy`|`aac`|`aac-standard`|`aac-night`|`eac3`|`ac3`, optionally prefixed `h264-`
 /// to re-encode the picture; anchor = start seconds for input `-ss`; audio =
 /// audio-relative track index) → one media playlist muxing video with that single
 /// audio track. Each (mode, anchor, audio) is its own session with its own child

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { HlsMasterDeclaration, MediaItem } from '@kromatv/client/media';
-import { fakeClient } from '@kromatv/client/test';
+import { fakeClient, recordingClient } from '@kromatv/client/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AvplayEngine } from './avplayEngine';
 import type { EngineOptions } from './baseEngine';
@@ -209,6 +209,19 @@ describe('AvplayEngine construction', () => {
   it('master mode opens the anchored HLS master (no anchor -> immediate)', () => {
     const { lastArgs } = make({ direct: false, startSec: 0 });
     expect(lastArgs('open')).toEqual(['master:sm1:false:0:0']);
+  });
+
+  it('opens the copy program declaring only Dolby and the codecs AVPlay carries, never DTS or TrueHD, so the server re-encodes those to surround', () => {
+    const { client: real } = recordingClient();
+
+    const { lastArgs } = make({
+      direct: false,
+      client: fakeClient({ media: { hlsMasterUrl: real.media.hlsMasterUrl } }),
+    });
+
+    expect(lastArgs('open')).toEqual([
+      'http://kroma.test/api/items/sm1/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3%2Cmp3&video=hevc%2Ch264%2Cvp9&hdr=hdr10%2Chdr10plus%2Chlg',
+    ]);
   });
 
   it('an anchored master resolves its real keyframe start before opening', async () => {

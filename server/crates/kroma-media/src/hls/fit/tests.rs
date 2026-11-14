@@ -443,3 +443,30 @@ fn only_a_copy_request_is_turned_into_a_surround_transcode() {
         audio(AudioMode::Eac3)
     );
 }
+
+const AVPLAY_COPY_SET: &str = "aac,ac3,eac3,mp3";
+const MOBILE_COPY_SET: &str = "aac,ac3,eac3";
+
+#[test]
+fn the_sets_the_clients_declare_keep_the_surround_bed_of_every_undecodable_track() {
+    for set in [AVPLAY_COPY_SET, MOBILE_COPY_SET] {
+        assert_eq!(surround("truehd", 8, set), AudioMode::Eac3, "{set}");
+        assert_eq!(surround("dts", 6, set), AudioMode::Eac3, "{set}");
+    }
+    assert_eq!(surround("dts", 6, "aac,ac3,mp3"), AudioMode::Ac3);
+    assert_eq!(surround("truehd", 8, "aac"), AudioMode::Aac);
+    assert_eq!(surround("aac", 2, "aac"), AudioMode::Copy);
+}
+
+#[test]
+fn a_re_encoded_picture_keeps_the_surround_bed_the_same_request_earned() {
+    let sdr_only = copy()
+        .for_client_track(Some("truehd"), Some(8), Some(MOBILE_COPY_SET))
+        .for_client_hdr(Some(&hdr_video(Some(HdrFormat::Hdr10), None, None)), Some(""), true);
+
+    assert_eq!(
+        sdr_only,
+        StreamMode::new(VideoMode::H264, AudioMode::Eac3)
+    );
+    assert_eq!(sdr_only.token(), "h264-eac3");
+}

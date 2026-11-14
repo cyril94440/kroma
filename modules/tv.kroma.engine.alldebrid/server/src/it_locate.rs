@@ -116,7 +116,7 @@ async fn a_purged_file_goes_back_to_a_url() {
 #[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
 async fn with_the_cache_switched_off_a_warm_never_fetches() {
     let fake = movie().start();
-    let host = StubHost::new().with_setting("cacheMaxGb", json!(0));
+    let host = StubHost::new().with_config("cacheMaxGb", json!(0));
     known_to(&host, &fake);
 
     let answer = locate(&host, "7:Movie.mkv", true).await;

@@ -84,3 +84,16 @@ describe('a transcode session card', () => {
     expect(screen.getByText('-')).toBeTruthy();
   });
 });
+
+describe('the sound a session is producing', () => {
+  it.each([
+    ['eac3', 'E-AC-3 5.1'],
+    ['ac3', 'AC-3 5.1'],
+    ['aac', 'AAC'],
+    ['aac-night', 'AAC · night'],
+  ])('names %s as %s', (audio, label) => {
+    stage(session({ audio }));
+
+    expect(screen.getByText((text) => text.endsWith(`· ${label}`))).toBeTruthy();
+  });
+});

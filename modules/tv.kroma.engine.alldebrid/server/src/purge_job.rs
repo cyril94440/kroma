@@ -69,8 +69,21 @@ mod tests {
     }
 
     #[test]
+    fn an_age_limit_saved_in_admin_applies_to_the_next_run_without_a_restart() {
+        let host = StubHost::new();
+        let idle = stale_file(&host, 10);
+
+        run(&host).unwrap();
+        assert!(idle.exists());
+        host.set_config("cacheMaxDays", json!(5));
+        run(&host).unwrap();
+
+        assert!(!idle.exists());
+    }
+
+    #[test]
     fn with_the_cache_switched_off_the_job_empties_it() {
-        let host = StubHost::new().with_setting("cacheMaxGb", json!(0));
+        let host = StubHost::new().with_config("cacheMaxGb", json!(0));
         let idle = stale_file(&host, 1);
 
         run(&host).unwrap();

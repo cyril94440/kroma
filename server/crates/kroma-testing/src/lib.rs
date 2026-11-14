@@ -12,7 +12,7 @@ mod ranged_server;
 mod sources;
 
 pub use cargo::cargo;
-pub use media::clip;
+pub use media::{clip, hdr10_clip};
 #[cfg(not(target_family = "wasm"))]
 pub use ranged_server::{Heard, RangedServer};
 pub use sources::{findings, rust_sources, Finding};

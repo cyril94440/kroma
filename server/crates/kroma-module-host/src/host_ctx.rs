@@ -38,6 +38,49 @@ pub trait HostCtx: Send + Sync + 'static {
     fn setting_str(&self, key: &str, default: &str) -> String;
     fn setting_bool(&self, key: &str, default: bool) -> bool;
     fn setting_i64(&self, key: &str, default: i64) -> i64;
+
+    /// The value of the calling module's own `config` field `key`: what the
+    /// operator saved in Admin, else the field's `default` from `module.json`,
+    /// `None` when neither exists or the manifest declares no such field. Never
+    /// another module's config. Read it where it is used rather than caching it,
+    /// so a change in Admin applies without a restart. A host that predates the
+    /// endpoint answers `None`.
+    fn config_value(&self, _key: &str) -> Option<serde_json::Value> {
+        None
+    }
+
+    /// [`config_value`](Self::config_value) as an integer. A value stored as text
+    /// (`"50"`, which is how a manifest default is written) counts.
+    fn config_i64(&self, key: &str, default: i64) -> i64 {
+        self.config_value(key)
+            .and_then(|value| crate::config_value::as_i64(&value))
+            .unwrap_or(default)
+    }
+
+    /// [`config_value`](Self::config_value) as a flag, accepting `"true"` and
+    /// `"false"` text.
+    fn config_bool(&self, key: &str, default: bool) -> bool {
+        self.config_value(key)
+            .and_then(|value| crate::config_value::as_bool(&value))
+            .unwrap_or(default)
+    }
+
+    /// [`config_value`](Self::config_value) as text; a non-string value reads as
+    /// its JSON.
+    fn config_str(&self, key: &str, default: &str) -> String {
+        self.config_value(key)
+            .and_then(|value| crate::config_value::as_string(&value))
+            .unwrap_or_else(|| default.to_string())
+    }
+
+    // What the operator saved for `module`'s config fields, as the core stores it.
+    // The core's side of the seam: the supervisor answers a module's own
+    // `config_value` from it, for the module its token names. Empty from a host
+    // that stores none.
+    fn module_config(&self, _module: &str) -> serde_json::Map<String, serde_json::Value> {
+        serde_json::Map::new()
+    }
+
     // Persist a batch of settings atomically (one write).
     fn set_settings(&self, patch: std::collections::BTreeMap<String, serde_json::Value>);
 
@@ -140,6 +183,12 @@ impl<T: HostCtx + ?Sized> HostCtx for std::sync::Arc<T> {
     }
     fn setting_i64(&self, key: &str, default: i64) -> i64 {
         (**self).setting_i64(key, default)
+    }
+    fn config_value(&self, key: &str) -> Option<serde_json::Value> {
+        (**self).config_value(key)
+    }
+    fn module_config(&self, module: &str) -> serde_json::Map<String, serde_json::Value> {
+        (**self).module_config(module)
     }
     fn set_settings(&self, patch: std::collections::BTreeMap<String, serde_json::Value>) {
         (**self).set_settings(patch)
@@ -245,6 +294,15 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["request.approved"]
         );
+    }
+
+    #[test]
+    fn the_arc_blanket_impl_forwards_config() {
+        let host = Arc::new(testing::StubHost::new().with_config("k", json!(3)));
+        let via_arc: &dyn HostCtx = &host;
+
+        assert_eq!(via_arc.config_i64("k", 0), 3);
+        assert!(via_arc.module_config("tv.a").is_empty());
     }
 
     #[derive(Default)]

@@ -94,6 +94,7 @@
   "modulePermissions.programPinned": "Version vérifiée, fournie avec le module",
   "modulePermissions.programServer": "Celui installé sur le serveur",
   "modulePermissions.purposeBinaryDownload": "télécharger les programmes qu'il utilise",
+  "modulePermissions.purposeDebridTransfer": "copier les téléchargements terminés depuis le service de débridage",
   "modulePermissions.purposeDownloadClient": "piloter le client de téléchargement",
   "modulePermissions.purposeEngineApi": "piloter son moteur de téléchargement",
   "modulePermissions.purposeFlaresolverr": "passer par FlareSolverr",

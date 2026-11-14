@@ -34,6 +34,8 @@ struct AdminModule {
     manifest: kroma_module_manifest::ModuleManifest,
     enabled: bool,
     config_values: BTreeMap<String, Value>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    config_locales: BTreeMap<String, BTreeMap<String, String>>,
     removable: bool,
     /// Where this module came from, and whether a local build has replaced its
     /// component since. `None` for a compile-time module (it came from the server).
@@ -83,6 +85,11 @@ async fn list_modules(
                     (f.key.clone(), value)
                 })
                 .collect();
+            let config_locales = if m.config.is_empty() {
+                BTreeMap::new()
+            } else {
+                config_locales(&supervisor, &m.id)
+            };
             let origin = removable.then(|| supervisor.origin(&m.id));
             let running = supervisor.is_running(&m.id);
             let has_sidecar =
@@ -91,6 +98,7 @@ async fn list_modules(
                 manifest: m,
                 enabled,
                 config_values,
+                config_locales,
                 removable,
                 origin,
                 running,
@@ -100,6 +108,14 @@ async fn list_modules(
         })
         .collect();
     Ok(Json(mods).into_response())
+}
+
+fn config_locales(supervisor: &Supervisor, id: &str) -> BTreeMap<String, BTreeMap<String, String>> {
+    supervisor
+        .catalogs(id)
+        .into_iter()
+        .filter_map(|(code, text)| Some((code, serde_json::from_str(&text).ok()?)))
+        .collect()
 }
 
 #[derive(Deserialize)]

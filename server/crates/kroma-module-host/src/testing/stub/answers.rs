@@ -72,6 +72,17 @@ impl HostCtx for StubHost {
             .and_then(|v| v.as_i64())
             .unwrap_or(default)
     }
+    fn config_value(&self, key: &str) -> Option<serde_json::Value> {
+        self.config.lock().unwrap().get(key).cloned()
+    }
+    fn module_config(&self, module: &str) -> serde_json::Map<String, serde_json::Value> {
+        self.module_configs
+            .lock()
+            .unwrap()
+            .get(module)
+            .cloned()
+            .unwrap_or_default()
+    }
     fn set_settings(&self, patch: BTreeMap<String, serde_json::Value>) {
         self.settings.lock().unwrap().extend(patch.clone());
         self.log.settings_written.lock().unwrap().push(patch);

@@ -214,15 +214,29 @@ export function capabilities(): PlaybackCapabilities {
  * The audio codecs this device can decode, named the way the server names them
  * (ffprobe's `codec_name`, which is what an item's audio tracks carry).
  *
- * This is what a player sends as `copyCodecs`: the server stream-copies audio by
- * default and only re-encodes what this list leaves out, so a device that never
- * declares anything is served a copy of everything and plays whatever it cannot
- * decode as silence.
+ * A device that never declares anything is served a copy of everything and plays
+ * whatever it cannot decode as silence, which is why a player sends
+ * {@link copyableAudioCodecs}, drawn from this list, as `copyCodecs`.
  */
 export function decodableAudioCodecs(caps: PlaybackCapabilities = capabilities()): string[] {
   return Object.entries(caps.audio)
     .filter(([, decodable]) => decodable)
     .map(([codec]) => codec);
+}
+
+/** Audio codecs ffmpeg can stream-copy into the fMP4 HLS variant, preserving
+ * surround; others (DTS/TrueHD/FLAC/Opus) fall back to a stereo-AAC transcode. */
+export const FMP4_COPY_CODECS = new Set<string>(['aac', 'ac3', 'eac3']);
+
+/**
+ * What a master or a download may stream-copy: the codecs this device decodes
+ * that an fMP4 can also carry. A master declares this rather than
+ * {@link decodableAudioCodecs}, because the server copies whatever the declaration
+ * names, so a device that decodes TrueHD would be served TrueHD in a container
+ * that cannot hold it instead of the 5.1 E-AC-3 its `eac3` earns.
+ */
+export function copyableAudioCodecs(caps: PlaybackCapabilities = capabilities()): string[] {
+  return decodableAudioCodecs(caps).filter((codec) => FMP4_COPY_CODECS.has(codec));
 }
 
 /**
@@ -263,7 +277,7 @@ export function hdrDeclaration(caps: PlaybackCapabilities = capabilities()): str
  * audio it decodes, the video it draws, and the HDR it displays. */
 export function deviceDeclaration(caps: PlaybackCapabilities = capabilities()) {
   return {
-    copyCodecs: decodableAudioCodecs(caps),
+    copyCodecs: copyableAudioCodecs(caps),
     videoCodecs: decodableVideoCodecs(caps),
     hdr: hdrDeclaration(caps),
   };

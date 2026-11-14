@@ -5,11 +5,10 @@ import { audioFormatName, spatialOf } from '../audio-label';
 import {
   audioTracksOf,
   canDecodeAudioCodec,
-  FMP4_COPY_CODECS,
   selectedAudioTrack,
   surroundTargetFor,
 } from './audio-support';
-import { capabilities, type PlaybackCapabilities } from './capabilities';
+import { capabilities, FMP4_COPY_CODECS, type PlaybackCapabilities } from './capabilities';
 import { pictureOutcome } from './dolby-vision';
 
 export interface StreamNotice {

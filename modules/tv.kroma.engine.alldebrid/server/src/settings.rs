@@ -26,8 +26,8 @@ impl Default for CacheSettings {
 impl CacheSettings {
     pub fn read(host: &dyn HostCtx) -> Self {
         Self {
-            max_gb: host.setting_i64(MAX_GB_KEY, DEFAULT_GB).max(0) as u64,
-            max_days: host.setting_i64(MAX_DAYS_KEY, DEFAULT_DAYS).max(0) as u64,
+            max_gb: host.config_i64(MAX_GB_KEY, DEFAULT_GB).max(0) as u64,
+            max_days: host.config_i64(MAX_DAYS_KEY, DEFAULT_DAYS).max(0) as u64,
         }
     }
 
@@ -66,13 +66,32 @@ mod tests {
     #[test]
     fn the_operators_values_are_read_and_zero_days_means_no_age_limit() {
         let host = StubHost::new()
-            .with_setting(MAX_GB_KEY, json!(5))
-            .with_setting(MAX_DAYS_KEY, json!(0));
+            .with_config(MAX_GB_KEY, json!(5))
+            .with_config(MAX_DAYS_KEY, json!(0));
 
         let settings = CacheSettings::read(&host);
 
         assert_eq!(settings.limits().max_bytes, Some(5 * GB));
         assert!(settings.limits().max_age.is_zero());
+    }
+
+    #[test]
+    fn a_value_saved_in_admin_text_or_number_changes_the_budget() {
+        let host = StubHost::new().with_config(MAX_GB_KEY, json!("5"));
+
+        assert_eq!(CacheSettings::read(&host).limits().max_bytes, Some(5 * GB));
+    }
+
+    #[test]
+    fn a_change_saved_after_the_first_read_is_seen_by_the_next() {
+        let host = StubHost::new();
+        let before = CacheSettings::read(&host);
+
+        host.set_config(MAX_GB_KEY, json!(8));
+        let after = CacheSettings::read(&host);
+
+        assert_eq!(before.max_gb, 50);
+        assert_eq!(after.max_gb, 8);
     }
 
     #[test]
@@ -85,7 +104,7 @@ mod tests {
 
     #[test]
     fn a_negative_value_reads_as_zero() {
-        let host = StubHost::new().with_setting(MAX_GB_KEY, json!(-3));
+        let host = StubHost::new().with_config(MAX_GB_KEY, json!(-3));
 
         assert_eq!(CacheSettings::read(&host).max_gb, 0);
     }

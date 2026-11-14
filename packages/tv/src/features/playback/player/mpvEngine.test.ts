@@ -1,5 +1,5 @@
 import type { HlsMasterDeclaration, MediaItem } from '@kromatv/client/media';
-import { fakeClient } from '@kromatv/client/test';
+import { fakeClient, recordingClient } from '@kromatv/client/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EngineOptions } from './baseEngine';
 import type { EngineListeners } from './engine';
@@ -199,6 +199,29 @@ describe('MpvEngine audio declaration', () => {
       'opus',
       'mp3',
       'vorbis',
+    ]);
+  });
+});
+
+describe('MpvEngine master request', () => {
+  it('opens the copy program with every codec mpv decodes declared, so the server re-encodes none of it', () => {
+    const t = fakeTauri();
+    vi.stubGlobal('__TAURI__', t.bridge);
+    const { client: real } = recordingClient();
+
+    new MpvEngine(
+      opts({
+        direct: false,
+        startSec: 0,
+        client: fakeClient({ media: { hlsMasterUrl: real.media.hlsMasterUrl } }),
+      }),
+    ).start();
+
+    expect(t.loads()).toEqual([
+      {
+        url: 'http://kroma.test/api/items/v9/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3%2Cdts%2Ctruehd%2Cflac%2Copus%2Cmp3%2Cvorbis&video=hevc%2Ch264%2Ch26410bit%2Cav1%2Cvp9&hdr=hdr10%2Chdr10plus%2Chlg%2Cdv',
+        start: 0,
+      },
     ]);
   });
 });

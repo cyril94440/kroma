@@ -90,16 +90,13 @@ fn a_file_ffprobe_cannot_open_reads_as_no_hdr10_plus() {
 
 #[test]
 fn a_probe_that_outlives_its_budget_is_killed_and_reads_as_nothing() {
-    let started = Instant::now();
+    let marker = format!("30.{}", std::process::id());
 
-    let out = run(
-        "sh",
-        &["-c".into(), "sleep 30".into()],
-        Duration::from_millis(100),
-    );
+    let out = run("sleep", &[marker.clone().into()], Duration::ZERO);
 
     assert!(out.is_none());
-    assert!(started.elapsed() < Duration::from_secs(5));
+    let survivors = Command::new("pgrep").args(["-f", &format!("sleep {marker}")]).output().unwrap();
+    assert!(survivors.stdout.is_empty(), "the probe was left running");
 }
 
 #[test]

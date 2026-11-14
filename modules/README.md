@@ -382,6 +382,39 @@ A module whose strings also have to reach something that is not the web
 frontend or the server crate, a device channel it installs, ships the same JSON
 there rather than restating it in that language.
 
+### Module config
+
+A value the operator should be able to change in Admin (a cache size, a region)
+is a `config` field in `module.json`, which the module page renders as a form:
+
+```jsonc
+"config": [
+  { "key": "cacheMaxGb", "label": "config.cacheMaxGb", "type": "number", "default": "50" }
+]
+```
+
+`label`, each `options` entry and `placeholder` are keys of the module's own
+`locales/{en,fr}.json`, and a string no catalog has renders as written. The
+bundle's catalogs reach the form even when the module has no frontend. Read the
+value where it is used, never at start, so a change applies without a restart:
+
+```rust
+let max_gb = host.config_i64("cacheMaxGb", 50);
+```
+
+`config_value` answers the saved value, else the field's `default`, else `None`,
+and `config_i64`, `config_bool` and `config_str` take a fallback for a missing or
+mistyped one (a manifest default is text, and `"50"` reads as 50). It is the
+module's own config only: a key its manifest does not declare is a `403`, and no
+call reaches another module's. A secret field is returned to its module, and
+never logged. In a test, `StubHost::with_config` seeds a value and `set_config`
+changes it between two calls.
+
+A module built against an SDK before `config_value` exists on a server that
+lacks the route gets `None` for every key, so it runs on its defaults; raise
+`engines.server` to the first server with the route when the defaults would be
+wrong.
+
 ### Notifications
 
 A module tells people through the core's inbox, never one of its own. Declare
