@@ -34,10 +34,14 @@ pub use live::Transcode;
 pub use mode::{AudioMode, Rung, StreamMode, VideoMode, SURROUND_MIN_CHANNELS};
 pub use tonemap::{filters as tonemap_filters, Filters, ToneMap, ToneSource, SDR_TAGS};
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+#[cfg(test)]
+use std::path::Path;
 use std::sync::Arc;
 
 use kroma_module_wire::{AudioStream, VideoStream};
+
+use crate::input::MediaInput;
 
 use key::session_key;
 use session::Sessions;
@@ -55,7 +59,7 @@ use session::Sessions;
 /// for, which decide the flags a copy needs and what a re-encode keeps.
 pub struct Asked<'a> {
     pub item_id: &'a str,
-    pub input: &'a str,
+    pub input: &'a MediaInput,
     pub opener: Option<&'a str>,
     pub audio: u32,
     pub mode: StreamMode,
@@ -93,21 +97,25 @@ impl HlsEngine {
     /// header read) and kept. Lets the player show the real length when the
     /// catalog row was never probed: otherwise the growing EVENT playlist's
     /// duration is all the client can see (it reads the live edge as the total).
-    pub async fn input_duration_ms(&self, input: &str) -> Option<u64> {
-        if let Some(known) = self.durations.lock().unwrap().get(input).copied() {
+    ///
+    /// Only a file on this machine is kept: a network URL is short-lived and a
+    /// bearer, so it is read each time and never stored.
+    pub async fn input_duration_ms(&self, input: &MediaInput) -> Option<u64> {
+        let key = input.local().map(|path| path.to_string_lossy().into_owned());
+        if let Some(known) = key
+            .as_ref()
+            .and_then(|key| self.durations.lock().unwrap().get(key).copied())
+        {
             return known;
         }
-        let path = input.to_string();
-        let read = tokio::task::spawn_blocking(move || {
-            crate::probe::probe_duration_ms(Path::new(&path))
-        })
-        .await
-        .ok()
-        .flatten();
-        self.durations
-            .lock()
-            .unwrap()
-            .insert(input.to_string(), read);
+        let held = input.clone();
+        let read = tokio::task::spawn_blocking(move || crate::probe::probe_duration_ms(&held))
+            .await
+            .ok()
+            .flatten();
+        if let Some(key) = key {
+            self.durations.lock().unwrap().insert(key, read);
+        }
         read
     }
 

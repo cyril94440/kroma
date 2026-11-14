@@ -3,10 +3,10 @@
 
 use std::ffi::OsString;
 use std::path::Path;
-
 use kroma_module_wire::{AudioStream, VideoStream};
 
-use crate::{input, stream_copy};
+use crate::input::{self, MediaInput};
+use crate::stream_copy;
 
 use super::ffmpeg::{keyframe_cadence, SEGMENT_PATTERN, SEGMENT_SECONDS};
 use super::hwaccel::Pipeline;
@@ -22,7 +22,7 @@ const SURROUND_BITRATE: &str = "640k";
 const SURROUND_CHANNELS: &str = "6";
 
 pub(super) struct Spec<'a> {
-    pub input: &'a Path,
+    pub input: &'a MediaInput,
     pub dir: &'a Path,
     pub audio: u32,
     pub mode: StreamMode,
@@ -59,7 +59,7 @@ pub(super) fn build(spec: &Spec) -> Vec<OsString> {
     if spec.burst {
         push(&["-readrate_initial_burst", READRATE_BURST]);
     }
-    args.extend(input::file(spec.input));
+    args.extend(input::media(spec.input));
     let mut push = |items: &[&str]| args.extend(items.iter().map(OsString::from));
     if seeking {
         push(&["-copyts"]);

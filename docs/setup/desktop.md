@@ -64,6 +64,21 @@ version in your browser instead.
 KROMA plays video with mpv, which is inside the app: there is nothing else to
 install.
 
+## HDR and surround sound
+
+KROMA asks mpv to send HDR to your display when the display and the system
+report HDR support, and mpv converts the picture to fit a standard display
+otherwise. HDR output through mpv is available on Windows and on Wayland; on
+Linux the app draws through X11, so expect a standard picture there. Dolby
+Vision is read as its HDR base picture and reshaped by mpv's `gpu-next` renderer.
+
+Surround sound plays as surround when the system reports speakers for it.
+Dolby and DTS bitstream passthrough to a receiver is off, because it only works
+over HDMI to a receiver that decodes the format, and otherwise gives silence or
+noise. To turn it on, set the environment variable `KROMA_AUDIO_SPDIF=1` before
+starting KROMA, or list codecs, for example `KROMA_AUDIO_SPDIF=ac3,eac3,truehd`.
+There is no switch for it in the app yet.
+
 ## Steam Deck
 
 1. Switch to **Desktop Mode**.

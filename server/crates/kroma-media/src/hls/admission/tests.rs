@@ -92,10 +92,10 @@ async fn a_host_with_no_slot_left_refuses_a_master_before_it_spawns_anything() {
     let (mut s, dir) = registry("admit-refused", 8, &[(TRANSCODE, LIVE)]).await;
     s.transcode_cap = 1;
     let s = Arc::new(s);
-    let input = dir.path().join("never-opened.mkv");
+    let input = crate::input::MediaInput::Local(dir.path().join("never-opened.mkv"));
     let asked = Asked {
         item_id: "itB",
-        input: input.to_str().expect("a path"),
+        input: &input,
         opener: Some(VIEWER),
         audio: 0,
         mode: StreamMode::new(VideoMode::H264At(Rung::P1080), AudioMode::Copy),
@@ -108,7 +108,7 @@ async fn a_host_with_no_slot_left_refuses_a_master_before_it_spawns_anything() {
     let answer = s.master("itB:h264-1080-copy:0:a0", &asked).await;
 
     assert_eq!(answer.err(), Some(Refusal::Busy));
-    assert!(!input.exists(), "nothing read the file it was refused for");
+    assert!(!input.local().unwrap().exists(), "nothing read the file it was refused for");
 }
 
 #[tokio::test]

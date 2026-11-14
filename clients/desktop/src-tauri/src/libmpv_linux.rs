@@ -23,13 +23,14 @@ use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
 use crate::libmpv_shared::{self, MpvSlot};
+use crate::mpv_options;
 
 pub type InprocState = MpvSlot;
 
 fn vo_choice() -> String {
     match std::env::var("KROMA_MPV_VO") {
         Ok(vo) if !vo.trim().is_empty() => vo.trim().to_owned(),
-        _ => "gpu".to_owned(),
+        _ => mpv_options::IN_PROCESS_VO.to_owned(),
     }
 }
 
@@ -47,7 +48,7 @@ pub fn init(app: &AppHandle, xid: u64) -> bool {
         // bring up `gpu` has one knob rather than two.
         init.set_property("vo", vo_choice().as_str())?;
         init.set_property("hwdec", "auto-safe")?;
-        libmpv_shared::apply_common_options(&init)
+        libmpv_shared::apply_common_options(&init, true)
     }) {
         Ok(m) => Arc::new(m),
         Err(e) => {

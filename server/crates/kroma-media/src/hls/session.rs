@@ -8,7 +8,7 @@
 //! takes them away again, and [`super::live`] is what the admin sees of them.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -188,7 +188,7 @@ impl Sessions {
     }
 
     async fn ensure(self: &Arc<Self>, key: &str, asked: &Asked<'_>) -> Result<Arc<Session>, Refusal> {
-        let (input, mode, source) = (Path::new(asked.input), asked.mode, asked.source);
+        let (input, mode, source) = (asked.input, asked.mode, asked.source);
         let (audio, start_secs) = (asked.audio, asked.anchor as f64);
         // The anchor is part of the key, so an existing session is always the right one.
         {

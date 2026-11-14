@@ -1,7 +1,6 @@
 //! The remux process: what is spawned, and the one probe that decides where it
 //! starts. Everything here shells out; nothing here touches the session map.
 
-use std::path::Path;
 use std::process::Stdio;
 
 #[cfg(test)]
@@ -9,7 +8,7 @@ use std::path::PathBuf;
 
 use tokio::process::{Child, Command};
 
-use crate::input;
+use crate::input::{self, MediaInput};
 
 use super::args::{build, Spec};
 use super::naming::contains;
@@ -61,7 +60,7 @@ pub fn detect_burst() -> bool {
 /// Read as one frame FROM the anchor, not a scan of the window before it: the
 /// demuxer's seek is the seek `-ss` will make, so the first frame handed back is
 /// the answer, and a scan would demux every byte of that window instead.
-pub async fn keyframe_before(input: &Path, anchor: f64) -> f64 {
+pub async fn keyframe_before(input: &MediaInput, anchor: f64) -> f64 {
     if anchor <= 0.5 {
         return 0.0;
     }
@@ -77,7 +76,7 @@ pub async fn keyframe_before(input: &Path, anchor: f64) -> f64 {
         .arg("-read_intervals")
         .arg(format!("{anchor:.3}%+#1"))
         .args(["-show_entries", "frame=pts_time", "-of", "csv=p=0"])
-        .args(input::file(input))
+        .args(input::media(input))
         .output()
         .await;
     let Ok(out) = out else {
@@ -117,7 +116,7 @@ pub(super) fn spawn_stream(spec: &Spec) -> std::io::Result<Child> {
 mod tests {
     use super::*;
 
-    fn clip(dir: &Path) -> Option<PathBuf> {
+    fn clip(dir: &std::path::Path) -> Option<PathBuf> {
         let path = dir.join("clip.mp4");
         std::process::Command::new("ffmpeg")
             .args(["-v", "error"])
@@ -137,14 +136,14 @@ mod tests {
             return;
         };
 
-        let start = keyframe_before(&path, 11.0).await;
+        let start = keyframe_before(&MediaInput::Local(path.clone()), 11.0).await;
 
         assert!((start - 10.0).abs() < 0.05, "{start}");
     }
 
     #[tokio::test]
     async fn a_second_the_container_cannot_answer_for_keeps_the_anchor() {
-        let start = keyframe_before(Path::new("http://127.0.0.1:1/clip.mp4"), 42.0).await;
+        let start = keyframe_before(&MediaInput::Local("http://127.0.0.1:1/clip.mp4".into()), 42.0).await;
 
         assert_eq!(start, 42.0);
     }

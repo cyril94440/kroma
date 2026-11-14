@@ -254,6 +254,10 @@ poison it.
   rung whose IPC socket comes up; the winning args are printed as `KROMA: mpv up [...]`.
   Override with `KROMA_MPV_VO` (+ optional `KROMA_MPV_GPU_API` / `KROMA_MPV_GPU_CONTEXT`) to
   pin one output and skip the ladder.
+- **HDR / audio.** The sidecar and the Windows/Linux libmpv engines pass
+  `target-colorspace-hint=auto` (the manual's default from mpv 0.41; 0.40 defaults to `no`);
+  libmpv lists `vo=gpu-next,gpu`. `KROMA_AUDIO_SPDIF` (`1` or a codec list from
+  `ac3,eac3,dts,dts-hd,truehd`) turns on `audio-spdif` passthrough; off by default.
 - **HEVC via VA-API.** Expected to work on the APU; confirm no software-decode fallback
   kicks in on 10-bit HEVC.
 - **HDR** is OLED-only (LCD Decks are SDR); a hardware limit, not ours.

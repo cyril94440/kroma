@@ -8,10 +8,10 @@ fn engine(root: &Path) -> HlsEngine {
     HlsEngine::new(root.join("hls"), 2, 0)
 }
 
-fn asked<'a>(input: &'a Path, anchor: u64) -> Asked<'a> {
+fn asked<'a>(input: &'a MediaInput, anchor: u64) -> Asked<'a> {
     Asked {
         item_id: "it1",
-        input: input.to_str().unwrap(),
+        input,
         opener: None,
         audio: 0,
         mode: COPY,
@@ -23,8 +23,9 @@ fn asked<'a>(input: &'a Path, anchor: u64) -> Asked<'a> {
 }
 
 async fn remux(engine: &HlsEngine, input: &Path) -> String {
+    let input = MediaInput::Local(input.to_path_buf());
     engine
-        .master(asked(input, 0))
+        .master(asked(&input, 0))
         .await
         .expect("a playlist out of a file ffmpeg can read")
         .0
@@ -49,10 +50,10 @@ async fn the_length_a_file_carries_is_read_once_and_kept() {
     let dir = kroma_testing::temp_dir("hls-duration");
     let input = kroma_testing::clip(dir.path());
     let engine = engine(dir.path());
-    let path = input.to_str().unwrap();
+    let path = MediaInput::Local(input.clone());
 
-    let first = engine.input_duration_ms(path).await;
-    let again = engine.input_duration_ms(path).await;
+    let first = engine.input_duration_ms(&path).await;
+    let again = engine.input_duration_ms(&path).await;
 
     assert_eq!(first, again);
     assert!(
@@ -66,8 +67,8 @@ async fn a_file_nothing_can_open_has_no_length_and_is_not_probed_twice() {
     let dir = kroma_testing::temp_dir("hls-no-duration");
     let engine = engine(dir.path());
 
-    let first = engine.input_duration_ms("/nowhere/absent.mkv").await;
-    let again = engine.input_duration_ms("/nowhere/absent.mkv").await;
+    let first = engine.input_duration_ms(&MediaInput::Local("/nowhere/absent.mkv".into())).await;
+    let again = engine.input_duration_ms(&MediaInput::Local("/nowhere/absent.mkv".into())).await;
 
     assert_eq!(first, None);
     assert_eq!(again, None);
@@ -175,7 +176,7 @@ async fn a_re_anchor_into_a_session_already_running_is_answered_out_of_it() {
     finished_playlist(&engine).await;
 
     let (playlist, start) = engine
-        .master(asked(&input, 2))
+        .master(asked(&MediaInput::Local(input.clone()), 2))
         .await
         .expect("the anchor sits inside what the running session has produced");
 

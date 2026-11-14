@@ -1,6 +1,6 @@
 //! The one way an ffmpeg or ffprobe command names its input.
 
-pub use kroma_primitives::input::{file, generated};
+pub use kroma_primitives::input::{file, generated, media, remote, MediaInput, RemoteUrl, RemoteUrlError};
 
 #[cfg(test)]
 mod tests;

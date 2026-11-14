@@ -85,7 +85,7 @@ fn only_a_pq_hdr10_stream_is_ever_read_a_second_time() {
 
 #[test]
 fn a_file_ffprobe_cannot_open_reads_as_no_hdr10_plus() {
-    assert!(!first_frame_carries(Path::new("/nonexistent/clip.mkv"), 0));
+    assert!(!first_frame_carries(&MediaInput::Local("/nonexistent/clip.mkv".into()), 0));
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn a_probe_that_finishes_in_time_hands_back_what_it_printed() {
 
 #[test]
 fn the_pass_reads_one_frame_of_the_stream_it_was_asked_about() {
-    let rendered: Vec<String> = args(Path::new("/media/x.mkv"), 2)
+    let rendered: Vec<String> = args(&MediaInput::Local("/media/x.mkv".into()), 2)
         .iter()
         .map(|a| a.to_string_lossy().into_owned())
         .collect();
@@ -124,5 +124,5 @@ fn the_pass_reads_one_frame_of_the_stream_it_was_asked_about() {
     assert!(joined.contains("-select_streams 2"), "{joined}");
     assert!(joined.contains("-read_intervals %+#1"), "{joined}");
     let named: Vec<OsString> = input::file("/media/x.mkv").into();
-    assert!(args(Path::new("/media/x.mkv"), 2).ends_with(&named), "{joined}");
+    assert!(args(&MediaInput::Local("/media/x.mkv".into()), 2).ends_with(&named), "{joined}");
 }

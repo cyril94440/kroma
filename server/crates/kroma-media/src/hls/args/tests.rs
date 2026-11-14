@@ -57,7 +57,7 @@ fn line(
     pipeline: Pipeline,
 ) -> String {
     let dir = PathBuf::from("/s");
-    let input = PathBuf::from("/m/film.mkv");
+    let input = MediaInput::Local(PathBuf::from("/m/film.mkv"));
     build(&Spec {
         input: &input,
         dir: &dir,
@@ -356,7 +356,7 @@ fn without_a_tone_map_every_device_pipeline_is_the_one_it_always_was() {
 #[test]
 fn a_seek_starts_the_decode_at_the_anchor_under_copyts() {
     let dir = PathBuf::from("/s");
-    let input = PathBuf::from("/m/film.mkv");
+    let input = MediaInput::Local(PathBuf::from("/m/film.mkv"));
     let cmd = build(&Spec {
         input: &input,
         dir: &dir,

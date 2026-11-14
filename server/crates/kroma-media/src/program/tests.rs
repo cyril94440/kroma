@@ -200,7 +200,7 @@ async fn a_program_answers_its_playlist_with_the_start_and_the_true_length() {
     let resp = program(None, &tracks)
         .master(
             &engine,
-            input.to_str().unwrap(),
+            &MediaInput::Local(input.clone()),
             session,
             None,
             &Credential::new("t", Some("tok")),
@@ -233,7 +233,7 @@ async fn an_unprobed_program_takes_its_length_off_the_file_itself() {
     let resp = unprobed
         .master(
             &engine,
-            input.to_str().unwrap(),
+            &MediaInput::Local(input.clone()),
             Session {
                 mode: COPY,
                 anchor: 0,
@@ -288,7 +288,7 @@ async fn a_segment_url_is_good_forever_and_a_playlist_never_is() {
     program(None, &tracks)
         .master(
             &engine,
-            input.to_str().unwrap(),
+            &MediaInput::Local(input.clone()),
             session,
             None,
             &Credential::new("t", None),

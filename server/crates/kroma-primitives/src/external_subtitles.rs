@@ -56,7 +56,7 @@ impl ExternalSubtitle {
 pub fn beside(video: &Path, files: &[PathBuf]) -> Vec<ExternalSubtitle> {
     let holds = match files
         .iter()
-        .filter(|file| crate::video::has_video_extension(file))
+        .filter(|file| crate::video::is_media_file(file))
         .count()
     {
         0 | 1 => Release::OneVideo,

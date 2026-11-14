@@ -8,7 +8,7 @@ use tracing::debug;
 
 use kroma_module_wire::VideoStream;
 
-use crate::input;
+use crate::input::{self, MediaInput};
 
 use super::hdr10plus;
 use super::parse::{build_result, video_index};
@@ -36,10 +36,10 @@ pub(super) const DURATION_ARGS: [&str; 6] = [
 /// Reads just the container's `format.duration`: a header read, no frame decode,
 /// so it is cheap enough to call on demand. `None` when ffprobe is missing or the
 /// file has no readable duration.
-pub fn probe_duration_ms(path: &Path) -> Option<u64> {
+pub fn probe_duration_ms(input: &MediaInput) -> Option<u64> {
     let out = Command::new("ffprobe")
         .args(DURATION_ARGS)
-        .args(input::file(path))
+        .args(input::media(input))
         .output()
         .ok()?;
     if !out.status.success() {
@@ -57,16 +57,28 @@ pub fn probe_duration_ms(path: &Path) -> Option<u64> {
 /// the file, so the caller must leave it to a later pass rather than record a
 /// verdict that would stand for good.
 pub fn probe_file(path: &Path, ffprobe_present: bool) -> Option<ProbeResult> {
+    let container = path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("");
+    probe_input(&MediaInput::Local(path.to_path_buf()), container, ffprobe_present)
+}
+
+/// [`probe_file`] over any input. `container` is the real container's extension,
+/// which the extension guess falls back on when ffprobe cannot answer: a
+/// network URL carries none.
+pub fn probe_input(
+    input: &MediaInput,
+    container: &str,
+    ffprobe_present: bool,
+) -> Option<ProbeResult> {
     if !ffprobe_present {
-        return Some(fallback_from_extension(path));
+        return Some(fallback_from_container(container));
     }
-    match run_ffprobe(path) {
-        Outcome::Read(result, video_stream) => Some(with_hdr10plus(path, *result, video_stream)),
+    match run_ffprobe(input) {
+        Outcome::Read(result, video_stream) => Some(with_hdr10plus(input, *result, video_stream)),
         Outcome::Unreadable(reason) => Some(ProbeResult {
             unreadable: Some(reason),
             ..ProbeResult::default()
         }),
-        Outcome::NotProbed => Some(fallback_from_extension(path)),
+        Outcome::NotProbed => Some(fallback_from_container(container)),
         Outcome::Killed => None,
     }
 }
@@ -78,9 +90,9 @@ enum Outcome {
     Killed,
 }
 
-fn with_hdr10plus(path: &Path, mut result: ProbeResult, stream: Option<u32>) -> ProbeResult {
+fn with_hdr10plus(input: &MediaInput, mut result: ProbeResult, stream: Option<u32>) -> ProbeResult {
     if let (Some(video), Some(stream)) = (result.video.as_mut(), stream) {
-        hdr10plus::upgrade(video, || hdr10plus::first_frame_carries(path, stream));
+        hdr10plus::upgrade(video, || hdr10plus::first_frame_carries(input, stream));
     }
     result
 }
@@ -88,7 +100,7 @@ fn with_hdr10plus(path: &Path, mut result: ProbeResult, stream: Option<u32>) -> 
 // Failures log at DEBUG, not WARN: every worker probing every file would flood
 // the default log, and a wholesale degradation still shows up as `probed` ≪
 // `total` in the phase-2 summary.
-fn run_ffprobe(path: &Path) -> Outcome {
+fn run_ffprobe(input: &MediaInput) -> Outcome {
     let output = match Command::new("ffprobe")
         .args([
             "-v",
@@ -99,26 +111,33 @@ fn run_ffprobe(path: &Path) -> Outcome {
             "-of",
             "json",
         ])
-        .args(input::file(path))
+        .args(input::media(input))
         .output()
     {
         Ok(output) => output,
         Err(e) => {
-            debug!(file = %path.display(), error = %e, "ffprobe failed to spawn; using extension guess");
+            debug!(file = %label(input), error = %e, "ffprobe failed to spawn; using extension guess");
             return Outcome::NotProbed;
         }
     };
-    outcome_of(path, output.status.code(), &output.stdout, &output.stderr)
+    outcome_of(input, output.status.code(), &output.stdout, &output.stderr)
 }
 
-fn outcome_of(path: &Path, exit_code: Option<i32>, stdout: &[u8], stderr: &[u8]) -> Outcome {
+fn label(input: &MediaInput) -> String {
+    match input {
+        MediaInput::Local(path) => path.display().to_string(),
+        MediaInput::Remote(url) => url.host().to_string(),
+    }
+}
+
+fn outcome_of(input: &MediaInput, exit_code: Option<i32>, stdout: &[u8], stderr: &[u8]) -> Outcome {
     let Some(code) = exit_code else {
-        debug!(file = %path.display(), "ffprobe was killed before it answered");
+        debug!(file = %label(input), "ffprobe was killed before it answered");
         return Outcome::Killed;
     };
     if code != 0 {
-        let reason = failure_reason(path, stderr, code);
-        debug!(file = %path.display(), code, %reason, "ffprobe refused the file");
+        let reason = failure_reason(input, stderr, code);
+        debug!(file = %label(input), code, %reason, "ffprobe refused the file");
         return Outcome::Unreadable(reason);
     }
     match serde_json::from_slice(stdout) {
@@ -127,22 +146,30 @@ fn outcome_of(path: &Path, exit_code: Option<i32>, stdout: &[u8], stderr: &[u8])
             Outcome::Read(Box::new(build_result(parsed)), video_stream)
         }
         Err(e) => {
-            debug!(file = %path.display(), error = %e, "failed to parse ffprobe JSON; using extension guess");
+            debug!(file = %label(input), error = %e, "failed to parse ffprobe JSON; using extension guess");
             Outcome::NotProbed
         }
     }
 }
 
-fn failure_reason(path: &Path, stderr: &[u8], exit_code: i32) -> String {
+fn failure_reason(input: &MediaInput, stderr: &[u8], exit_code: i32) -> String {
     let text = String::from_utf8_lossy(stderr);
-    // The reason reaches clients, which are never told a file's absolute path.
-    let prefix = format!("{}: ", path.display());
+    // The reason reaches clients, which are never told a file's absolute path
+    // nor the bearer URL that stands for it.
     let said = text
         .lines()
         .rev()
         .map(str::trim)
         .find(|line| !line.is_empty())
-        .map(|line| line.strip_prefix(prefix.as_str()).unwrap_or(line))
+        .map(|line| match input {
+            MediaInput::Local(path) => line
+                .strip_prefix(format!("{}: ", path.display()).as_str())
+                .unwrap_or(line)
+                .to_string(),
+            MediaInput::Remote(url) => url
+                .redact(line)
+                .replace(&format!("{}: ", url.host()), ""),
+        })
         .unwrap_or_default();
     if said.is_empty() {
         return format!("ffprobe exited with status {exit_code}");
@@ -150,12 +177,8 @@ fn failure_reason(path: &Path, stderr: &[u8], exit_code: i32) -> String {
     said.chars().take(REASON_CHARS).collect()
 }
 
-fn fallback_from_extension(path: &Path) -> ProbeResult {
-    let ext = path
-        .extension()
-        .and_then(std::ffi::OsStr::to_str)
-        .unwrap_or("")
-        .to_ascii_lowercase();
+fn fallback_from_container(container: &str) -> ProbeResult {
+    let ext = container.to_ascii_lowercase();
 
     let codec = match ext.as_str() {
         "webm" => "vp9",
@@ -197,54 +220,54 @@ mod tests {
 
     #[test]
     fn a_file_ffprobe_refuses_is_unreadable_and_keeps_ffprobes_own_reason() {
-        let path = Path::new("/media/Dune (2021)/dune.mkv");
+        let path = MediaInput::Local("/media/Dune (2021)/dune.mkv".into());
         let stderr = b"/media/Dune (2021)/dune.mkv: Invalid data found when processing input\n";
 
-        let reason = reason_of(outcome_of(path, Some(1), b"", stderr));
+        let reason = reason_of(outcome_of(&path, Some(1), b"", stderr));
 
         assert_eq!(reason, "Invalid data found when processing input");
     }
 
     #[test]
     fn the_reason_never_carries_the_path_the_client_is_not_shown() {
-        let path = Path::new("/srv/media/private/x.mkv");
+        let path = MediaInput::Local("/srv/media/private/x.mkv".into());
         let stderr = b"/srv/media/private/x.mkv: moov atom not found\n";
 
-        let reason = reason_of(outcome_of(path, Some(1), b"", stderr));
+        let reason = reason_of(outcome_of(&path, Some(1), b"", stderr));
 
         assert!(!reason.contains("/srv/media"), "{reason}");
     }
 
     #[test]
     fn a_refusal_with_nothing_to_say_still_names_the_status_it_failed_with() {
-        let path = Path::new("/media/x.mkv");
+        let path = MediaInput::Local("/media/x.mkv".into());
 
         assert_eq!(
-            reason_of(outcome_of(path, Some(183), b"", b"  \n")),
+            reason_of(outcome_of(&path, Some(183), b"", b"  \n")),
             "ffprobe exited with status 183"
         );
     }
 
     #[test]
     fn a_probe_a_signal_took_is_no_verdict_about_the_file() {
-        let outcome = outcome_of(Path::new("/media/x.mkv"), None, b"", b"");
+        let outcome = outcome_of(&MediaInput::Local("/media/x.mkv".into()), None, b"", b"");
 
         assert!(matches!(outcome, Outcome::Killed));
     }
 
     #[test]
     fn a_reason_longer_than_the_cap_is_cut_to_it() {
-        let path = Path::new("/media/x.mkv");
+        let path = MediaInput::Local("/media/x.mkv".into());
         let stderr = "e".repeat(REASON_CHARS * 2).into_bytes();
 
-        let reason = reason_of(outcome_of(path, Some(1), b"", &stderr));
+        let reason = reason_of(outcome_of(&path, Some(1), b"", &stderr));
 
         assert_eq!(reason.chars().count(), REASON_CHARS);
     }
 
     #[test]
     fn output_kroma_cannot_parse_is_not_the_files_fault() {
-        let outcome = outcome_of(Path::new("/media/x.mkv"), Some(0), b"not json", b"");
+        let outcome = outcome_of(&MediaInput::Local("/media/x.mkv".into()), Some(0), b"not json", b"");
 
         assert!(matches!(outcome, Outcome::NotProbed));
     }
@@ -253,7 +276,7 @@ mod tests {
     fn a_described_file_comes_back_with_its_streams_and_no_fault() {
         let stdout = br#"{"streams":[{"codec_type":"video","codec_name":"hevc","width":3840,"height":2160}]}"#;
 
-        let outcome = outcome_of(Path::new("/media/x.mkv"), Some(0), stdout, b"");
+        let outcome = outcome_of(&MediaInput::Local("/media/x.mkv".into()), Some(0), stdout, b"");
 
         let Outcome::Read(result, _) = outcome else {
             panic!("a parsable description must read as one");

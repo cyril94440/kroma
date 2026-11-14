@@ -8,6 +8,7 @@ use kroma_module_wire::{AudioStream, VideoStream};
 use serde::Deserialize;
 
 use crate::hls::{Asked, HlsEngine, Refusal, StreamMode, ToneMap};
+use crate::input::MediaInput;
 use crate::json_error::json_error;
 use crate::stream::metered_body;
 use crate::{playlist, ByteMeter, Credential};
@@ -98,7 +99,7 @@ impl Program<'_> {
     pub async fn master<M: ByteMeter>(
         &self,
         engine: &HlsEngine,
-        input: &str,
+        input: &MediaInput,
         session: Session,
         opener: Option<&str>,
         credential: &Credential,

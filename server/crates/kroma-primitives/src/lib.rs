@@ -8,6 +8,7 @@ pub mod input;
 pub mod language;
 pub mod pcm;
 pub mod remote_file;
+pub mod remote_url;
 pub mod video;
 
 use std::fs::File;

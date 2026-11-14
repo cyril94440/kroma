@@ -12,6 +12,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Manager, State};
 
 use crate::libmpv_shared::{self, MpvSlot};
+use crate::mpv_options;
 
 pub type MpvState = MpvSlot;
 
@@ -22,9 +23,9 @@ pub fn init(app: &AppHandle, hwnd: i64) -> bool {
     let mpv = match Mpv::with_initializer(|init| {
         init.set_property("wid", hwnd)?;
         // d3d11va for HEVC/H264, dav1d for AV1.
-        init.set_property("vo", "gpu")?;
+        init.set_property("vo", mpv_options::IN_PROCESS_VO)?;
         init.set_property("hwdec", "auto-safe")?;
-        libmpv_shared::apply_common_options(&init)
+        libmpv_shared::apply_common_options(&init, true)
     }) {
         Ok(m) => Arc::new(m),
         Err(e) => {

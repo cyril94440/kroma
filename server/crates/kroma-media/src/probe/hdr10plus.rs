@@ -4,13 +4,12 @@
 
 use std::ffi::OsString;
 use std::io::Read;
-use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use kroma_module_wire::{HdrFormat, VideoStream};
 
-use crate::input;
+use crate::input::{self, MediaInput};
 
 use super::ffprobe_output::FfFrames;
 
@@ -32,8 +31,8 @@ pub(super) fn upgrade(video: &mut VideoStream, detect: impl FnOnce() -> bool) {
     }
 }
 
-pub(super) fn first_frame_carries(path: &Path, stream: u32) -> bool {
-    let Some(stdout) = run("ffprobe", &args(path, stream), BUDGET) else {
+pub(super) fn first_frame_carries(input: &MediaInput, stream: u32) -> bool {
+    let Some(stdout) = run("ffprobe", &args(input, stream), BUDGET) else {
         return false;
     };
     serde_json::from_slice::<FfFrames>(&stdout).is_ok_and(|frames| carries(&frames))
@@ -50,7 +49,7 @@ pub(super) fn carries(frames: &FfFrames) -> bool {
     })
 }
 
-fn args(path: &Path, stream: u32) -> Vec<OsString> {
+fn args(input: &MediaInput, stream: u32) -> Vec<OsString> {
     let mut args: Vec<OsString> = [
         "-v",
         "error",
@@ -66,7 +65,7 @@ fn args(path: &Path, stream: u32) -> Vec<OsString> {
     .iter()
     .map(OsString::from)
     .collect();
-    args.extend(input::file(path));
+    args.extend(input::media(input));
     args
 }
 

@@ -86,6 +86,58 @@ pub async fn stream_file<M: ByteMeter>(path: &Path, req_headers: &HeaderMap, met
     .await
 }
 
+/// [`stream_file`] over a body that cannot seek but can be opened at any byte:
+/// `open(start, end)` reads `[start, end]` inclusive, and is called once, with
+/// the range the request resolved to. Answers the same `200`, `206` and `416`
+/// as a file would, from `len` alone. `head` answers the headers without opening
+/// anything. An `Err` is `open` failing before a byte was promised, so the
+/// caller still owes the client an error of its own.
+pub async fn stream_ranged<M, F, Fut>(
+    len: u64,
+    content_type: &str,
+    req_headers: &HeaderMap,
+    head: bool,
+    meter: M,
+    open: F,
+) -> std::io::Result<Response>
+where
+    M: ByteMeter,
+    F: FnOnce(u64, u64) -> Fut,
+    Fut: std::future::Future<Output = std::io::Result<Upstream>>,
+{
+    let outcome = parse_range(req_headers, len);
+    let (start, end) = match outcome {
+        RangeOutcome::Unsatisfiable => return Ok(unsatisfiable(len)),
+        RangeOutcome::Full => (0, len.saturating_sub(1)),
+        RangeOutcome::Partial { start, end } => (start, end),
+    };
+    let reader: Upstream = if head || len == 0 {
+        Box::pin(tokio::io::empty())
+    } else {
+        open(start, end).await?
+    };
+    Ok(match outcome {
+        RangeOutcome::Partial { .. } => partial_response(reader, start, end, len, content_type, meter),
+        _ => full_response(reader, len, content_type, meter),
+    })
+}
+
+/// A byte source opened mid-way: what [`stream_ranged`]'s `open` hands back.
+pub type Upstream = Pin<Box<dyn AsyncRead + Send>>;
+
+fn unsatisfiable(len: u64) -> Response {
+    let mut resp = json_error(
+        StatusCode::RANGE_NOT_SATISFIABLE,
+        "requested range not satisfiable",
+    );
+    resp.headers_mut().insert(
+        header::CONTENT_RANGE,
+        HeaderValue::from_str(&format!("bytes */{len}"))
+            .unwrap_or(HeaderValue::from_static("bytes */0")),
+    );
+    resp
+}
+
 /// [`stream_file`] over any seekable reader of `len` bytes.
 async fn stream_reader<R, M>(
     mut reader: R,
@@ -109,18 +161,7 @@ where
             }
             partial_response(reader, start, end, len, content_type, meter)
         }
-        RangeOutcome::Unsatisfiable => {
-            let mut resp = json_error(
-                StatusCode::RANGE_NOT_SATISFIABLE,
-                "requested range not satisfiable",
-            );
-            resp.headers_mut().insert(
-                header::CONTENT_RANGE,
-                HeaderValue::from_str(&format!("bytes */{}", len))
-                    .unwrap_or(HeaderValue::from_static("bytes */0")),
-            );
-            resp
-        }
+        RangeOutcome::Unsatisfiable => unsatisfiable(len),
     }
 }
 
@@ -238,13 +279,12 @@ fn parse_range(headers: &HeaderMap, total_size: u64) -> RangeOutcome {
 }
 
 fn content_type_for(path: &Path) -> &'static str {
-    let ext = path
-        .extension()
-        .and_then(std::ffi::OsStr::to_str)
-        .unwrap_or("")
-        .to_ascii_lowercase();
+    content_type_of(path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or(""))
+}
 
-    match ext.as_str() {
+/// The media type a container's extension is served as.
+pub fn content_type_of(extension: &str) -> &'static str {
+    match extension.to_ascii_lowercase().as_str() {
         "mp4" | "m4v" => "video/mp4",
         "mkv" => "video/x-matroska",
         "webm" => "video/webm",
