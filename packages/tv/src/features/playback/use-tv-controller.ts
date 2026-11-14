@@ -1,6 +1,12 @@
 import type { KromaClient } from '@kromatv/client';
 import type { MediaItem } from '@kromatv/client/media';
-import { pictureBadge, refineTrackLang, streamNotices, surfaceCapabilities } from '@kromatv/core';
+import {
+  deliveredVideo,
+  pictureBadge,
+  refineTrackLang,
+  streamNotices,
+  surfaceCapabilities,
+} from '@kromatv/core';
 import { buildLeanStats, type PlayerController, useAudioFilter, useT } from '@kromatv/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -10,6 +16,8 @@ import {
   type EnginePref,
 } from '#tv/app/enginePref';
 import { useLangPrefs } from '#tv/app/langPref';
+import { usePlaybackCapabilities } from '#tv/app/providers/playbackCapabilities';
+import { serverAudioFilter } from '#tv/features/playback/player/baseEngine';
 import { type Playback, useDirectPlayback } from '#tv/features/playback/player/useDirectPlayback';
 import type { TvPip } from '#tv/features/playback/use-tv-pip';
 import { type TvSubtitles, useTvSubtitles } from '#tv/features/playback/use-tv-subtitles';
@@ -60,21 +68,30 @@ export function useTvController(
     [pb],
   );
 
+  const runtime = usePlaybackCapabilities();
+  const serverFilter = pb.surface === 'avplay' ? serverAudioFilter(filter.mode) : undefined;
+  const delivery = pb.playbackMode === 'direct' && !serverFilter ? 'file' : 'stream';
+  const delivered = useMemo(
+    () => ({
+      ...item,
+      video: deliveredVideo(item.video, surfaceCapabilities(pb.surface, runtime), delivery),
+    }),
+    [item, pb.surface, runtime, delivery],
+  );
+
   const qualities = useMemo(() => {
-    const badge = pictureBadge(item.video);
+    const badge = pictureBadge(delivered.video);
     const badgeSuffix = badge ? ` · ${badge}` : '';
-    const note = streamNotices(
-      item,
-      pb.playbackMode,
-      surfaceCapabilities(pb.surface),
-      pb.audioIndex,
-    )
+    const note = streamNotices(item, pb.playbackMode, surfaceCapabilities(pb.surface, runtime), {
+      audioIndex: pb.audioIndex,
+      filter: serverFilter,
+    })
       .map((n) => t(n.messageKey, n.messageVars))
       .join(' · ');
     return [
       { id: 'auto', label: `${t('player.qualityAuto')}${badgeSuffix}`, note: note || undefined },
     ];
-  }, [item, pb.playbackMode, pb.surface, pb.audioIndex, t]);
+  }, [item, delivered, pb.playbackMode, pb.surface, pb.audioIndex, runtime, serverFilter, t]);
 
   // Only what this build actually compiled in: an engine the shell has no native
   // module for is not a choice, and listing it as one is a dead row on a remote.
@@ -119,7 +136,7 @@ export function useTvController(
   useEffect(() => {
     statsRef.current = () =>
       buildLeanStats({
-        item,
+        item: delivered,
         cur: pb.cur,
         dur: pb.dur,
         bufEnd: pb.bufEnd,

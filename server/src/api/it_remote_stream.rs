@@ -34,7 +34,7 @@ async fn playground_over(real_of: impl FnOnce(&std::path::Path) -> std::path::Pa
     let bytes = std::fs::read(&real).unwrap();
     let (t, fake) = test_app_with_source();
     let stubbed = stubbed_movie(&t, &real, "Remote.Movie.2020.mp4").await;
-    fake.answers_url(&stubbed.cdn.url("movie.mp4"), bytes.len() as u64);
+    fake.answers_url(&stubbed.url("movie.mp4"), bytes.len() as u64);
     Playground { t, fake, stubbed, bytes, real, _dir: dir }
 }
 
@@ -121,7 +121,7 @@ async fn a_source_that_does_not_answer_leaves_the_file_to_a_later_probe() {
     let (_, item) = get(&p.t.app, &format!("/api/items/{}", p.stubbed.item), Some(&p.t.token)).await;
     assert_eq!(item["files"][0]["probed"], false);
     assert!(item["files"][0].get("unreadable").is_none_or(Value::is_null));
-    p.fake.answers_url(&p.stubbed.cdn.url("clip.mp4"), p.bytes.len() as u64);
+    p.fake.answers_url(&p.stubbed.url("clip.mp4"), p.bytes.len() as u64);
     probe(&p.t, &p.stubbed).await.expect("the retry reads it");
     let (_, item) = get(&p.t.app, &format!("/api/items/{}", p.stubbed.item), Some(&p.t.token)).await;
     assert_eq!(item["files"][0]["probed"], true);

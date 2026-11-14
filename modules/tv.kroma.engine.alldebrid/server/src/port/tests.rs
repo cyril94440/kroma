@@ -40,7 +40,7 @@ async fn every_method_is_mounted_where_the_consumer_calls_it() {
         .await;
 
         assert_eq!(status, StatusCode::OK, "{method}");
-        if method == "reannounce" {
+        if method == "reannounce" || method == "remove" {
             assert_eq!(answer, json!({ "Ok": null }), "{method}");
         } else {
             assert!(
@@ -65,7 +65,7 @@ async fn a_status_that_could_not_be_asked_is_a_bad_gateway_not_a_vanished_magnet
 #[cfg(not(target_family = "wasm"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn status_answers_null_for_a_forgotten_magnet_and_the_pinned_keys_otherwise() {
-    let fake = Fake::start(|req| match req.query["id"].as_str() {
+    let fake = Fake::start(|req| match req.form()["id"].as_str() {
         "1" => Resp::failure("MAGNET_INVALID_ID", "gone"),
         _ => Resp::data(
             json!({ "magnets": [{ "id": 2, "filename": "n", "size": 10, "statusCode": 1 }] }),
@@ -174,7 +174,7 @@ async fn an_instant_with_no_candidates_answers_null_without_reaching_alldebrid()
     .await;
 
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(answer, json!({ "Ok": null }));
+    assert_eq!(answer, json!({ "Ok": { "peerless": true, "hit": null } }));
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -198,5 +198,8 @@ async fn an_instant_answers_the_key_and_the_client_ref_of_the_release_it_kept() 
     )
     .await;
 
-    assert_eq!(answer, json!({ "Ok": { "key": "b", "client_ref": "42" } }));
+    assert_eq!(
+        answer,
+        json!({ "Ok": { "peerless": true, "hit": { "key": "b", "client_ref": "42" } } })
+    );
 }

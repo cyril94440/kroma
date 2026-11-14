@@ -9,6 +9,7 @@ mod failure;
 mod imported;
 mod notify;
 mod refresh;
+mod reopen;
 mod review;
 mod wanted;
 
@@ -23,6 +24,7 @@ pub use create::{create_approved, create_request};
 pub use failure::fail_request;
 pub use imported::{on_download_imported, Imported};
 pub use refresh::refresh_pass;
+pub use reopen::release_wanted;
 pub use review::{approve_request, deny_request};
 pub use wanted::preview_wanted;
 

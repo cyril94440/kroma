@@ -70,6 +70,17 @@ pub async fn stream_file<M: ByteMeter>(path: &Path, req_headers: &HeaderMap, met
     let Ok(file) = File::open(path).await else {
         return json_error(StatusCode::NOT_FOUND, "media file not found on disk");
     };
+    stream_open(file, content_type_for(path), req_headers, meter).await
+}
+
+/// [`stream_file`] over a file the caller already opened and checked, so what
+/// was checked is what is served whatever happens to its path meanwhile.
+pub async fn stream_open<M: ByteMeter>(
+    file: File,
+    content_type: &str,
+    req_headers: &HeaderMap,
+    meter: M,
+) -> Response {
     let Ok(metadata) = file.metadata().await else {
         return json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -79,7 +90,7 @@ pub async fn stream_file<M: ByteMeter>(path: &Path, req_headers: &HeaderMap, met
     stream_reader(
         file,
         metadata.len(),
-        content_type_for(path),
+        content_type,
         req_headers,
         meter,
     )

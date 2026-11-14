@@ -13,11 +13,32 @@ describe('readSourceFailure', () => {
     [502, 'error.sourceGone'],
     [503, 'error.sourceDisabled'],
   ])('names the source failure a %i answer carries: %s', async (status, code) => {
-    expect(await readSourceFailure(answer(status, { error: 'x', code }))).toBe(code);
+    expect(await readSourceFailure(answer(status, { error: 'x', code }))).toEqual({
+      messageKey: code,
+    });
   });
 
-  it('ignores a code the catalog does not hold', async () => {
-    expect(await readSourceFailure(answer(502, { error: 'x', code: 'error.other' }))).toBeNull();
+  it('shows the server message for an error code this client has no key for', async () => {
+    expect(
+      await readSourceFailure(
+        answer(503, { error: 'Still being prepared', code: 'error.notCached' }),
+      ),
+    ).toEqual({
+      messageKey: 'error.sourceMessage',
+      messageVars: { message: 'Still being prepared' },
+    });
+  });
+
+  it('falls back to a generic line for an unknown code with no message', async () => {
+    expect(await readSourceFailure(answer(502, { code: 'error.notCached' }))).toEqual({
+      messageKey: 'error.sourceUnknown',
+    });
+  });
+
+  it('ignores a body whose code is not an error key', async () => {
+    expect(await readSourceFailure(answer(502, { error: 'x', code: 'oops' }))).toBeNull();
+    expect(await readSourceFailure(answer(502, { error: 'x' }))).toBeNull();
+    expect(await readSourceFailure(answer(502, { code: 7 }))).toBeNull();
   });
 
   it('ignores a status that is not a source failure, whatever the body says', async () => {
@@ -38,7 +59,7 @@ describe('probeSourceFailure', () => {
       .mockResolvedValue(answer(502, { error: 'x', code: 'error.sourceRefused' }));
     vi.stubGlobal('fetch', fetch);
 
-    expect(await probeSourceFailure('/stream')).toBe('error.sourceRefused');
+    expect(await probeSourceFailure('/stream')).toEqual({ messageKey: 'error.sourceRefused' });
     expect(fetch).toHaveBeenCalledWith('/stream', { headers: { Range: 'bytes=0-0' } });
   });
 

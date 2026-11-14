@@ -470,3 +470,14 @@ fn a_re_encoded_picture_keeps_the_surround_bed_the_same_request_earned() {
     );
     assert_eq!(sdr_only.token(), "h264-eac3");
 }
+
+#[test]
+fn a_surround_target_the_build_cannot_encode_degrades_one_step_to_stereo_aac() {
+    use crate::capabilities::AudioTargets;
+    let target = |ac3, eac3, set| transcode_target_with(Some(6), set, AudioTargets { ac3, eac3 });
+
+    assert_eq!(target(true, true, "aac,ac3,eac3"), AudioMode::Eac3);
+    assert_eq!(target(true, false, "aac,ac3,eac3"), AudioMode::Ac3);
+    assert_eq!(target(false, false, "aac,ac3,eac3"), AudioMode::Aac);
+    assert_eq!(target(false, true, "aac,ac3"), AudioMode::Aac);
+}

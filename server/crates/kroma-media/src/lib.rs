@@ -6,6 +6,8 @@
 //! never comes with it.
 
 pub mod audio;
+pub mod capabilities;
+pub mod download;
 pub mod external_subtitles;
 pub mod ffmpeg_gate;
 pub mod ffmpeg_run;

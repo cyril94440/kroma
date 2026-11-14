@@ -163,9 +163,6 @@ pub async fn storyboard_image(
     }
 }
 
-// A scrub sheet reads the whole title: a stub gets one only once its source holds
-// a complete local copy, and until then the manifest is a 404 the player does
-// not poll.
 async fn whole_file_of(state: &SharedState, item: &MediaItem) -> Option<std::path::PathBuf> {
     let abs = item.abs_path.clone()?;
     let held = state.clone();
@@ -211,9 +208,6 @@ pub async fn subtitles(
         }
     }
 
-    // Extracting a text subtitle reads the whole file (cues are interleaved), so
-    // cache per (file, mtime, track). Computing the key stats the file, which on a
-    // slow mount would block the tokio worker.
     let data_dir = state.config.data_dir.clone();
     let cache = {
         let (abs, data_dir) = (abs.clone(), data_dir.clone());
@@ -227,9 +221,7 @@ pub async fn subtitles(
     if let Ok(bytes) = tokio::fs::read(&cache).await {
         return vtt_response(bytes);
     }
-    // Cache miss: demux once and warm every text track. The per-file lock joins an
-    // extraction already in flight instead of demuxing in parallel.
-    let resolved = match remote::playable(&state, &viewer, &abs, true).await {
+    let resolved = match remote::embedded(&state, &viewer, &abs).await {
         Ok(resolved) => resolved,
         Err(refused) => return refused,
     };
@@ -269,7 +261,9 @@ fn vtt_response(bytes: Vec<u8>) -> Response {
 /// single-track variant backs subtitle translation; playback extraction goes
 /// through [`subtitles::extract_batch_blocking`].
 pub(crate) async fn extract_webvtt(resolved: &Resolved, index: usize) -> Option<Vec<u8>> {
-    let child = tokio::process::Command::new("ffmpeg")
+    let mut command = tokio::process::Command::new("ffmpeg");
+    input::without_proxies(command.as_std_mut());
+    let child = command
         .args(["-v", "error", "-nostdin"])
         .args(input::media(&resolved.input))
         .args(["-map", &format!("0:s:{index}"), "-f", "webvtt", "pipe:1"])

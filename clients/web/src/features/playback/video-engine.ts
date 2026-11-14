@@ -9,6 +9,7 @@ import type { MovieView, WebRuntime } from '#web/shared/lib/api';
 import type { AudioTrack } from '@kromatv/client/media';
 import type { PlaybackMode } from '@kromatv/client/playback';
 import {
+  type AudioDelivery,
   attachHlsRecovery,
   deviceDeclaration,
   type EngineDecision,
@@ -58,6 +59,7 @@ export interface VideoPlayback {
   waitReason: WaitReason | null;
   failure: StreamFailure | null;
   mode: PlaybackMode;
+  delivered: AudioDelivery | null;
   ready: boolean;
   cur: number;
   dur: number;

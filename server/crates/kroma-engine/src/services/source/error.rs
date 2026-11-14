@@ -10,6 +10,7 @@ pub enum SourceError {
     Unreachable,
     Gone(String),
     Refused(Refusal),
+    Preparing,
 }
 
 /// A source's answer the core would not use, and which rule it broke.
@@ -21,7 +22,7 @@ pub enum Refusal {
     PathOutsideItsFolders,
     NotTheFileStubbed,
     NoPathNoUrl,
-    NetworkPolicy,
+    DuplicateSource,
 }
 
 impl fmt::Display for Refusal {
@@ -33,7 +34,7 @@ impl fmt::Display for Refusal {
             Self::PathOutsideItsFolders => f.write_str("the path is outside the folders the source may hold"),
             Self::NotTheFileStubbed => f.write_str("the path is not a complete file of the size the stub declares"),
             Self::NoPathNoUrl => f.write_str("the source answered neither a path nor a URL"),
-            Self::NetworkPolicy => f.write_str("the network policy does not let a title be read from this host directly"),
+            Self::DuplicateSource => f.write_str("more than one official module answers for this source"),
         }
     }
 }
@@ -46,6 +47,7 @@ impl fmt::Display for SourceError {
             Self::Unreachable => f.write_str("the source did not answer"),
             Self::Gone(why) => write!(f, "the source could not locate the file: {why}"),
             Self::Refused(rule) => write!(f, "the source's answer was refused: {rule}"),
+            Self::Preparing => f.write_str("the title is being cached and cannot be read until it is"),
         }
     }
 }
@@ -54,8 +56,8 @@ impl std::error::Error for SourceError {}
 
 impl SourceError {
     /// Whether asking again later can succeed: a module that is off or not
-    /// answering comes back, a refused answer or an unreadable stub does not.
+    /// answering comes back, a title still being cached is ready later, a refused answer or an unreadable stub does not.
     pub fn is_transient(&self) -> bool {
-        matches!(self, Self::NoModule | Self::Unreachable | Self::Gone(_))
+        matches!(self, Self::NoModule | Self::Unreachable | Self::Gone(_) | Self::Preparing)
     }
 }

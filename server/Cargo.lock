@@ -2166,6 +2166,7 @@ dependencies = [
  "kroma-requests",
  "kroma-testing",
  "lettre",
+ "libc",
  "lzma-rust2",
  "notify",
  "p256",

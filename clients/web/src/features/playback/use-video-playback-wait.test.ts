@@ -200,7 +200,7 @@ describe('useVideoPlayback when the server refuses the stream', () => {
     vi.useRealTimers();
 
     expect(fetch).toHaveBeenCalledTimes(3);
-    expect(result.current.failure).toBe('error.sourceUnreachable');
+    expect(result.current.failure).toEqual({ messageKey: 'error.sourceUnreachable' });
     expect(vi.mocked(attachMediaSource)).not.toHaveBeenCalled();
   });
 

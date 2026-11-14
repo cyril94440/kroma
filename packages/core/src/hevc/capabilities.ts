@@ -256,15 +256,22 @@ export function decodableVideoCodecs(caps: PlaybackCapabilities = capabilities()
   return (['hevc', 'h264', 'h26410bit', 'av1', 'vp9'] as const).filter((codec) => declared[codec]);
 }
 
+function decodesHevcDolbyVision(hdr: HdrCapabilities): boolean {
+  if (!hdr.dolbyVision) return false;
+  return hdr.dolbyVisionProfiles === undefined || hdr.dolbyVisionProfiles.some((p) => p !== 10);
+}
+
 /**
  * The HDR systems this device displays, in the words the server's `hdr` query
- * token takes (`hdr10`, `hdr10plus`, `hlg`, `dv`). Undefined where the table is a
+ * token takes (`hdr10`, `hdr10plus`, `hlg`, `dv`, where `dv` is HEVC Dolby Vision: an AV1-only
+ * Dolby Vision decoder does not earn it). Undefined where the table is a
  * guess rather than a statement about the device, which leaves the server to behave
  * as it did before the token existed; an empty list is a declared SDR display.
  */
 export function hdrDeclaration(caps: PlaybackCapabilities = capabilities()): string[] | undefined {
   if (!caps.hdrDeclared) return undefined;
-  const { hdr10, hdr10Plus, hlg, dolbyVision } = caps.hdr;
+  const { hdr10, hdr10Plus, hlg } = caps.hdr;
+  const dolbyVision = decodesHevcDolbyVision(caps.hdr);
   return [
     hdr10 ? 'hdr10' : null,
     hdr10Plus ? 'hdr10plus' : null,

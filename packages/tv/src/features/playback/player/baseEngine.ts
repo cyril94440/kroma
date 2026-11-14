@@ -6,7 +6,7 @@
 import type { KromaClient } from '@kromatv/client';
 import type { MediaItem } from '@kromatv/client/media';
 import {
-  decodableAudioCodecs,
+  copyableAudioCodecs,
   decodableVideoCodecs,
   decoderMaxFrame,
   hdrDeclaration,
@@ -95,7 +95,7 @@ export abstract class BaseTvEngine implements TvEngine {
   }
 
   protected declaredAudioCodecs(): string[] {
-    return decodableAudioCodecs(this.capabilities);
+    return copyableAudioCodecs(this.capabilities);
   }
 
   protected declaredHdr(): string[] | undefined {

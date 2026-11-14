@@ -28,6 +28,8 @@ mod multipart;
 #[cfg(not(target_family = "wasm"))]
 mod pin;
 mod response;
+#[cfg(all(feature = "test-hosts", not(target_family = "wasm")))]
+pub mod test_hosts;
 
 #[cfg(not(target_family = "wasm"))]
 pub use curl::curl_available;

@@ -133,7 +133,9 @@ means the table is a guess, and the server behaves as before.
   to a client, the base HDR10 layer is preserved rather than HDR discarded entirely, and the
   player says so: Dolby Vision drawn as its HDR10, HLG or SDR layer, HDR10+ drawn as HDR10, and
   HDR tone-mapped to an SDR display are each a notice, never a silent change. It is a fallback
-  [`playback/`](../playback/) makes visible.
+  [`playback/`](../playback/) makes visible. Dolby Vision profile 7 is always delivered over HLS as
+  its HDR10 base layer alone, so that notice holds for it even on a device that decodes Dolby
+  Vision; only the original file, played directly, keeps its enhancement layer.
 
 ## Audio
 

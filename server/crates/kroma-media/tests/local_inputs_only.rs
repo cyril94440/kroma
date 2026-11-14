@@ -6,6 +6,8 @@ const RAW_INPUT_FLAG: &str = "\"-i\"";
 const RAW_WHITELIST_FLAG: &str = "protocol_whitelist";
 const FFPROBE_COMMAND: &str = "Command::new(\"ffprobe\")";
 const HELPER_CALL: &str = "input::";
+const MEDIA_CALL: &str = "input::media(";
+const PROXY_GUARD: &str = "without_proxies";
 const NO_INPUT_FLAG: &str = "\"-version\"";
 
 const SCANNED_ROOTS: [&str; 2] = ["server", "modules"];
@@ -32,14 +34,23 @@ fn violations(source: &str) -> Vec<Finding> {
     let probes = source
         .match_indices(FFPROBE_COMMAND)
         .filter(|(at, _)| {
-            let statement = source[*at..].split(';').next().unwrap_or_default();
-            !statement.contains(HELPER_CALL) && !statement.contains(NO_INPUT_FLAG)
+            let function = source[*at..].split("\n}\n").next().unwrap_or_default();
+            !function.contains(HELPER_CALL) && !function.contains(NO_INPUT_FLAG)
         })
         .map(|(at, _)| Finding {
             line: source[..at].matches('\n').count() + 1,
             reason: "runs ffprobe without naming the input through kroma_media::input",
         });
-    by_line.chain(probes).collect()
+    let proxied = source.match_indices(MEDIA_CALL).filter_map(|(at, _)| {
+        let start = source[..at].rfind("\nfn ").or_else(|| source[..at].rfind("fn ")).unwrap_or(0);
+        let end = at + source[at..].find("\n}\n").unwrap_or(source.len() - at);
+        let function = &source[start..end];
+        (function.contains("Command::new(") && !function.contains(PROXY_GUARD)).then(|| Finding {
+            line: source[..at].matches('\n').count() + 1,
+            reason: "builds an ffmpeg or ffprobe command without taking the proxy variables out of it",
+        })
+    });
+    by_line.chain(probes).chain(proxied).collect()
 }
 
 fn repo_root() -> PathBuf {

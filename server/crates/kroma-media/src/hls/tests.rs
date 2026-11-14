@@ -190,8 +190,7 @@ async fn a_title_behind_a_url_is_remuxed_from_the_network() {
     let dir = kroma_testing::temp_dir("hls-remote");
     let clip = kroma_testing::clip(dir.path());
     let server = kroma_testing::RangedServer::serve(&clip);
-    let url = kroma_primitives::input::RemoteUrl::parse_insecure(&server.url("clip.mp4")).unwrap();
-    let input = MediaInput::Remote(url);
+    let input = crate::input::relayed_at(server.port());
     let engine = engine(dir.path());
 
     let (playlist, start) = engine
@@ -211,9 +210,9 @@ async fn a_seek_into_a_url_starts_on_a_keyframe_read_over_the_network() {
     let dir = kroma_testing::temp_dir("hls-remote-seek");
     let clip = kroma_testing::clip(dir.path());
     let server = kroma_testing::RangedServer::serve(&clip);
-    let url = kroma_primitives::input::RemoteUrl::parse_insecure(&server.url("clip.mp4")).unwrap();
+    let input = crate::input::relayed_at(server.port());
 
-    let start = super::ffmpeg::keyframe_before(&MediaInput::Remote(url), 3.2).await;
+    let start = super::ffmpeg::keyframe_before(&input, 3.2).await;
 
     assert!((start - 3.0).abs() < 0.1, "{start}");
 }

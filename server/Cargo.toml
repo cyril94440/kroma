@@ -288,7 +288,8 @@ kroma-db = { workspace = true, features = ["testing"] }
 kroma-requests = { workspace = true, features = ["testing"] }
 # Lets a title be served from a socket on this machine: the shipped build refuses
 # a URL that is not https on a public host.
-kroma-engine = { workspace = true, features = ["insecure-test-sources"] }
+kroma-engine = { workspace = true }
+kroma-http = { workspace = true, features = ["test-hosts"] }
 # The stub a test writes into a library.
 kroma-primitives = { workspace = true }
 

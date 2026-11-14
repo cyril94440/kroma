@@ -51,7 +51,18 @@ function drawsOrToneMaps(drawn: boolean, as: 'hdr10' | 'hlg'): PictureOutcome {
   return drawn ? { kind: 'base', source: 'dolbyVision', as } : { kind: 'toneMapped' };
 }
 
-function dolbyVisionOutcome(video: HdrVideo, caps: PlaybackCapabilities): PictureOutcome {
+const STREAMED_AS_BASE_LAYER = 7;
+
+export type PictureDelivery = 'file' | 'stream';
+
+function dolbyVisionOutcome(
+  video: HdrVideo,
+  caps: PlaybackCapabilities,
+  delivery: PictureDelivery,
+): PictureOutcome {
+  if (delivery === 'stream' && video.dolbyVisionProfile === STREAMED_AS_BASE_LAYER) {
+    return drawsOrToneMaps(caps.hdr.hdr10, 'hdr10');
+  }
   if (decodesDolbyVision(caps, video.dolbyVisionProfile)) return { kind: 'native' };
   const base = dolbyVisionBaseLayer(video) ?? 'hdr10';
   switch (base) {
@@ -71,16 +82,18 @@ function dolbyVisionOutcome(video: HdrVideo, caps: PlaybackCapabilities): Pictur
  * itself, the base layer it degrades to, an SDR picture tone-mapped from HDR, or
  * nothing it can draw. Only Dolby Vision with no compatible base layer is refused;
  * every other variant carries a picture a device without its dynamic metadata can
- * still show.
+ * still show. Over a `stream` (the server's HLS) a profile 7 title arrives as its
+ * HDR10 base layer alone, whatever the device decodes; `file` is the original.
  */
 export function pictureOutcome(
   video: HdrVideo | null | undefined,
   caps: PlaybackCapabilities,
+  delivery: PictureDelivery = 'file',
 ): PictureOutcome {
   if (!video || (!video.hdr && !video.hdrFormat)) return { kind: 'sdr' };
   switch (video.hdrFormat) {
     case 'dolbyVision':
-      return dolbyVisionOutcome(video, caps);
+      return dolbyVisionOutcome(video, caps, delivery);
     case 'hdr10Plus':
       if (caps.hdr.hdr10Plus) return { kind: 'native' };
       return caps.hdr.hdr10

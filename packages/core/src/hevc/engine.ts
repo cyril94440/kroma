@@ -11,7 +11,7 @@ import { canDirectPlay } from './directplay';
 import {
   ANDROID_TV_CAPS,
   APPLE_TV_CAPS,
-  AVPLAY_HLS_CAPS,
+  avplayHlsCapabilities,
   MPV_CAPS,
   MSE_CAPS,
   SAFARI_CAPS,
@@ -129,8 +129,11 @@ export function selectEngine(item: MediaItem, env: PlayEnv): EngineDecision {
 
 /** The capability table of the plane a title is drawn on: mpv and AVPlay decode
  * on their own, so the runtime the page was probed in says nothing about them. */
-export function surfaceCapabilities(surface: string): PlaybackCapabilities {
+export function surfaceCapabilities(
+  surface: string,
+  runtime?: PlaybackCapabilities,
+): PlaybackCapabilities {
   if (surface === 'mpv') return MPV_CAPS;
-  if (surface === 'avplay') return AVPLAY_HLS_CAPS;
-  return capabilities();
+  if (surface === 'avplay') return avplayHlsCapabilities(runtime);
+  return runtime ?? capabilities();
 }

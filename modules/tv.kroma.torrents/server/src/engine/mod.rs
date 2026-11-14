@@ -79,6 +79,45 @@ pub struct InstantHit {
     pub client_ref: String,
 }
 
+/// What an engine answered to an instant ask: the candidate it kept, and its
+/// statement that it moves no peer traffic through this machine. Without that
+/// statement the downloads module treats the engine as a peer and holds it to
+/// the VPN kill switch.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstantAnswer {
+    pub hit: Option<InstantHit>,
+    pub peerless: bool,
+}
+
+impl InstantAnswer {
+    /// Reads either shape an engine may answer: `{ "hit", "peerless" }`, or the
+    /// bare hit (or `null`) of an engine that predates the statement, which
+    /// never counts as peerless.
+    pub fn from_json(value: serde_json::Value) -> anyhow::Result<Self> {
+        #[derive(Deserialize)]
+        struct Stated {
+            #[serde(default)]
+            hit: Option<InstantHit>,
+            #[serde(default)]
+            peerless: bool,
+        }
+        match &value {
+            serde_json::Value::Null => Ok(Self::default()),
+            serde_json::Value::Object(map) if map.contains_key("hit") || map.contains_key("peerless") => {
+                let stated: Stated = serde_json::from_value(value)?;
+                Ok(Self {
+                    hit: stated.hit,
+                    peerless: stated.peerless,
+                })
+            }
+            _ => Ok(Self {
+                hit: Some(serde_json::from_value(value)?),
+                peerless: false,
+            }),
+        }
+    }
+}
+
 /// An engine that cannot say which releases it holds already.
 #[derive(Debug)]
 pub struct InstantUnsupported;
@@ -109,11 +148,20 @@ pub trait DownloadClient: Send + Sync {
         anyhow::bail!("this download client cannot list a torrent's files before adding it")
     }
     // The first of the ranked candidates the engine can hand over without
-    // fetching anything, left added; every other candidate is left out. An empty
-    // list asks only whether the engine can do this. Only an engine that moves no
-    // data through this machine implements it, so it is never a peer.
-    fn instant(&self, _candidates: &[InstantCandidate]) -> anyhow::Result<Option<InstantHit>> {
+    // fetching anything, left added; every other candidate is left out, all
+    // within `budget`. An empty list asks only whether the engine can do this,
+    // and what it says about peer traffic.
+    fn instant(
+        &self,
+        _candidates: &[InstantCandidate],
+        _budget: std::time::Duration,
+    ) -> anyhow::Result<InstantAnswer> {
         Err(InstantUnsupported.into())
+    }
+    // The release was turned down: remove it and, where the engine can tell it
+    // made it, whatever it kept on its side.
+    fn discard(&self, client_ref: &str) -> anyhow::Result<()> {
+        self.remove(client_ref, true)
     }
     // `Ok(None)` = the engine no longer knows this torrent.
     fn status(&self, client_ref: &str) -> anyhow::Result<Option<TorrentStatus>>;

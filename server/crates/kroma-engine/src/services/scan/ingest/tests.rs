@@ -13,7 +13,7 @@ fn def(root: &Path) -> LibraryDef {
 
 fn stub(path: &Path) {
     let file = RemoteFile {
-        source: "alldebrid".into(),
+        source: "debrid".into(),
         reference: "7:a.mkv".into(),
         name: "a.mkv".into(),
         size: 5,

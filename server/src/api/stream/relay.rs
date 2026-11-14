@@ -4,14 +4,13 @@
 use axum::http::HeaderMap;
 use axum::response::Response;
 
-use kroma_media::input::MediaInput;
-use kroma_media::stream::{content_type_of, stream_file, stream_ranged};
 use kroma_media::ByteMeter;
 
 use crate::model::User;
+use crate::services::source::ServeError;
 use crate::state::SharedState;
 
-use super::remote::{playable, unreachable};
+use super::remote::{failure, unreachable};
 
 pub(super) async fn stream_stub<M: ByteMeter>(
     state: &SharedState,
@@ -21,26 +20,15 @@ pub(super) async fn stream_stub<M: ByteMeter>(
     headers: &HeaderMap,
     meter: M,
 ) -> Result<Response, Response> {
-    let resolved = playable(state, viewer, path, true).await?;
-    match resolved.input {
-        MediaInput::Local(copy) => Ok(stream_file(&copy, headers, meter).await),
-        MediaInput::Remote(url) => {
-            let stub = resolved.stub.ok_or_else(|| unreachable(viewer))?;
-            let container = stub.container().unwrap_or_default();
-            let sources = state.sources.clone();
-            stream_ranged(
-                stub.size,
-                content_type_of(&container),
-                headers,
-                head,
-                meter,
-                |start, end| async move { sources.relay(&url, start, end).await },
-            )
-            .await
-            .map_err(|error| {
+    state
+        .sources
+        .serve(path, true, head, headers, meter)
+        .await
+        .map_err(|error| match error {
+            ServeError::Source(error) => failure(viewer, &error),
+            ServeError::Upstream(error) => {
                 tracing::warn!(%error, "a streamed title could not be opened at its host");
                 unreachable(viewer)
-            })
-        }
-    }
+            }
+        })
 }

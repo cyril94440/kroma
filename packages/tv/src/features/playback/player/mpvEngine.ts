@@ -12,7 +12,7 @@
 // media element (surface: 'mpv').
 
 import {
-  decodableAudioCodecs,
+  copyableAudioCodecs,
   decodableVideoCodecs,
   hdrDeclaration,
   MPV_CAPS,
@@ -77,7 +77,7 @@ export class MpvEngine extends BaseTvEngine {
   }
 
   protected override declaredAudioCodecs(): string[] {
-    return decodableAudioCodecs(MPV_CAPS);
+    return copyableAudioCodecs(MPV_CAPS);
   }
 
   protected override declaredVideoCodecs(): string[] {

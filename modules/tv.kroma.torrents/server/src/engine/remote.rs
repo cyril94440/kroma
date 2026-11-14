@@ -17,7 +17,7 @@ use kroma_module_sdk::host::{call, call_raw, pinned_resolver, HostCtx, Resolver}
 #[cfg(test)]
 use super::TorrentState;
 use super::{
-    AddTorrentReq, ClientDef, DownloadClient, InstantCandidate, InstantHit, InstantUnsupported,
+    AddTorrentReq, ClientDef, DownloadClient, InstantAnswer, InstantCandidate, InstantUnsupported,
     TorrentFileEntry, TorrentStatus,
 };
 
@@ -96,12 +96,28 @@ impl DownloadClient for RemoteEngine {
         anyhow::bail!("this download client cannot list a torrent's files before adding it")
     }
 
-    fn instant(&self, candidates: &[InstantCandidate]) -> anyhow::Result<Option<InstantHit>> {
-        self.ask("instant", json!({ "candidates": candidates }))
+    fn instant(
+        &self,
+        candidates: &[InstantCandidate],
+        budget: std::time::Duration,
+    ) -> anyhow::Result<InstantAnswer> {
+        let answer: serde_json::Value = self
+            .ask(
+                "instant",
+                json!({ "candidates": candidates, "budget_ms": budget.as_millis() as u64 }),
+            )
             .map_err(|error| match absent_route(&error) {
                 true => InstantUnsupported.into(),
                 false => error,
-            })
+            })?;
+        InstantAnswer::from_json(answer)
+    }
+
+    fn discard(&self, client_ref: &str) -> anyhow::Result<()> {
+        self.ask(
+            "remove",
+            json!({ "client_ref": client_ref, "delete_data": true, "discard": true }),
+        )
     }
 
     fn status(&self, client_ref: &str) -> anyhow::Result<Option<TorrentStatus>> {

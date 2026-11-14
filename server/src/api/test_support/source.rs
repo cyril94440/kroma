@@ -13,7 +13,7 @@ use kroma_primitives::remote_file::{self, RemoteFile};
 use kroma_testing::RangedServer;
 use serde_json::{json, Value};
 
-use super::{build_app_wired, TestApp};
+use super::{build_app_official, TestApp};
 
 pub const MODULE_ID: &str = "tv.example.debrid";
 pub const SOURCE_ID: &str = "debrid";
@@ -107,8 +107,8 @@ fn reply(stream: TcpStream, answer: &Mutex<Value>, asked: &Mutex<Vec<Value>>) {
     );
 }
 
-/// The app with a `source` contribution backed by a [`FakeSource`], and a
-/// source that is willing to read from a loopback socket.
+/// The app with an official module contributing `source`, backed by a
+/// [`FakeSource`].
 pub fn test_app_with_source() -> (TestApp, FakeSource) {
     let fake = FakeSource::start();
     let base = format!("http://127.0.0.1:{}", fake.port);
@@ -123,8 +123,7 @@ pub fn test_app_with_source() -> (TestApp, FakeSource) {
             token: "port-token".into(),
         }]
     });
-    let app = build_app_wired(None, &[], |_| (), contributions);
-    app.state.sources.allow_loopback();
+    let app = build_app_official(None, &[], |_| (), contributions, &[MODULE_ID]);
     (app, fake)
 }
 
@@ -135,6 +134,26 @@ pub struct Stubbed {
     pub file: String,
     pub abs: String,
     pub cdn: RangedServer,
+    host: String,
+}
+
+impl Stubbed {
+    /// An `https` URL on a public-looking name that the test host mapping
+    /// serves from the [`RangedServer`], so everything that vets a URL runs.
+    pub fn url(&self, name: &str) -> String {
+        format!("https://{}/{name}?token=hunter2", self.host)
+    }
+}
+
+fn public_name_for(cdn: &RangedServer) -> String {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let host = format!("cdn-{}.example.com", NEXT.fetch_add(1, Ordering::SeqCst));
+    kroma_http::test_hosts::map_host(
+        &host,
+        "93.184.216.34".parse().expect("an address"),
+        std::net::SocketAddr::from(([127, 0, 0, 1], cdn.port())),
+    );
+    host
 }
 
 pub async fn stubbed_movie(t: &TestApp, real: &Path, name: &str) -> Stubbed {
@@ -181,7 +200,16 @@ pub async fn stubbed_movie(t: &TestApp, real: &Path, name: &str) -> Stubbed {
         item: item.id.clone(),
         file: file.id,
         abs: file.abs_path.expect("a scanned path"),
+        host: String::new(),
         cdn: RangedServer::serve(real),
+    }
+    .named()
+}
+
+impl Stubbed {
+    fn named(mut self) -> Self {
+        self.host = public_name_for(&self.cdn);
+        self
     }
 }
 

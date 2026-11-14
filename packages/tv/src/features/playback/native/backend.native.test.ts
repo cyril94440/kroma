@@ -84,15 +84,15 @@ describe('the one question it asks', () => {
     plan();
     // AVFoundation and Media3 disagree about containers: AVPlay demuxes Matroska,
     // AVFoundation does not.
-    expect(nativeDirectPlayable).toHaveBeenCalledWith(item, 'ios');
+    expect(nativeDirectPlayable).toHaveBeenCalledWith(item, 'ios', undefined);
 
     rn.os = 'android';
     plan();
-    expect(nativeDirectPlayable).toHaveBeenLastCalledWith(item, 'android');
+    expect(nativeDirectPlayable).toHaveBeenLastCalledWith(item, 'android', undefined);
 
     rn.os = 'tizen';
     plan();
-    expect(nativeDirectPlayable).toHaveBeenLastCalledWith(item, 'tizen');
+    expect(nativeDirectPlayable).toHaveBeenLastCalledWith(item, 'tizen', undefined);
   });
 
   it('opens the original file when the player can', () => {
@@ -124,9 +124,13 @@ describe('the one question it asks', () => {
     expect(plan('vlc')).toMatchObject({ eng: 'vlc' });
   });
 
+  it('asks about the track the player opens with, not the file default', () => {
+    rn.os = 'ios';
+    planEngine(item, env, 'auto', undefined, 2);
+    expect(nativeDirectPlayable).toHaveBeenLastCalledWith(item, 'ios', 2);
+  });
+
   it('never reports a transcode, because the audio is never re-encoded', () => {
-    // The native players decode AC-3 / E-AC-3, so the server's master is
-    // stream-copied either way.
     for (const answer of [true, false]) {
       nativeDirectPlayable.mockReturnValue(answer);
       expect(plan().playbackMode).not.toBe('transcode');

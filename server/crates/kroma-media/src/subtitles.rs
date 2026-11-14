@@ -86,6 +86,7 @@ pub fn extract_vtt_from(
 // keeps this from competing with a live remux for cores.
 fn pass(input: &MediaInput, tracks: &[(usize, PathBuf)], tmps: &[PathBuf]) -> Command {
     let mut cmd = Command::new("ffmpeg");
+    input::without_proxies(&mut cmd);
     cmd.args(["-v", "error", "-nostdin", "-threads", "1", "-y"]);
     cmd.args(input::media(input));
     for ((track, _), tmp) in tracks.iter().zip(tmps) {

@@ -16,6 +16,9 @@ pub struct Heard {
 
 #[derive(Default)]
 struct Behaviour {
+    redirect: Option<String>,
+    announced_total: Option<u64>,
+    ignores_ranges: bool,
     status: Option<u16>,
     cut_after: Option<u64>,
 }
@@ -71,6 +74,29 @@ impl RangedServer {
         self.behaviour.lock().unwrap().status = Some(status);
     }
 
+    /// Answer every request with a `302` to `location`, as a CDN does when it
+    /// moves a file, from now on.
+    pub fn redirect_to(&self, location: &str) {
+        self.behaviour.lock().unwrap().redirect = Some(location.to_string());
+    }
+
+    /// Report `total` as the file's size in every `Content-Range`, as a host
+    /// that is serving some other file would.
+    pub fn announce_total(&self, total: u64) {
+        self.behaviour.lock().unwrap().announced_total = Some(total);
+    }
+
+    /// Answer every request with the whole file and a `200`, as a host that
+    /// does not support ranges does.
+    pub fn ignore_ranges(&self) {
+        self.behaviour.lock().unwrap().ignores_ranges = true;
+    }
+
+    /// The loopback port this server listens on.
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+
     /// Close the connection after `bytes` of a body, as a CDN that drops one does.
     pub fn cut_bodies_after(&self, bytes: u64) {
         self.behaviour.lock().unwrap().cut_after = Some(bytes);
@@ -111,11 +137,19 @@ fn connection(stream: TcpStream, file: &Path, heard: &Mutex<Vec<Heard>>, behavio
             }
         }
         heard.lock().unwrap().push(Heard { method: method.clone(), target, range: range.clone() });
-        let (status, cut_after) = {
+        let (status, cut_after, redirect, announced, whole) = {
             let held = behaviour.lock().unwrap();
-            (held.status, held.cut_after)
+            (held.status, held.cut_after, held.redirect.clone(), held.announced_total, held.ignores_ranges)
         };
-        if answer(&mut out, file, &method, range.as_deref(), status, cut_after).is_err() {
+        let range = if whole { None } else { range };
+        if let Some(location) = redirect {
+            let sent = write!(out, "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: keep-alive\r\n\r\n");
+            if sent.is_err() {
+                return;
+            }
+            continue;
+        }
+        if answer(&mut out, file, &method, range.as_deref(), status, cut_after, announced).is_err() {
             let _ = out.shutdown(Shutdown::Both);
             return;
         }
@@ -129,6 +163,7 @@ fn answer(
     range: Option<&str>,
     status: Option<u16>,
     cut_after: Option<u64>,
+    announced: Option<u64>,
 ) -> std::io::Result<()> {
     if let Some(status) = status {
         return write!(out, "HTTP/1.1 {status} Failing\r\nContent-Length: 0\r\nConnection: keep-alive\r\n\r\n");
@@ -140,7 +175,7 @@ fn answer(
     };
     let length = end - start + 1;
     let head = if range.is_some() {
-        format!("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {start}-{end}/{len}\r\n")
+        format!("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {start}-{end}/{}\r\n", announced.unwrap_or(len))
     } else {
         "HTTP/1.1 200 OK\r\n".to_string()
     };

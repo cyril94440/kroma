@@ -1,6 +1,7 @@
 //! AllDebrid as a download engine: AllDebrid fetches the torrent on its own
 //! servers, and this module answers the `download-client` point from its API.
-//! Finished files are fetched one at a time into a cache that purges itself.
+//! A finished magnet becomes `.kremote` stubs the library streams from; the
+//! bytes of a file a viewer plays can be kept in a cache that purges itself.
 
 use std::path::Path;
 
@@ -12,6 +13,7 @@ pub mod creds;
 pub mod files;
 pub mod locate;
 pub mod memo;
+pub mod owned;
 pub mod port;
 pub mod purge_job;
 pub mod ready;
@@ -26,17 +28,30 @@ mod instant;
 mod lifecycle;
 pub mod resolve;
 mod status;
+mod transfer_hosts;
 
 #[cfg(all(test, not(target_family = "wasm")))]
 mod fake_alldebrid;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_cache_limits;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_engine;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_instant;
 #[cfg(all(test, not(target_family = "wasm")))]
+mod it_instant_held;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_limits;
+#[cfg(all(test, not(target_family = "wasm")))]
 mod it_locate;
 #[cfg(all(test, not(target_family = "wasm")))]
+mod it_locate_keys;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_owned;
+#[cfg(all(test, not(target_family = "wasm")))]
 mod it_ready;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_status;
 
 pub const KIND: &str = "alldebrid";
 pub const MODULE_ID: &str = "tv.kroma.engine.alldebrid";
@@ -49,6 +64,7 @@ pub struct AllDebrid {
     api: api::Api,
     cache: cache::Cache,
     creds: creds::Creds,
+    owned: owned::Owned,
     saved: creds::Saved,
     module_dir: std::path::PathBuf,
 }
@@ -61,6 +77,7 @@ impl AllDebrid {
             api: api::Api::new(&def.url, &def.password)?,
             cache: cache::Cache::new(module_dir),
             creds: creds::Creds::new(module_dir),
+            owned: owned::Owned::new(module_dir),
             saved: creds::Saved {
                 url: def.url.trim().to_string(),
                 key: def.password.trim().to_string(),
@@ -144,6 +161,5 @@ mod tests {
 
         assert_eq!(module.id(), MODULE_ID);
         assert_eq!(module.jobs().len(), 1);
-        assert_eq!(KIND, "alldebrid");
     }
 }

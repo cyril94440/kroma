@@ -1,14 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { canDirectPlay } from './directplay';
 import { makeItem, track, UNPROBED } from './directplay.fixture';
-import {
-  avplayDirectPlayable,
-  nativeDirectPlayable,
-  type PlayEnv,
-  selectEngine,
-  surfaceCapabilities,
-} from './engine';
-import { AVPLAY_HLS_CAPS, MPV_CAPS, MSE_CAPS, SAFARI_CAPS } from './runtime-caps';
+import { avplayDirectPlayable, nativeDirectPlayable, type PlayEnv, selectEngine } from './engine';
+import { MSE_CAPS, SAFARI_CAPS } from './runtime-caps';
 
 describe('direct play and the track a title opens on', () => {
   const dtsMp4 = makeItem({
@@ -92,13 +86,6 @@ describe('selectEngine with E-AC-3 surround on the server', () => {
       kind: 'web-mse',
       aacMaster: true,
     });
-  });
-});
-
-describe('surfaceCapabilities', () => {
-  it('answers for the plane that decodes, not for the page that was probed', () => {
-    expect(surfaceCapabilities('mpv')).toBe(MPV_CAPS);
-    expect(surfaceCapabilities('avplay')).toBe(AVPLAY_HLS_CAPS);
   });
 });
 

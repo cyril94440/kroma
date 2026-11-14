@@ -4,7 +4,7 @@
   "id": "tv.kroma.engine.alldebrid",
   "name": "AllDebrid engine",
   "version": "0.1.0",
-  "description": "AllDebrid as a download engine for the Downloads module. AllDebrid fetches the torrent on its servers, then KROMA copies the finished files onto this server for import.",
+  "description": "AllDebrid as a download engine for the Downloads module. AllDebrid fetches the torrent on its servers; KROMA keeps a small stub per video and streams the file from AllDebrid when it is played.",
   "engines": {
     "server": ">=0.1.39"
   },
@@ -66,8 +66,8 @@
       ]
     },
     "fs": {
-      "read": ["module", "downloads"],
-      "write": ["module", "downloads"]
+      "read": ["module"],
+      "write": ["module"]
     }
   }
 }

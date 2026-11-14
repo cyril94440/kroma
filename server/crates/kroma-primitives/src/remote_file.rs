@@ -9,6 +9,8 @@ use crate::video::VIDEO_EXTENSIONS;
 pub const EXTENSION: &str = "kremote";
 
 const MAX_STUB_BYTES: u64 = 64 * 1024;
+const MAX_TITLE_BYTES: u64 = 1 << 50;
+const MAX_FIELD_CHARS: usize = 1024;
 
 /// A small file standing for a video whose bytes live elsewhere. `source` is the
 /// contribution that can locate them, `reference` means something only to that
@@ -24,6 +26,22 @@ pub struct RemoteFile {
 }
 
 impl RemoteFile {
+    fn validate(&self) -> Result<(), &'static str> {
+        let plain = |text: &str| {
+            !text.is_empty() && text.chars().count() <= MAX_FIELD_CHARS && !text.chars().any(char::is_control)
+        };
+        if self.size > MAX_TITLE_BYTES {
+            return Err("a remote file stub declares a size no title has");
+        }
+        if !plain(&self.source) || !plain(&self.reference) || !plain(&self.name) {
+            return Err("a remote file stub holds an empty, oversized or control-character field");
+        }
+        if self.name.contains(['/', '\\']) || self.name == "." || self.name == ".." {
+            return Err("a remote file stub's name is a path");
+        }
+        Ok(())
+    }
+
     /// The lowercased extension of `name` when it is a video container, else
     /// `None`.
     pub fn container(&self) -> Option<String> {
@@ -40,7 +58,8 @@ pub fn is_remote_file(path: &Path) -> bool {
         .is_some_and(|extension| extension.eq_ignore_ascii_case(EXTENSION))
 }
 
-/// Reads a stub. A file over 64 KiB is refused before it is parsed.
+/// Reads a stub. A file over 64 KiB is refused before it is parsed, and so is
+/// one whose size no real title has or whose name could leave its folder.
 pub fn read(path: &Path) -> std::io::Result<RemoteFile> {
     let file = std::fs::File::open(path)?;
     if file.metadata()?.len() > MAX_STUB_BYTES {
@@ -51,8 +70,11 @@ pub fn read(path: &Path) -> std::io::Result<RemoteFile> {
     }
     let mut bytes = Vec::new();
     file.take(MAX_STUB_BYTES + 1).read_to_end(&mut bytes)?;
-    serde_json::from_slice(&bytes)
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
+    let stub: RemoteFile = serde_json::from_slice(&bytes)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+    stub.validate()
+        .map_err(|why| std::io::Error::new(std::io::ErrorKind::InvalidData, why))?;
+    Ok(stub)
 }
 
 /// Writes a stub, creating its folder.
@@ -70,7 +92,7 @@ mod tests {
 
     fn sample() -> RemoteFile {
         RemoteFile {
-            source: "alldebrid".into(),
+            source: "debrid".into(),
             reference: "7:Show/a.mkv".into(),
             name: "Movie.2020.2160p.MKV".into(),
             size: 42,
@@ -132,5 +154,30 @@ mod tests {
         assert_eq!(text.container(), None);
         let bare = RemoteFile { name: "a".into(), ..sample() };
         assert_eq!(bare.container(), None);
+    }
+
+    fn stub_with(body: &str) -> std::io::Result<RemoteFile> {
+        let dir = kroma_testing::temp_dir("remote-file-validate");
+        let path = dir.path().join("a.kremote");
+        std::fs::write(&path, body).unwrap();
+        read(&path)
+    }
+
+    #[test]
+    fn a_size_above_two_to_the_fiftieth_is_refused_so_it_cannot_wrap_into_a_negative_row() {
+        let big = format!(r#"{{"source":"s","ref":"r","name":"n.mkv","size":{}}}"#, (1u64 << 50) + 1);
+        let max = format!(r#"{{"source":"s","ref":"r","name":"n.mkv","size":{}}}"#, 1u64 << 50);
+
+        assert_eq!(stub_with(&big).unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+        assert!(stub_with(&max).is_ok());
+        assert!(stub_with(r#"{"source":"s","ref":"r","name":"n.mkv","size":18446744073709551615}"#).is_err());
+    }
+
+    #[test]
+    fn a_name_that_is_a_path_or_holds_a_control_character_is_refused() {
+        for name in ["../a.mkv", "a/b.mkv", "a\\b.mkv", "..", "", "a\nb.mkv", "a\u{0}.mkv"] {
+            let body = serde_json::json!({ "source": "s", "ref": "r", "name": name, "size": 1 }).to_string();
+            assert!(stub_with(&body).is_err(), "{name:?}");
+        }
     }
 }

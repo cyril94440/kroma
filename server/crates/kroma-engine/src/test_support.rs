@@ -138,6 +138,7 @@ pub(crate) fn test_state_with_source(
             });
             let root = data_dir.join("sources");
             wiring.source_roots = Arc::new(move |module| vec![root.join(module)]);
+            wiring.official_modules = Arc::new(|| vec![SOURCE_MODULE.to_string()]);
             server = Some(fake);
         },
     );

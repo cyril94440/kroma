@@ -20,10 +20,12 @@ mod disk;
 mod job;
 mod pull;
 pub mod purge;
+mod reserve;
 
 pub use disk::dest as within;
-pub use pull::Progress;
+pub use pull::{Progress, Tidy};
 pub use purge::{Limits, Report};
+pub use reserve::{Load, Room, MAX_PULLS};
 
 pub const DIR: &str = "cache";
 
@@ -32,6 +34,7 @@ pub enum Availability {
     Cached(PathBuf),
     Fetching { done: u64, total: u64, bps: u64 },
     Failed(String),
+    Declined(String),
 }
 
 #[derive(Debug, Clone)]
@@ -72,17 +75,66 @@ impl Cache {
     }
 
     /// Starts or joins the background fetch of one file, and touches it when it
-    /// is already here. Needs a running async runtime.
-    pub fn ensure_cached(&self, api: &Api, magnet: &str, file: &Planned) -> Result<Availability> {
+    /// is already here. A fetch only starts when the file fits `limits` once the
+    /// finished files, the partial ones and the fetches running are counted,
+    /// evicting the least recently used finished files to make room; otherwise
+    /// it is declined and playback carries on by relay. Needs a running async
+    /// runtime.
+    pub fn ensure_cached(
+        &self,
+        api: &Api,
+        magnet: &str,
+        file: &Planned,
+        limits: Limits,
+    ) -> Result<Availability> {
         let path = self.path_of(magnet, &file.rel)?;
         if disk::is_complete(&path, file.size) {
             self.touch(&path);
             return Ok(Availability::Cached(path));
         }
-        Ok(match pull::join_or_start(&path, file, api.clone()) {
-            Progress::Running { done, total, bps } => Availability::Fetching { done, total, bps },
-            Progress::Failed(reason) => Availability::Failed(reason),
-        })
+        if !pull::is_running(&path) {
+            if let Some(reason) = self.make_room(&path, file.size, limits) {
+                return Ok(Availability::Declined(reason));
+            }
+        }
+        let tidy = Tidy {
+            root: self.root.clone(),
+            limits,
+        };
+        Ok(
+            match pull::join_or_start(&path, file, api.clone(), Some(tidy)) {
+                Progress::Running { done, total, bps } => {
+                    Availability::Fetching { done, total, bps }
+                }
+                Progress::Failed(reason) => Availability::Failed(reason),
+            },
+        )
+    }
+
+    fn make_room(&self, dest: &Path, size: u64, limits: Limits) -> Option<String> {
+        let budget = limits.max_bytes?;
+        let held = disk::len(&disk::part_of(dest)).unwrap_or(0);
+        let entries = purge::entries(&self.root);
+        let room = reserve::room_for(
+            &entries,
+            SystemTime::now(),
+            size.saturating_sub(held),
+            size,
+            budget,
+            pull::load_under(&self.root),
+            &pull::running(),
+        );
+        match room {
+            Room::Fits(evict) => {
+                for path in evict {
+                    let _ = std::fs::remove_file(path);
+                }
+                None
+            }
+            Room::TooBig => Some(format!("{size} bytes is more than the {budget} the cache may hold")),
+            Room::Busy => Some("the cache is already fetching as many files as it may".into()),
+            Room::Full => Some("no room in the cache without dropping files in use".into()),
+        }
     }
 
     /// Like [`Cache::ensure_cached`] for a file that belongs at `dest` instead:
@@ -91,7 +143,7 @@ impl Cache {
         if disk::is_complete(dest, file.size) {
             return Availability::Cached(dest.to_path_buf());
         }
-        match pull::join_or_start(dest, file, api.clone()) {
+        match pull::join_or_start(dest, file, api.clone(), None) {
             Progress::Running { done, total, bps } => Availability::Fetching { done, total, bps },
             Progress::Failed(reason) => Availability::Failed(reason),
         }
@@ -108,3 +160,5 @@ impl Cache {
 
 #[cfg(all(test, not(target_family = "wasm")))]
 mod tests;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod tests_edges;

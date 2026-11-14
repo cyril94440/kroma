@@ -1,8 +1,10 @@
 //! Invoke the `ffprobe` CLI on one file: availability check, the per-file run,
 //! and what a refusal means against an extension guess.
 
+use std::io::Read;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 use tracing::debug;
 
@@ -15,6 +17,23 @@ use super::parse::{build_result, video_index};
 use super::ProbeResult;
 
 const REASON_CHARS: usize = 200;
+const REMOTE_BUDGET: Duration = Duration::from_secs(120);
+const OUTPUT_CAP: u64 = 16 * 1024 * 1024;
+const POLL: Duration = Duration::from_millis(50);
+const NETWORK_SIGNS: [&str; 12] = [
+    "server returned",
+    "http error",
+    "i/o error",
+    "input/output error",
+    "connection",
+    "timed out",
+    "timeout",
+    "end of file",
+    "network",
+    "broken pipe",
+    "temporarily unavailable",
+    "error number -",
+];
 
 pub fn ffprobe_available() -> bool {
     Command::new("ffprobe")
@@ -37,11 +56,10 @@ pub(super) const DURATION_ARGS: [&str; 6] = [
 /// so it is cheap enough to call on demand. `None` when ffprobe is missing or the
 /// file has no readable duration.
 pub fn probe_duration_ms(input: &MediaInput) -> Option<u64> {
-    let out = Command::new("ffprobe")
-        .args(DURATION_ARGS)
-        .args(input::media(input))
-        .output()
-        .ok()?;
+    let mut command = Command::new("ffprobe");
+    input::without_proxies(&mut command);
+    command.args(DURATION_ARGS).args(input::media(input));
+    let out = run_bounded(command, budget_for(input))?;
     if !out.status.success() {
         return None;
     }
@@ -69,18 +87,85 @@ pub fn probe_input(
     container: &str,
     ffprobe_present: bool,
 ) -> Option<ProbeResult> {
+    match probe_outcome(input, container, ffprobe_present) {
+        Probed::Done(result) => Some(result),
+        Probed::Killed | Probed::Network => None,
+    }
+}
+
+/// What probing one input came to. `Killed` and `Network` learned nothing about
+/// the file, so neither may stand as a verdict: a file whose bytes could not be
+/// fetched is not an unreadable file.
+#[derive(Debug)]
+pub enum Probed {
+    Done(ProbeResult),
+    Killed,
+    Network,
+}
+
+pub fn probe_outcome(input: &MediaInput, container: &str, ffprobe_present: bool) -> Probed {
     if !ffprobe_present {
-        return Some(fallback_from_container(container));
+        return Probed::Done(fallback_from_container(container));
     }
     match run_ffprobe(input) {
-        Outcome::Read(result, video_stream) => Some(with_hdr10plus(input, *result, video_stream)),
-        Outcome::Unreadable(reason) => Some(ProbeResult {
+        Outcome::Read(result, video_stream) => {
+            Probed::Done(with_hdr10plus(input, *result, video_stream))
+        }
+        Outcome::Unreadable(reason) => Probed::Done(ProbeResult {
             unreadable: Some(reason),
             ..ProbeResult::default()
         }),
-        Outcome::NotProbed => Some(fallback_from_container(container)),
-        Outcome::Killed => None,
+        Outcome::NotProbed => Probed::Done(fallback_from_container(container)),
+        Outcome::Killed => Probed::Killed,
+        Outcome::Network => Probed::Network,
     }
+}
+
+fn budget_for(input: &MediaInput) -> Option<Duration> {
+    input.local().is_none().then_some(REMOTE_BUDGET)
+}
+
+/// Runs `command` to the end, or kills it once `budget` has passed. `None` when
+/// it could not be spawned or was killed for time.
+fn run_bounded(mut command: Command, budget: Option<Duration>) -> Option<Output> {
+    input::without_proxies(&mut command);
+    let Some(budget) = budget else {
+        return command.stdin(Stdio::null()).output().ok();
+    };
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .ok()?;
+    let (mut stdout, mut stderr) = (child.stdout.take()?, child.stderr.take()?);
+    let out_reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = (&mut stdout).take(OUTPUT_CAP).read_to_end(&mut bytes);
+        bytes
+    });
+    let err_reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = (&mut stderr).take(OUTPUT_CAP).read_to_end(&mut bytes);
+        bytes
+    });
+    let started = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < budget => std::thread::sleep(POLL),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    };
+    Some(Output {
+        status,
+        stdout: out_reader.join().unwrap_or_default(),
+        stderr: err_reader.join().unwrap_or_default(),
+    })
 }
 
 enum Outcome {
@@ -88,6 +173,7 @@ enum Outcome {
     Unreadable(String),
     NotProbed,
     Killed,
+    Network,
 }
 
 fn with_hdr10plus(input: &MediaInput, mut result: ProbeResult, stream: Option<u32>) -> ProbeResult {
@@ -101,24 +187,19 @@ fn with_hdr10plus(input: &MediaInput, mut result: ProbeResult, stream: Option<u3
 // the default log, and a wholesale degradation still shows up as `probed` ≪
 // `total` in the phase-2 summary.
 fn run_ffprobe(input: &MediaInput) -> Outcome {
-    let output = match Command::new("ffprobe")
-        .args([
-            "-v",
-            "error",
-            "-show_format",
-            "-show_streams",
-            "-show_chapters",
-            "-of",
-            "json",
-        ])
-        .args(input::media(input))
-        .output()
-    {
-        Ok(output) => output,
-        Err(e) => {
-            debug!(file = %label(input), error = %e, "ffprobe failed to spawn; using extension guess");
-            return Outcome::NotProbed;
-        }
+    let mut command = Command::new("ffprobe");
+    input::without_proxies(&mut command);
+    command
+        .args(["-v", "error", "-show_format", "-show_streams", "-show_chapters", "-of", "json"])
+        .args(input::media(input));
+    let Some(output) = run_bounded(command, budget_for(input)) else {
+        return if input.local().is_some() {
+            debug!(file = %label(input), "ffprobe failed to spawn; using extension guess");
+            Outcome::NotProbed
+        } else {
+            debug!(file = %label(input), "ffprobe could not read the title in time");
+            Outcome::Network
+        };
     };
     outcome_of(input, output.status.code(), &output.stdout, &output.stderr)
 }
@@ -126,7 +207,7 @@ fn run_ffprobe(input: &MediaInput) -> Outcome {
 fn label(input: &MediaInput) -> String {
     match input {
         MediaInput::Local(path) => path.display().to_string(),
-        MediaInput::Remote(url) => url.host().to_string(),
+        MediaInput::Remote(_) => "the relay".to_string(),
     }
 }
 
@@ -136,6 +217,10 @@ fn outcome_of(input: &MediaInput, exit_code: Option<i32>, stdout: &[u8], stderr:
         return Outcome::Killed;
     };
     if code != 0 {
+        if input.local().is_none() && names_a_network_failure(stderr) {
+            debug!(file = %label(input), code, "ffprobe could not fetch the title");
+            return Outcome::Network;
+        }
         let reason = failure_reason(input, stderr, code);
         debug!(file = %label(input), code, %reason, "ffprobe refused the file");
         return Outcome::Unreadable(reason);
@@ -152,6 +237,11 @@ fn outcome_of(input: &MediaInput, exit_code: Option<i32>, stdout: &[u8], stderr:
     }
 }
 
+fn names_a_network_failure(stderr: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(stderr).to_ascii_lowercase();
+    NETWORK_SIGNS.iter().any(|sign| text.contains(sign))
+}
+
 fn failure_reason(input: &MediaInput, stderr: &[u8], exit_code: i32) -> String {
     let text = String::from_utf8_lossy(stderr);
     // The reason reaches clients, which are never told a file's absolute path
@@ -166,9 +256,7 @@ fn failure_reason(input: &MediaInput, stderr: &[u8], exit_code: i32) -> String {
                 .strip_prefix(format!("{}: ", path.display()).as_str())
                 .unwrap_or(line)
                 .to_string(),
-            MediaInput::Remote(url) => url
-                .redact(line)
-                .replace(&format!("{}: ", url.host()), ""),
+            MediaInput::Remote(relayed) => relayed.redact(line).replace("the relay: ", ""),
         })
         .unwrap_or_default();
     if said.is_empty() {
@@ -214,7 +302,7 @@ mod tests {
             Outcome::Unreadable(reason) => reason,
             Outcome::Read(..) => panic!("a refusal must not read as a description"),
             Outcome::NotProbed => panic!("a refusal must not read as a missing probe"),
-            Outcome::Killed => panic!("a refusal must not read as a killed probe"),
+            Outcome::Killed | Outcome::Network => panic!("a refusal must not read as a killed probe"),
         }
     }
 

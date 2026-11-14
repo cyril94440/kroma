@@ -29,6 +29,12 @@ pub struct Report {
 /// recently used unprotected ones until the rest fits `max_bytes`. `None` or a
 /// zero age switches that limit off; `Some(0)` allows no bytes at all. An entry being fetched, or used within [`GRACE`],
 /// is never chosen.
+pub fn is_partial(path: &Path) -> bool {
+    path.extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .is_some_and(|ext| matches!(ext, "part" | "chunk" | "kroma-upgrade"))
+}
+
 pub fn victims(
     entries: &[Entry],
     now: SystemTime,

@@ -8,7 +8,7 @@ use anyhow::{anyhow, bail, Result};
 use serde::Serialize;
 
 use crate::api::{self, Api};
-use crate::cache::Cache;
+use crate::cache::{Availability, Cache};
 use crate::creds::{Creds, Saved};
 use crate::files::Planned;
 use crate::memo;
@@ -32,7 +32,7 @@ pub fn locate(
     let (magnet, rel) =
         parse_reference(reference).ok_or_else(|| anyhow!("not a reference this module made"))?;
     let saved = Creds::new(module_dir).candidates(magnet);
-    let (file, _) = through(&saved, |api| {
+    let (file, api) = through(&saved, |api| {
         plan_with(api, magnet)?
             .into_iter()
             .find(|file| file.rel == rel)
@@ -50,8 +50,13 @@ pub fn locate(
     }
     let (url, _) = through(&saved, |api| url_of(api, magnet, &file))?;
     if warm && settings.enabled() {
-        let ((), api) = through(&saved, |api| api.user().map(|_| ()))?;
-        cache.ensure_cached(&api, magnet, &file)?;
+        match cache.ensure_cached(&api, magnet, &file, settings.limits()) {
+            Ok(Availability::Declined(reason)) => {
+                tracing::info!(magnet, file = %file.rel, "not cached: {reason}");
+            }
+            Ok(_) => {}
+            Err(error) => tracing::warn!(magnet, file = %file.rel, "could not start caching: {error:#}"),
+        }
     }
     Ok(Located {
         path: None,
@@ -89,5 +94,5 @@ fn through<T>(saved: &[Saved], mut ask: impl FnMut(&Api) -> Result<T>) -> Result
 fn is_auth(error: &anyhow::Error) -> bool {
     error
         .downcast_ref::<api::Refused>()
-        .is_some_and(|refused| refused.code.starts_with("AUTH_"))
+        .is_some_and(api::Refused::is_auth)
 }

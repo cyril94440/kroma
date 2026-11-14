@@ -3017,7 +3017,7 @@
     "status": "AGREED",
     "text": "The first-class audio codecs are **AAC**, **AC-3** and **E-AC-3**",
     "file": "docs/spec/media/README.md",
-    "line": 142
+    "line": 144
   },
   {
     "id": "MEDIA-24",
@@ -3027,7 +3027,7 @@
     "status": "SHIPPED",
     "text": "An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos",
     "file": "docs/spec/media/README.md",
-    "line": 148
+    "line": 150
   },
   {
     "id": "MEDIA-25",
@@ -3037,7 +3037,7 @@
     "status": "SHIPPED",
     "text": "**Passthrough** is the default for multichannel and lossless audio:",
     "file": "docs/spec/media/README.md",
-    "line": 153
+    "line": 155
   },
   {
     "id": "MEDIA-26",
@@ -3047,7 +3047,7 @@
     "status": "AGREED",
     "text": "**Downmixing** to stereo happens only when the target cannot render",
     "file": "docs/spec/media/README.md",
-    "line": 156
+    "line": 158
   },
   {
     "id": "MEDIA-27",
@@ -3057,7 +3057,7 @@
     "status": "SHIPPED",
     "text": "Multiple audio streams, languages and commentary alike, are all",
     "file": "docs/spec/media/README.md",
-    "line": 162
+    "line": 164
   },
   {
     "id": "MEDIA-28",
@@ -3067,7 +3067,7 @@
     "status": "AGREED",
     "text": "A subtitle stream is either **embedded**, a track inside the media",
     "file": "docs/spec/media/README.md",
-    "line": 186
+    "line": 188
   },
   {
     "id": "MEDIA-29",
@@ -3077,7 +3077,7 @@
     "status": "AGREED",
     "text": "The first-class subtitle formats are **SRT**, **WebVTT** and",
     "file": "docs/spec/media/README.md",
-    "line": 190
+    "line": 192
   },
   {
     "id": "MEDIA-30",
@@ -3087,7 +3087,7 @@
     "status": "AGREED",
     "text": "The **forced** disposition, only the foreign-language lines a",
     "file": "docs/spec/media/README.md",
-    "line": 194
+    "line": 196
   },
   {
     "id": "MEDIA-31",
@@ -3097,7 +3097,7 @@
     "status": "AGREED",
     "text": "**Burning in**, rendering a subtitle permanently into the video, is",
     "file": "docs/spec/media/README.md",
-    "line": 197
+    "line": 199
   },
   {
     "id": "MEDIA-32",
@@ -3107,7 +3107,7 @@
     "status": "SHIPPED",
     "text": "Every title carries a **poster**, a **backdrop**, a **logo** and, per",
     "file": "docs/spec/media/README.md",
-    "line": 207
+    "line": 209
   },
   {
     "id": "MEDIA-33",
@@ -3117,7 +3117,7 @@
     "status": "AGREED",
     "text": "Image sources rank by trust: embedded in the media file, then a",
     "file": "docs/spec/media/README.md",
-    "line": 210
+    "line": 212
   },
   {
     "id": "MEDIA-34",
@@ -3127,7 +3127,7 @@
     "status": "AGREED",
     "text": "KROMA derives a fixed set of sizes per image, a small grid",
     "file": "docs/spec/media/README.md",
-    "line": 213
+    "line": 215
   },
   {
     "id": "MEDIA-35",
@@ -3137,7 +3137,7 @@
     "status": "AGREED",
     "text": "Derived sizes are cached and served without re-deriving, and a",
     "file": "docs/spec/media/README.md",
-    "line": 216
+    "line": 218
   },
   {
     "id": "MEDIA-36",
@@ -3147,7 +3147,7 @@
     "status": "AGREED",
     "text": "Artwork is never a reason a title fails to appear. A title with no",
     "file": "docs/spec/media/README.md",
-    "line": 218
+    "line": 220
   },
   {
     "id": "MEDIA-37",
@@ -3157,7 +3157,7 @@
     "status": "SHIPPED",
     "text": "KROMA learns a file's streams by **probing** it once, when the",
     "file": "docs/spec/media/README.md",
-    "line": 225
+    "line": 227
   },
   {
     "id": "MEDIA-38",
@@ -3167,7 +3167,7 @@
     "status": "AGREED",
     "text": "A probe is the authoritative stream truth until the file's bytes",
     "file": "docs/spec/media/README.md",
-    "line": 235
+    "line": 237
   },
   {
     "id": "MEDIA-39",
@@ -3177,7 +3177,7 @@
     "status": "AGREED",
     "text": "When a direct play fails in a way that implicates the stream",
     "file": "docs/spec/media/README.md",
-    "line": 238
+    "line": 240
   },
   {
     "id": "MEDIA-40",
@@ -3187,7 +3187,7 @@
     "status": "AGREED",
     "text": "Trust is per-file and durable: a corrected probe is written back,",
     "file": "docs/spec/media/README.md",
-    "line": 243
+    "line": 245
   },
   {
     "id": "MEDIA-41",
@@ -3197,7 +3197,7 @@
     "status": "AGREED",
     "text": "A file whose container opens and whose streams enumerate, but which",
     "file": "docs/spec/media/README.md",
-    "line": 257
+    "line": 259
   },
   {
     "id": "MEDIA-42",
@@ -3207,7 +3207,7 @@
     "status": "AGREED",
     "text": "The title **appears** in the library with whatever *is* known. A",
     "file": "docs/spec/media/README.md",
-    "line": 261
+    "line": 263
   },
   {
     "id": "MEDIA-43",
@@ -3217,7 +3217,7 @@
     "status": "AGREED",
     "text": "The unknown stream is marked **undescribed** and carries its raw",
     "file": "docs/spec/media/README.md",
-    "line": 264
+    "line": 266
   },
   {
     "id": "MEDIA-44",
@@ -3227,7 +3227,7 @@
     "status": "SHIPPED",
     "text": "An undescribed stream is *not direct-playable*, because KROMA will",
     "file": "docs/spec/media/README.md",
-    "line": 266
+    "line": 268
   },
   {
     "id": "MEDIA-45",
@@ -3237,7 +3237,7 @@
     "status": "SHIPPED",
     "text": "A file that will not open at all, a truncated or corrupt container,",
     "file": "docs/spec/media/README.md",
-    "line": 269
+    "line": 271
   },
   {
     "id": "MEDIA-46",
@@ -3247,7 +3247,7 @@
     "status": "AGREED",
     "text": "Undescribed and unreadable are distinct states. The first is \"we",
     "file": "docs/spec/media/README.md",
-    "line": 272
+    "line": 274
   },
   {
     "id": "MEDIA-47",
@@ -3257,7 +3257,7 @@
     "status": "AGREED",
     "text": "An audio stream carries the region of its language when the file says",
     "file": "docs/spec/media/README.md",
-    "line": 175
+    "line": 177
   },
   {
     "id": "MEDIA-48",
@@ -3267,7 +3267,7 @@
     "status": "SHIPPED",
     "text": "A video copied into fragmented MP4 keeps what makes it HDR: HEVC is",
     "file": "docs/spec/media/README.md",
-    "line": 166
+    "line": 168
   },
   {
     "id": "MEDIA-49",
@@ -3277,7 +3277,7 @@
     "status": "SHIPPED",
     "text": "A video re-encoded to 8-bit H.264 from an HDR source is tone-mapped",
     "file": "docs/spec/media/README.md",
-    "line": 170
+    "line": 172
   },
   {
     "id": "MEDIA-50",
@@ -3287,7 +3287,7 @@
     "status": "SHIPPED",
     "text": "A stub is a title like any other: it appears with the container",
     "file": "docs/spec/media/README.md",
-    "line": 285
+    "line": 287
   },
   {
     "id": "MEDIA-51",
@@ -3297,7 +3297,7 @@
     "status": "SHIPPED",
     "text": "A media file whose bytes are streamed says so (`remote`), so a",
     "file": "docs/spec/media/README.md",
-    "line": 289
+    "line": 291
   },
   {
     "id": "MEDIA-52",
@@ -3307,7 +3307,7 @@
     "status": "SHIPPED",
     "text": "Where a remote file's bytes are is answered by its source each",
     "file": "docs/spec/media/README.md",
-    "line": 291
+    "line": 293
   },
   {
     "id": "MEDIA-53",
@@ -3317,7 +3317,7 @@
     "status": "SHIPPED",
     "text": "A link is used only if it is `https`, carries no credentials, and",
     "file": "docs/spec/media/README.md",
-    "line": 294
+    "line": 296
   },
   {
     "id": "MEDIA-54",
@@ -3327,7 +3327,7 @@
     "status": "SHIPPED",
     "text": "A source that is off, gone or silent fails playback with a",
     "file": "docs/spec/media/README.md",
-    "line": 298
+    "line": 300
   },
   {
     "id": "MEDIA-55",
@@ -3337,7 +3337,7 @@
     "status": "SHIPPED",
     "text": "Work that reads a whole title (scrub thumbnails, intro and credits",
     "file": "docs/spec/media/README.md",
-    "line": 301
+    "line": 303
   },
   {
     "id": "MOD-1",

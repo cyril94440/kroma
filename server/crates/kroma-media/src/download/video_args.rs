@@ -1,10 +1,10 @@
 //! The picture half of the download command: copied with the flags that keep
 //! its HDR, or re-encoded to the 8-bit H.264 every download target decodes.
 
-use kroma_media::hls::{ToneMap, SDR_TAGS};
-use kroma_media::stream_copy;
+use kroma_module_wire::VideoStream;
 
-use crate::model::VideoStream;
+use crate::hls::{ToneMap, SDR_TAGS};
+use crate::stream_copy;
 
 pub(super) fn video_args(
     video: Option<&VideoStream>,
@@ -33,7 +33,7 @@ pub(super) fn video_args(
 
 #[cfg(test)]
 mod tests {
-    use kroma_media::hls::{Filters, ToneSource};
+    use crate::hls::{Filters, ToneSource};
 
     use super::*;
 

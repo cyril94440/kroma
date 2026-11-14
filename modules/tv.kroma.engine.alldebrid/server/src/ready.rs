@@ -4,7 +4,7 @@ use kroma_module_sdk::primitives::remote_file::{self, RemoteFile};
 use crate::api::Magnet;
 use crate::cache::{within, Availability, Cache};
 use crate::files::{kind_of, Kind, Planned};
-use crate::resolve::plan_with;
+use crate::resolve::{is_unusable, plan_with};
 use crate::status::base;
 use crate::types::{TorrentState, TorrentStatus};
 use crate::AllDebrid;
@@ -28,7 +28,16 @@ impl AllDebrid {
     /// under the magnet's own folder. `completed` is only reported once every
     /// stub exists and no sidecar is still on its way.
     pub fn ready_status(&self, client_ref: &str, magnet: &Magnet) -> Result<TorrentStatus> {
-        let plan = plan_with(&self.api, client_ref)?;
+        let plan = match plan_with(&self.api, client_ref) {
+            Ok(plan) => plan,
+            Err(error) if is_unusable(&error) => {
+                let mut status = base(client_ref, magnet);
+                status.state = TorrentState::Error;
+                status.error = Some(format!("{error:#}"));
+                return Ok(status);
+            }
+            Err(error) => return Err(error),
+        };
         let folder = self.stubs_folder(client_ref);
         let mut written = Vec::new();
         let mut waiting = false;
@@ -43,7 +52,7 @@ impl AllDebrid {
                     match Cache::ensure_at(&self.api, &within(&folder, &file.rel), file) {
                         Availability::Cached(_) => written.push(file.rel.clone()),
                         Availability::Fetching { .. } => waiting = true,
-                        Availability::Failed(_) => {}
+                        Availability::Failed(_) | Availability::Declined(_) => {}
                     }
                 }
                 Kind::Subtitle | Kind::Other => {}
@@ -71,6 +80,9 @@ impl AllDebrid {
 fn write_stub(folder: &std::path::Path, magnet: &str, file: &Planned) -> Result<String> {
     let stub_rel = format!("{}.{}", file.rel, remote_file::EXTENSION);
     let path = within(folder, &stub_rel);
+    if !path.starts_with(folder) {
+        bail!("a stub would land outside its folder");
+    }
     let wanted = RemoteFile {
         source: SOURCE.into(),
         reference: reference_of(magnet, &file.rel),
@@ -80,9 +92,6 @@ fn write_stub(folder: &std::path::Path, magnet: &str, file: &Planned) -> Result<
     if remote_file::read(&path).ok().as_ref() != Some(&wanted) {
         remote_file::write(&path, &wanted)
             .with_context(|| format!("save the stub for {}", file.rel))?;
-    }
-    if !path.starts_with(folder) {
-        bail!("a stub would land outside its folder");
     }
     Ok(stub_rel)
 }

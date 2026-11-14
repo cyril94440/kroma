@@ -1,5 +1,7 @@
 //! What an add can be handed, and how each reaches AllDebrid.
 
+use std::time::Duration;
+
 use anyhow::{bail, Context, Result};
 use kroma_module_sdk::http::address::web_target;
 use kroma_module_sdk::http::Fetch;
@@ -7,7 +9,7 @@ use kroma_module_sdk::http::Fetch;
 use crate::AllDebrid;
 
 const TORRENT_PURPOSE: &str = "torrent-file";
-const TORRENT_SECS: u32 = 30;
+pub(crate) const TORRENT_SECS: u32 = 30;
 const MAX_TORRENT_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -40,16 +42,34 @@ impl AllDebrid {
         let Some(link) = classify(magnet_or_url) else {
             bail!("AllDebrid takes a magnet link, an info hash or a link to a .torrent file");
         };
+        let before = self.snapshot();
         let id = match link {
             Link::Magnet(magnet) => self.api.upload_magnet(magnet)?,
-            Link::Web(url) => self.upload_fetched(url)?.id,
+            Link::Web(url) => self.upload_fetched(url, Duration::from_secs(u64::from(TORRENT_SECS)))?.id,
         };
+        self.claim_if_new(before.as_ref(), &id);
         self.remember(Some(&id));
         Ok(id)
     }
 
-    pub(crate) fn upload_fetched(&self, url: &str) -> Result<crate::api::Uploaded> {
-        let bytes = fetch_torrent(url)?;
+    pub(crate) fn snapshot(&self) -> Option<std::collections::HashSet<String>> {
+        match self.api.magnet_ids() {
+            Ok(ids) => Some(ids),
+            Err(error) => {
+                tracing::warn!("could not list the account's magnets; none will be deleted: {error:#}");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn claim_if_new(&self, before: Option<&std::collections::HashSet<String>>, id: &str) {
+        if crate::owned::is_new(before, id) {
+            self.owned.claim(id);
+        }
+    }
+
+    pub(crate) fn upload_fetched(&self, url: &str, left: Duration) -> Result<crate::api::Uploaded> {
+        let bytes = fetch_torrent(url, left)?;
         let staging = self.module_dir.join("torrents");
         std::fs::create_dir_all(&staging).context("create the torrent staging folder")?;
         let file = staging.join(format!(
@@ -57,19 +77,19 @@ impl AllDebrid {
             kroma_module_sdk::primitives::random_token()
         ));
         std::fs::write(&file, &bytes).context("stage the .torrent file")?;
-        let uploaded = self.api.upload_torrent_entry(&file);
+        let uploaded = self.api.within(left).upload_torrent_entry(&file);
         let _ = std::fs::remove_file(&file);
         uploaded
     }
 }
 
-fn fetch_torrent(url: &str) -> Result<Vec<u8>> {
+fn fetch_torrent(url: &str, left: Duration) -> Result<Vec<u8>> {
     let host = web_target(url)
         .map(|target| target.host)
         .unwrap_or_default();
     let response = Fetch::new()
         .purpose(TORRENT_PURPOSE)
-        .max_time(TORRENT_SECS)
+        .max_time((left.as_secs() as u32).clamp(1, TORRENT_SECS))
         .max_bytes(MAX_TORRENT_BYTES)
         .get(url)
         .with_context(|| format!("fetch the .torrent from {host}"))?;
@@ -116,14 +136,5 @@ mod tests {
     fn a_base32_info_hash_is_a_magnet() {
         assert!(is_info_hash("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"));
         assert!(!is_info_hash("ABCDEFGHIJKLMNOPQRSTUVWXYZ234561"));
-    }
-
-    #[test]
-    fn a_staged_file_name_carries_no_path_from_the_link() {
-        let staging = std::path::Path::new("/stage");
-        let name = format!("{}.torrent", kroma_module_sdk::primitives::random_token());
-
-        assert_eq!(std::path::Path::new(&name).components().count(), 1);
-        assert!(staging.join(&name).starts_with(staging));
     }
 }

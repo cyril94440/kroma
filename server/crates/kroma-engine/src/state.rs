@@ -155,11 +155,6 @@ impl AppState {
         let _ = crate::db::reconcile_running_runs(&db);
         crate::services::pipeline::recover_on_boot(&db);
         let metrics = Metrics::new(db.clone());
-        let sources = Arc::new(crate::services::source::Sources::new(
-            contributions.clone(),
-            permissions.clone(),
-            source_roots,
-        ));
         let network = Arc::new(crate::services::network::Network::new(
             db.clone(),
             settings.clone(),
@@ -169,6 +164,15 @@ impl AppState {
         .with_listeners(network_listeners)
         .with_core_ports(config.port, config.https_port_override)
         .with_declared(permissions));
+        let sources = crate::services::source::Sources::new(
+            contributions.clone(),
+            official_modules.clone(),
+            {
+                let network = network.clone();
+                Arc::new(move |module, target| network.declares_connect(module, target))
+            },
+            source_roots,
+        );
         let direct = crate::services::direct::Direct::new(config.public_ip_url.clone());
         Arc::new_cyclic(|weak| AppState {
             config,

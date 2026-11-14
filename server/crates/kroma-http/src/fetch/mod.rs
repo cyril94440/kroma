@@ -33,6 +33,7 @@ pub struct Fetch {
     follow_redirects: bool,
     public_only: bool,
     https_only: bool,
+    stall_seconds: Option<u32>,
 }
 
 impl Default for Fetch {
@@ -51,6 +52,7 @@ impl Default for Fetch {
             follow_redirects: true,
             public_only: false,
             https_only: false,
+            stall_seconds: None,
         }
     }
 }
@@ -101,6 +103,14 @@ impl Fetch {
     /// Refuse plain HTTP, on the first request and on every redirect.
     pub fn https_only(mut self) -> Self {
         self.https_only = true;
+        self
+    }
+
+    /// Abort a [`Fetch::stream`] whose upstream sends nothing for `seconds`
+    /// (default 30). A reader that stops polling does not count: curl is then
+    /// blocked writing, not waiting on the host.
+    pub fn stall_seconds(mut self, seconds: u32) -> Self {
+        self.stall_seconds = Some(seconds);
         self
     }
 

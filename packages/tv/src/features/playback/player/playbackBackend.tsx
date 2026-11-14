@@ -62,6 +62,7 @@ export interface PlaybackBackend<P extends EnginePlan = EnginePlan> {
     env: PlayEnv,
     pref: EnginePref,
     capabilities?: PlaybackCapabilities,
+    audioIndex?: number,
   ): P;
   createTvEngine(args: CreateEngineArgs<P>): TvEngine | null;
   Surface: ComponentType<SurfaceProps>;

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { makeItem, track, UNPROBED } from './directplay.fixture';
 import type { PlaybackCapabilities } from './capabilities';
-import { MSE_CAPS, SAFARI_CAPS, TIZEN_CAPS, WEBOS_CAPS } from './runtime-caps';
+import { observedAudioDelivery } from './audio-delivery';
+import { AVPLAY_HLS_CAPS, MSE_CAPS, SAFARI_CAPS, TIZEN_CAPS, WEBOS_CAPS } from './runtime-caps';
 import { pictureNotice, streamNotice, streamNotices } from './stream-notice';
 
 describe('streamNotice', () => {
@@ -11,29 +12,10 @@ describe('streamNotice', () => {
     expect(streamNotice(item, 'direct', MSE_CAPS)).toBeNull();
   });
 
-  it('calls a remux repackaged, without implying the picture changed', () => {
+  it('calls a remux of a copied track repackaged, without implying the sound changed', () => {
     const item = makeItem({ container: 'mkv', audio: [track({ index: 0, codec: 'ac3' })] });
 
-    expect(streamNotice(item, 'remux', MSE_CAPS)).toEqual({
-      messageKey: 'player.repackaged',
-    });
-  });
-
-  it('names the codec the browser could not keep', () => {
-    const item = makeItem({ audio: [track({ index: 0, codec: 'truehd', channels: 8 })] });
-
-    expect(streamNotice(item, 'transcode', MSE_CAPS)).toEqual({
-      messageKey: 'player.audioAdjusted',
-      messageVars: { codec: 'Dolby TrueHD' },
-    });
-  });
-
-  it('names the first track that forced the re-encode, not the first track', () => {
-    const item = makeItem({
-      audio: [track({ index: 0, codec: 'aac' }), track({ index: 1, codec: 'dts' })],
-    });
-
-    expect(streamNotice(item, 'transcode', MSE_CAPS)?.messageVars).toEqual({ codec: 'DTS' });
+    expect(streamNotice(item, 'remux', SAFARI_CAPS)).toEqual({ messageKey: 'player.repackaged' });
   });
 
   it('stays silent on a re-encode it cannot describe', () => {
@@ -98,46 +80,109 @@ describe('pictureNotice', () => {
   });
 });
 
-describe('audio replaced on a transcode', () => {
-  it('names the surround target where the device declares Dolby Digital Plus', () => {
+const TRUEHD_ATMOS = track({ index: 0, codec: 'truehd', channels: 8, spatial: 'atmos' });
+const DTS_51 = track({ index: 0, codec: 'dts', channels: 6 });
+
+describe('audio the server re-encodes in a remux', () => {
+  it('owns up to the surround target a remux earns, not a repackage', () => {
     const item = makeItem({ audio: [track({ index: 0, codec: 'truehd', channels: 8 })] });
-    expect(streamNotice(item, 'transcode', SAFARI_CAPS)).toEqual({
+    expect(streamNotice(item, 'remux', SAFARI_CAPS)).toEqual({
       messageKey: 'player.audioSurround',
       messageVars: { codec: 'Dolby TrueHD', target: 'Dolby Digital+' },
     });
   });
 
-  it('names Dolby Digital where that is the only Dolby decoder', () => {
+  it('owns up to losing Atmos when the bed is kept as 5.1', () => {
+    expect(streamNotice(makeItem({ audio: [TRUEHD_ATMOS] }), 'remux', SAFARI_CAPS)).toEqual({
+      messageKey: 'player.atmosSurround',
+      messageVars: { codec: 'Dolby TrueHD Atmos', target: 'Dolby Digital+' },
+    });
+  });
+
+  it('names Dolby Digital where that is the only Dolby codec declared', () => {
     const caps = { ...MSE_CAPS, audio: { ...MSE_CAPS.audio, ac3: true } };
-    const item = makeItem({ audio: [track({ index: 0, codec: 'dts', channels: 6 })] });
-    expect(streamNotice(item, 'transcode', caps)?.messageVars).toEqual({
+    expect(streamNotice(makeItem({ audio: [DTS_51] }), 'remux', caps)?.messageVars).toEqual({
       codec: 'DTS',
       target: 'Dolby Digital',
     });
   });
 
-  it('owns up to losing Atmos, to surround or to stereo', () => {
-    const atmos = makeItem({
-      audio: [track({ index: 0, codec: 'truehd', channels: 8, spatial: 'atmos' })],
+  it('says a surround track is downmixed where no Dolby codec is declared', () => {
+    expect(streamNotice(makeItem({ audio: [DTS_51] }), 'remux', MSE_CAPS)).toEqual({
+      messageKey: 'player.audioDownmixed',
+      messageVars: { codec: 'DTS' },
     });
-    expect(streamNotice(atmos, 'transcode', SAFARI_CAPS)).toEqual({
-      messageKey: 'player.atmosSurround',
-      messageVars: { codec: 'Dolby TrueHD Atmos', target: 'Dolby Digital+' },
-    });
-    expect(streamNotice(atmos, 'transcode', MSE_CAPS)).toEqual({
+    expect(streamNotice(makeItem({ audio: [TRUEHD_ATMOS] }), 'remux', MSE_CAPS)).toEqual({
       messageKey: 'player.atmosAdjusted',
       messageVars: { codec: 'Dolby TrueHD Atmos' },
     });
   });
 
-  it('judges the track being played before the others', () => {
+  it('says stereo AAC for an explicitly AAC master, never 5.1', () => {
+    expect(streamNotice(makeItem({ audio: [DTS_51] }), 'transcode', SAFARI_CAPS)).toEqual({
+      messageKey: 'player.audioDownmixed',
+      messageVars: { codec: 'DTS' },
+    });
+  });
+
+  it('reports what the server answered with over what it predicted', () => {
+    const item = makeItem({ audio: [DTS_51] });
+    const aacFallback = observedAudioDelivery('http://s/api/items/i/hls/aac/0/0/index.m3u8');
+    expect(streamNotice(item, 'remux', SAFARI_CAPS, { observed: aacFallback })).toEqual({
+      messageKey: 'player.audioDownmixed',
+      messageVars: { codec: 'DTS' },
+    });
+  });
+
+  it('says nothing is lost when a track the device decodes is copied', () => {
+    const item = makeItem({ audio: [track({ index: 0, codec: 'eac3', channels: 6 })] });
+    expect(streamNotice(item, 'remux', SAFARI_CAPS)).toEqual({ messageKey: 'player.repackaged' });
+  });
+
+  it('judges the track being played, not the others', () => {
     const item = makeItem({
       audio: [
         track({ index: 0, codec: 'dts', channels: 6, default: true }),
-        track({ index: 1, codec: 'flac', channels: 2 }),
+        track({ index: 1, codec: 'aac', channels: 2 }),
       ],
     });
-    expect(streamNotice(item, 'transcode', MSE_CAPS, 1)?.messageVars).toEqual({ codec: 'FLAC' });
+    expect(streamNotice(item, 'remux', SAFARI_CAPS, { audioIndex: 1 })).toEqual({
+      messageKey: 'player.repackaged',
+    });
+    expect(streamNotice(item, 'remux', SAFARI_CAPS, { audioIndex: 0 })?.messageKey).toBe(
+      'player.audioSurround',
+    );
+  });
+
+  it('owns up to the loudness filter with its own line', () => {
+    const item = makeItem({ audio: [track({ index: 0, codec: 'eac3', channels: 6 })] });
+    expect(streamNotice(item, 'direct', AVPLAY_HLS_CAPS, { filter: 'night' })).toEqual({
+      messageKey: 'player.audioLeveled',
+      messageVars: { codec: 'Dolby Digital+' },
+    });
+  });
+});
+
+describe('a Dolby Vision profile 7 stream', () => {
+  const p7 = hdrItem({
+    hdrFormat: 'dolbyVision',
+    dolbyVisionProfile: 7,
+    dolbyVisionCompatibility: 6,
+  });
+
+  it('arrives as HDR10 over HLS even on a device that decodes Dolby Vision', () => {
+    expect(pictureNotice(p7, WEBOS_CAPS, 'remux')).toEqual({
+      messageKey: 'player.dolbyVisionAsHdr10',
+    });
+  });
+
+  it('stays Dolby Vision when the original file is played', () => {
+    expect(pictureNotice(p7, WEBOS_CAPS, 'direct')).toBeNull();
+  });
+
+  it('says it is tone-mapped on an SDR display', () => {
+    const sdr = { ...WEBOS_CAPS, hdr: { ...WEBOS_CAPS.hdr, hdr10: false, hlg: false } };
+    expect(pictureNotice(p7, sdr, 'remux')).toEqual({ messageKey: 'player.hdrToneMapped' });
   });
 });
 
@@ -151,7 +196,7 @@ describe('streamNotices', () => {
       dolbyVisionCompatibility: 1,
       audio: [track({ index: 0, codec: 'truehd', channels: 8 })],
     });
-    expect(streamNotices(item, 'transcode', TIZEN_CAPS).map((n) => n.messageKey)).toEqual([
+    expect(streamNotices(item, 'remux', TIZEN_CAPS).map((n) => n.messageKey)).toEqual([
       'player.dolbyVisionAsHdr10',
       'player.audioSurround',
     ]);

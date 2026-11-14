@@ -70,6 +70,7 @@ export function planEngine(
   env: PlayEnv,
   pref: EnginePref,
   _capabilities?: PlaybackCapabilities,
+  audioIndex?: number,
 ): EnginePlan {
   const decision = selectEngine(item, env);
   const autoDirect = decision.kind === 'direct' || tvDirectPlay(item);
@@ -81,7 +82,7 @@ export function planEngine(
   if (eng === 'video-direct' && !webviewCanDirectPlay(item)) eng = 'video-remux';
   const useMpv = eng === 'mpv';
   const useAvplay = eng === 'avplay';
-  const avplayDirect = useAvplay && avplayDirectPlayable(item);
+  const avplayDirect = useAvplay && avplayDirectPlayable(item, audioIndex);
   const direct = eng === 'video-direct';
   // Shaka drives the MSE master wherever it ships, like the web client; only
   // the explicit `remux` preference keeps hls.js.

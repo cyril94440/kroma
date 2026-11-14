@@ -2,53 +2,29 @@
 //! answering the envelope's `data` or the failure it carried.
 
 use std::collections::HashSet;
-use std::fmt;
 use std::path::Path;
+use std::time::Instant;
 
 use anyhow::{anyhow, bail, Context, Result};
 use kroma_module_sdk::http::{Fetch, FormPart, Response};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+mod errors;
 mod wire;
 
+pub use errors::{is_retry_later, is_unknown_magnet, Delayed, Refused, RetryLater};
 pub use wire::{Magnet, Node, Unlocked, Uploaded, User};
 
 pub(crate) const DEFAULT_BASE: &str = "https://api.alldebrid.com";
 const PURPOSE: &str = "download-client";
 const CALL_SECS: u32 = 60;
-const UNKNOWN_MAGNET: &str = "MAGNET_INVALID_ID";
 
 #[derive(Debug, Clone)]
 pub struct Api {
     base: String,
     key: String,
-}
-
-/// An error AllDebrid itself reported, as its `code` and `message`.
-#[derive(Debug)]
-pub struct Refused {
-    pub code: String,
-    pub message: String,
-}
-
-impl fmt::Display for Refused {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.code.as_str() {
-            "AUTH_BAD_APIKEY" | "AUTH_MISSING_APIKEY" => {
-                write!(f, "AllDebrid rejected the API key ({})", self.code)
-            }
-            _ => write!(f, "AllDebrid: {} ({})", self.message, self.code),
-        }
-    }
-}
-
-impl std::error::Error for Refused {}
-
-pub fn is_unknown_magnet(error: &anyhow::Error) -> bool {
-    error
-        .downcast_ref::<Refused>()
-        .is_some_and(|refused| refused.code == UNKNOWN_MAGNET)
+    call_secs: u32,
 }
 
 impl Api {
@@ -61,7 +37,16 @@ impl Api {
         Ok(Self {
             base: if base.is_empty() { DEFAULT_BASE } else { base }.to_string(),
             key: key.to_string(),
+            call_secs: CALL_SECS,
         })
+    }
+
+    /// The same account, with no call allowed to outlast `left`.
+    pub fn within(&self, left: std::time::Duration) -> Self {
+        Self {
+            call_secs: (left.as_secs() as u32).clamp(1, CALL_SECS),
+            ..self.clone()
+        }
     }
 
     pub fn base(&self) -> &str {
@@ -71,7 +56,7 @@ impl Api {
     fn fetch(&self) -> Fetch {
         Fetch::new()
             .purpose(PURPOSE)
-            .max_time(CALL_SECS)
+            .max_time(self.call_secs)
             .header("authorization", format!("Bearer {}", self.key))
     }
 
@@ -79,19 +64,28 @@ impl Api {
         format!("{}{path}", self.base)
     }
 
-    fn get(&self, path: &str, query: &[(&str, &str)]) -> Result<Value> {
-        let fetch = query.iter().fold(self.fetch(), |fetch, (name, value)| {
-            fetch.query(name, *value)
-        });
-        data_of(fetch.get(&self.url(path)))
+    fn get(&self, path: &str) -> Result<Value> {
+        errors::check(&self.base, Instant::now())?;
+        self.settled(self.fetch().get(&self.url(path)))
     }
 
     fn post(&self, path: &str, fields: &[(&str, &str)]) -> Result<Value> {
-        data_of(self.fetch().post_form(&self.url(path), fields))
+        errors::check(&self.base, Instant::now())?;
+        self.settled(self.fetch().post_form(&self.url(path), fields))
+    }
+
+    fn settled(&self, sent: Result<Response>) -> Result<Value> {
+        match data_of(&self.base, sent) {
+            Err(error) if is_retry_later(&error) => Err(error),
+            other => {
+                errors::answered(&self.base);
+                other
+            }
+        }
     }
 
     pub fn user(&self) -> Result<User> {
-        let data = self.get("/v4/user", &[])?;
+        let data = self.get("/v4/user")?;
         parse(data.get("user"), "user")
     }
 
@@ -114,7 +108,8 @@ impl Api {
 
     pub fn upload_torrent_entry(&self, file: &Path) -> Result<Uploaded> {
         let parts = [("files[]", FormPart::File(file))];
-        let data = data_of(
+        errors::check(&self.base, Instant::now())?;
+        let data = self.settled(
             self.fetch()
                 .post_multipart(&self.url("/v4/magnet/upload/file"), &parts),
         )?;
@@ -125,27 +120,23 @@ impl Api {
     }
 
     pub fn magnet(&self, id: &str) -> Result<Option<Magnet>> {
-        let data = match self.get("/v4.1/magnet/status", &[("id", id)]) {
+        let data = match self.post("/v4.1/magnet/status", &[("id", id)]) {
             Err(error) if is_unknown_magnet(&error) => return Ok(None),
             other => other?,
         };
-        let first = match data.get("magnets") {
-            Some(Value::Array(all)) => all.first(),
-            Some(single @ Value::Object(_)) => Some(single),
-            _ => None,
-        };
-        first
+        magnet_list(&data)
+            .first()
             .map(|magnet| parse(Some(magnet), "magnet"))
             .transpose()
     }
 
     /// Ids of every magnet in the account, from one `magnet/status` call with no `id`.
     pub fn magnet_ids(&self) -> Result<HashSet<String>> {
-        let data = self.get("/v4.1/magnet/status", &[])?;
-        let Some(Value::Array(all)) = data.get("magnets") else {
+        let data = self.post("/v4.1/magnet/status", &[])?;
+        if data.get("magnets").is_none() {
             bail!("AllDebrid's reply has no magnet list");
-        };
-        Ok(all
+        }
+        Ok(magnet_list(&data)
             .iter()
             .filter_map(|magnet| magnet.get("id").and_then(wire::id_text))
             .collect())
@@ -153,12 +144,9 @@ impl Api {
 
     pub fn files(&self, id: &str) -> Result<Vec<Node>> {
         let data = self.post("/v4/magnet/files", &[("id[]", id)])?;
-        let entry = match data.get("magnets") {
-            Some(Value::Array(all)) => all.first(),
-            Some(single @ Value::Object(_)) => Some(single),
-            _ => None,
-        }
-        .ok_or_else(|| anyhow!("AllDebrid listed no files for this magnet"))?;
+        let entry = magnet_list(&data)
+            .first()
+            .ok_or_else(|| anyhow!("AllDebrid listed no files for this magnet"))?;
         if let Some(refused) = entry.get("error").and_then(failure) {
             return Err(refused.into());
         }
@@ -166,11 +154,11 @@ impl Api {
     }
 
     pub fn unlock(&self, link: &str) -> Result<Unlocked> {
-        let data = self.get("/v4/link/unlock", &[("link", link)])?;
+        let data = self.post("/v4/link/unlock", &[("link", link)])?;
         let unlocked: Unlocked = serde_json::from_value(data).context("read the unlocked link")?;
         if unlocked.link.is_empty() {
-            if unlocked.delayed.is_some() {
-                bail!("AllDebrid delayed this link, which is not supported");
+            if let Some(id) = unlocked.delayed.as_ref().and_then(wire::id_text) {
+                return Err(Delayed { id }.into());
             }
             bail!("AllDebrid returned no download link");
         }
@@ -201,9 +189,15 @@ fn parse<T: DeserializeOwned>(value: Option<&Value>, what: &str) -> Result<T> {
 }
 
 fn entries<'a>(data: &'a Value, list: &str) -> &'a [Value] {
-    data.get(list)
-        .and_then(Value::as_array)
-        .map_or(&[], Vec::as_slice)
+    match data.get(list) {
+        Some(Value::Array(all)) => all.as_slice(),
+        Some(single @ Value::Object(_)) => std::slice::from_ref(single),
+        _ => &[],
+    }
+}
+
+fn magnet_list(data: &Value) -> &[Value] {
+    entries(data, "magnets")
 }
 
 fn entry_uploaded(entry: &Value) -> Result<Uploaded> {
@@ -225,9 +219,12 @@ fn uploaded(data: &Value, list: &str) -> Result<String> {
     entry_uploaded(entry).map(|uploaded| uploaded.id)
 }
 
-fn data_of(sent: Result<Response>) -> Result<Value> {
+fn data_of(base: &str, sent: Result<Response>) -> Result<Value> {
     let response = sent?;
     let status = response.status;
+    if matches!(status, 429 | 503) {
+        return Err(errors::limited(base, status, Instant::now()).into());
+    }
     let Ok(envelope) = response.json::<wire::Envelope>() else {
         bail!("AllDebrid answered HTTP {status} with something that is not its API");
     };

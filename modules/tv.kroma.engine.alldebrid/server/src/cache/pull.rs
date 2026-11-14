@@ -56,6 +56,24 @@ pub fn running() -> HashSet<PathBuf> {
         .collect()
 }
 
+pub fn load_under(root: &Path) -> super::reserve::Load {
+    let held = held();
+    let mine = held.iter().filter(|(dest, _)| dest.starts_with(root));
+    let (pulls, unwritten) = mine.fold((0, 0u64), |(pulls, left), (_, pull)| {
+        let inner = pull.state();
+        let remaining = match inner.phase {
+            Phase::Running => inner.total.saturating_sub(inner.done),
+            Phase::Failed(..) => 0,
+        };
+        (pulls + usize::from(matches!(inner.phase, Phase::Running)), left + remaining)
+    });
+    super::reserve::Load { pulls, unwritten }
+}
+
+pub fn is_running(dest: &Path) -> bool {
+    held().get(dest).is_some_and(|pull| pull.current().is_some())
+}
+
 pub fn forget(dest: &Path) {
     if let Some(gone) = held().remove(dest) {
         gone.cancelled.store(true, Ordering::Relaxed);
@@ -75,7 +93,7 @@ pub fn forget_under(folder: &Path) {
 
 /// Joins the fetch of `dest` already running, or starts one. A fetch that
 /// failed answers its failure for a while before a new one is tried.
-pub fn join_or_start(dest: &Path, file: &Planned, api: Api) -> Progress {
+pub fn join_or_start(dest: &Path, file: &Planned, api: Api, after: Option<Tidy>) -> Progress {
     let existing = held().get(dest).cloned();
     if let Some(pull) = existing {
         if let Some(progress) = pull.current() {
@@ -97,7 +115,7 @@ pub fn join_or_start(dest: &Path, file: &Planned, api: Api) -> Progress {
     });
     held().insert(dest.to_path_buf(), pull.clone());
     let job = FileJob::new(api, dest.to_path_buf(), file);
-    tokio::spawn(run(pull.clone(), job));
+    tokio::spawn(run(pull.clone(), job, after));
     pull.current().unwrap_or(Progress::Running {
         done: started,
         total: file.size,
@@ -142,11 +160,19 @@ impl Pull {
     }
 }
 
-async fn run(pull: Arc<Pull>, job: FileJob) {
+pub struct Tidy {
+    pub root: PathBuf,
+    pub limits: super::purge::Limits,
+}
+
+async fn run(pull: Arc<Pull>, job: FileJob, after: Option<Tidy>) {
     match advance_to_the_end(&pull, job).await {
         Ok(()) => {
             if !pull.cancelled() {
                 held().remove(&pull.dest);
+                if let Some(tidy) = after {
+                    super::purge::purge(&tidy.root, std::time::SystemTime::now(), tidy.limits, &running());
+                }
             }
         }
         Err(error) => pull.fail(format!("{error:#}")),

@@ -64,7 +64,7 @@ pub(super) fn build(spec: &Spec) -> Vec<OsString> {
     if seeking {
         push(&["-copyts"]);
     }
-    push(&["-map", "0:v:0", "-map", &format!("0:a:{}", spec.audio)]);
+    push(&["-map", "0:v:0", "-map", &format!("0:a:{}?", spec.audio)]);
     if copying_video {
         push(&["-c:v", "copy"]);
         push(&stream_copy::video_args(spec.video));

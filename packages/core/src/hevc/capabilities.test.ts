@@ -187,6 +187,23 @@ describe('hdrDeclaration', () => {
     expect(hdrDeclaration(declared(NO_HDR))).toEqual([]);
   });
 
+  it('declares dv only for HEVC Dolby Vision, never for an AV1-only decoder', () => {
+    const declared = (profiles: number[]) =>
+      videoCaps({
+        hdr: {
+          hdr10: true,
+          hdr10Plus: false,
+          hlg: true,
+          dolbyVision: true,
+          dolbyVisionProfiles: profiles,
+        },
+        hdrDeclared: true,
+      });
+    expect(hdrDeclaration(declared([10]))).toEqual(['hdr10', 'hlg']);
+    expect(hdrDeclaration(declared([10, 8]))).toEqual(['hdr10', 'hlg', 'dv']);
+    expect(hdrDeclaration(declared([5]))).toEqual(['hdr10', 'hlg', 'dv']);
+  });
+
   it('is what a stream request carries beside the codec lists', () => {
     g.tizen = {};
     const declaration = deviceDeclaration(detectCapabilities());
@@ -212,18 +229,20 @@ describe('detectCapabilities (React Native)', () => {
     });
   });
 
-  it('declares tvOS and Android TV their HDR systems', () => {
-    expect(asReactNative('ios', () => hdrDeclaration(detectCapabilities()))).toEqual([
-      'hdr10',
-      'hdr10plus',
-      'hlg',
-      'dv',
-    ]);
-    expect(asReactNative('android', () => hdrDeclaration(detectCapabilities()))).toEqual([
-      'hdr10',
-      'hdr10plus',
-      'hlg',
-      'dv',
+  it('declares tvOS and Android TV the HDR systems that hold for any set, and no Dolby Vision', () => {
+    const declared = ['hdr10', 'hdr10plus', 'hlg'];
+    expect(asReactNative('ios', () => hdrDeclaration(detectCapabilities()))).toEqual(declared);
+    expect(asReactNative('android', () => hdrDeclaration(detectCapabilities()))).toEqual(declared);
+  });
+
+  it('copies only what an fMP4 carries on every TV engine table, never TrueHD or DTS', () => {
+    expect(
+      asReactNative('android', () => deviceDeclaration(detectCapabilities()).copyCodecs),
+    ).toEqual(['aac', 'ac3', 'eac3']);
+    expect(asReactNative('ios', () => deviceDeclaration(detectCapabilities()).copyCodecs)).toEqual([
+      'aac',
+      'ac3',
+      'eac3',
     ]);
   });
 

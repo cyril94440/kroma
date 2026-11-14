@@ -1,6 +1,10 @@
 //! The credentials this module keeps so it can reach AllDebrid when the core
 //! asks for a file without a client in hand: one record per magnet, and the
 //! latest seen, so a rotated key keeps older magnets working.
+//!
+//! A component cannot set or read a file mode, so the protection is the folder
+//! it lives in: the host creates this module's data directory owner-only before
+//! the module starts and tightens it again if it was ever opened to others.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -53,6 +57,29 @@ impl Creds {
         self.read(magnet).is_some()
     }
 
+    /// Drops the magnet's record, and the latest one too once no magnet keeps
+    /// a record of its own: with nothing left to reach, no key is kept.
+    pub fn forget(&self, magnet: &str) {
+        if crate::ensure_magnet_id(magnet).is_err() {
+            return;
+        }
+        let _ = std::fs::remove_file(self.path(magnet));
+        if !self.holds_a_magnet() {
+            let _ = std::fs::remove_file(self.path(LATEST));
+        }
+    }
+
+    fn holds_a_magnet(&self) -> bool {
+        std::fs::read_dir(&self.dir).is_ok_and(|entries| {
+            entries.flatten().any(|entry| {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                name.strip_suffix(".json")
+                    .is_some_and(|stem| stem != LATEST && crate::ensure_magnet_id(stem).is_ok())
+            })
+        })
+    }
+
     fn path(&self, name: &str) -> PathBuf {
         self.dir.join(format!("{name}.json"))
     }
@@ -66,40 +93,14 @@ impl Creds {
             return Ok(());
         }
         std::fs::create_dir_all(&self.dir)?;
-        restrict_dir(&self.dir);
         let target = self.path(name);
         let staged = self.dir.join(format!("{name}.tmp"));
-        let mut file = create_private(&staged)?;
+        let mut file = std::fs::File::create(&staged)?;
         file.write_all(&serde_json::to_vec(saved).map_err(std::io::Error::other)?)?;
         file.flush()?;
         std::fs::rename(staged, target)
     }
 }
-
-#[cfg(unix)]
-fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)
-}
-
-#[cfg(not(unix))]
-fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
-    std::fs::File::create(path)
-}
-
-#[cfg(unix)]
-fn restrict_dir(dir: &Path) {
-    use std::os::unix::fs::PermissionsExt;
-    let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
-}
-
-#[cfg(not(unix))]
-fn restrict_dir(_dir: &Path) {}
 
 #[cfg(test)]
 mod tests;

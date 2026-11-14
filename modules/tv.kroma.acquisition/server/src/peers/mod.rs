@@ -5,5 +5,6 @@
 //! whoever is running, so a provider can be swapped, disabled or replaced by one
 //! that did not exist when this shipped.
 
+pub mod deadline;
 pub mod downloads;
 pub mod indexers;

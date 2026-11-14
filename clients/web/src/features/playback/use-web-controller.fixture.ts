@@ -10,6 +10,7 @@ export const H = {
   endedHandler: null as (() => void) | null,
   handlers: {} as Record<string, () => void>,
   badge: 'HDR' as string | null,
+  badgeVideo: null as unknown,
   statsInput: null as Record<string, unknown> | null,
   rememberAudio: vi.fn(),
 };
@@ -98,6 +99,7 @@ export function installHarness(): void {
     H.endedHandler = null;
     H.handlers = {};
     H.badge = 'HDR';
+    H.badgeVideo = null;
     H.statsInput = null;
     H.filter = { mode: 'off', setMode: vi.fn(), supported: true };
     H.pb = makePb();

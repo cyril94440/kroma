@@ -18,7 +18,7 @@ pub fn plan_with(api: &Api, magnet: &str) -> Result<Vec<Planned>> {
     }
     let listed = api.files(magnet).map_err(|error| {
         if api::is_unknown_magnet(&error) {
-            anyhow!("this magnet is no longer on AllDebrid")
+            files::unusable("this magnet is no longer on AllDebrid")
         } else {
             error
         }
@@ -26,6 +26,14 @@ pub fn plan_with(api: &Api, magnet: &str) -> Result<Vec<Planned>> {
     let plan = files::flatten(&listed)?;
     memo::plans().put(key, plan.clone(), Instant::now());
     Ok(plan)
+}
+
+/// A plan failure that no retry will cure: the magnet's own contents, or an
+/// answer AllDebrid gave about them. Transport, rate limits and a rejected key
+/// are not.
+pub fn is_unusable(error: &anyhow::Error) -> bool {
+    error.is::<files::Unusable>()
+        || error.downcast_ref::<api::Refused>().is_some_and(|refused| !refused.is_auth())
 }
 
 impl AllDebrid {
@@ -46,8 +54,8 @@ impl AllDebrid {
         Ok(self.api.unlock(&self.find(magnet, rel)?.link)?.link)
     }
 
-    pub fn cache_file(&self, magnet: &str, rel: &str) -> Result<Availability> {
+    pub fn cache_file(&self, magnet: &str, rel: &str, limits: crate::cache::Limits) -> Result<Availability> {
         let file = self.find(magnet, rel)?;
-        self.cache.ensure_cached(&self.api, magnet, &file)
+        self.cache.ensure_cached(&self.api, magnet, &file, limits)
     }
 }

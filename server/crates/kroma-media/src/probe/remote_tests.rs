@@ -1,14 +1,14 @@
-use kroma_primitives::input::{MediaInput, RemoteUrl};
+use kroma_primitives::input::MediaInput;
 use kroma_testing::RangedServer;
 
-use super::run::{probe_duration_ms, probe_input};
+use super::run::{probe_duration_ms, probe_input, probe_outcome, Probed};
 
 fn served_clip() -> (kroma_testing::TempDir, RangedServer, MediaInput) {
     let dir = kroma_testing::temp_dir("probe-remote");
     let clip = kroma_testing::clip(dir.path());
     let server = RangedServer::serve(&clip);
-    let url = RemoteUrl::parse_insecure(&server.url("clip.mp4")).unwrap();
-    (dir, server, MediaInput::Remote(url))
+    let input = crate::input::relayed_at(server.port());
+    (dir, server, input)
 }
 
 #[test]
@@ -34,14 +34,30 @@ fn the_length_of_a_title_behind_a_url_is_read_from_its_header() {
 }
 
 #[test]
-fn a_url_that_fails_is_unreadable_and_the_reason_never_holds_the_link() {
+fn a_title_the_host_refuses_is_a_network_failure_to_try_again_and_never_unreadable() {
     let (_dir, server, input) = served_clip();
     server.fail_with(403);
 
-    let result = probe_input(&input, "mkv", true).expect("a verdict");
+    let probed = probe_outcome(&input, "mkv", true);
 
-    let reason = result.unreadable.expect("a refused read is unreadable");
-    assert!(!reason.contains("hunter2") && !reason.contains("127.0.0.1:"), "{reason}");
+    assert!(matches!(probed, Probed::Network), "{probed:?}");
+    assert!(probe_input(&input, "mkv", true).is_none(), "no verdict is stored");
+}
+
+#[test]
+fn bytes_that_arrive_whole_and_are_not_a_video_are_unreadable() {
+    let dir = kroma_testing::temp_dir("probe-remote-junk");
+    let junk = dir.path().join("clip.mp4");
+    std::fs::write(&junk, vec![0x41u8; 200_000]).unwrap();
+    let server = RangedServer::serve(&junk);
+    let input = crate::input::relayed_at(server.port());
+
+    let Probed::Done(result) = probe_outcome(&input, "mkv", true) else {
+        panic!("the file was fetched and is a verdict");
+    };
+
+    let reason = result.unreadable.expect("a fetched, undecodable file is unreadable");
+    assert!(!reason.contains("secret") && !reason.contains("grant"), "{reason}");
 }
 
 #[test]

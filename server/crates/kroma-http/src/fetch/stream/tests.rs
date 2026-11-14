@@ -135,3 +135,20 @@ async fn dropping_a_stream_ends_the_process_behind_it() {
     }
     assert!(left <= before, "{left} curl processes left behind");
 }
+
+#[tokio::test]
+async fn a_reader_that_pauses_longer_than_the_stall_window_still_gets_the_whole_body() {
+    let (_dir, server, bytes) = served(30 * 1024 * 1024);
+
+    let mut streamed = Fetch::new()
+        .stall_seconds(1)
+        .stream(&server.url("body.bin"))
+        .await
+        .unwrap();
+    let mut got = vec![0u8; 4096];
+    streamed.read_exact(&mut got).await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+    streamed.read_to_end(&mut got).await.unwrap();
+
+    assert_eq!(got, bytes);
+}

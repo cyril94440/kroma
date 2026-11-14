@@ -201,12 +201,25 @@ async fn an_instant_grab_with_no_manager_running_answers_err_and_the_capability_
 }
 
 #[tokio::test]
-async fn an_instant_grab_names_each_release_by_a_key_and_a_grab_spec() {
-    let (status, _) = call(
+async fn an_instant_grab_with_no_manager_reads_the_keyed_releases_and_budget_then_says_so() {
+    let (status, answer) = call(
         "/_port/tv.kroma.torrents/grab/grab-instant",
-        json!({ "releases": [{ "key": "g|i", "spec": { "magnet_or_url": "m", "kind": "movie", "release_title": "R" } }] }),
+        json!({ "budget_ms": 5000, "releases": [{ "key": "g|i", "spec": { "magnet_or_url": "m", "kind": "movie", "release_title": "R" } }] }),
     )
     .await;
 
     assert_eq!(status, StatusCode::OK);
+    assert!(answer["Err"].as_str().is_some_and(|reason| reason.contains("manager")), "{answer}");
+}
+
+#[tokio::test]
+async fn a_drop_with_the_discard_flag_is_read_and_answers_false_for_an_unknown_row() {
+    let (status, answer) = call(
+        "/_port/tv.kroma.torrents/grab/drop-data",
+        json!({ "id": "nope", "discard": true }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_ne!(answer, json!(null));
 }

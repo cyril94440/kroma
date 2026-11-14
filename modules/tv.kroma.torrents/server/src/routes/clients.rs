@@ -105,10 +105,7 @@ pub async fn create<S: HostStorage + Clone + Send + Sync + 'static>(
     state.require(&user, Permission::SettingsManage)?;
     let kind = body.kind.as_deref().unwrap_or_default().trim().to_string();
     if !is_external_engine(&state.contributions(DOWNLOAD_CLIENT), &kind) {
-        return Err(json_error(
-            StatusCode::BAD_REQUEST,
-            "no enabled download engine answers for this kind",
-        ));
+        return Err(state.lerr(&user, StatusCode::BAD_REQUEST, "error.noEngineForKind"));
     }
     let url = body
         .url
@@ -134,11 +131,37 @@ pub async fn create<S: HostStorage + Clone + Send + Sync + 'static>(
         created_at: now_ms(),
     };
     let view = view_of(&row, crate::EngineState::Unknown, None);
+    let row = vet_new_client(dm(&state), row).await?;
     query(state.store(), move |pool| {
         db::insert_download_client(&pool, &row)
     })
     .await?;
     Ok(Json(view).into_response())
+}
+
+fn looks_incomplete(row: &DownloadClientRow) -> bool {
+    row.url.is_empty() || row.password.is_empty()
+}
+
+/// An engine's own `test` is the only place that knows which of its fields it
+/// needs, so a definition that leaves the URL or the secret empty is put to it
+/// before it is saved, and refused with the engine's reason when it fails.
+async fn vet_new_client(
+    manager: Arc<DownloadManager>,
+    row: DownloadClientRow,
+) -> Result<DownloadClientRow, Response> {
+    if !looks_incomplete(&row) {
+        return Ok(row);
+    }
+    let tried = blocking(move || {
+        let outcome = manager.engine_for(&row).and_then(|engine| engine.test());
+        Ok((row, outcome))
+    })
+    .await?;
+    match tried {
+        (row, Ok(_)) => Ok(row),
+        (_, Err(error)) => Err(json_error(StatusCode::BAD_REQUEST, &format!("{error:#}"))),
+    }
 }
 
 /// `PUT /download-clients/:id` partial update (kind is immutable;
@@ -209,10 +232,7 @@ pub async fn remove<S: HostStorage + Clone + Send + Sync + 'static>(
 ) -> Result<Response, Response> {
     state.require(&user, Permission::SettingsManage)?;
     if id == EMBEDDED_CLIENT_ID {
-        return Err(json_error(
-            StatusCode::BAD_REQUEST,
-            "the embedded engine cannot be deleted",
-        ));
+        return Err(state.lerr(&user, StatusCode::BAD_REQUEST, "error.embeddedClientPermanent"));
     }
     let deleted = query(state.store(), move |pool| {
         db::delete_download_client(&pool, &id)
@@ -262,48 +282,4 @@ pub async fn test<S: HostStorage + Clone + Send + Sync + 'static>(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn answering(kinds: &[&str]) -> Vec<Contribution> {
-        kinds
-            .iter()
-            .map(|kind| Contribution {
-                module_id: format!("tv.kroma.engine.{kind}"),
-                instance: Some((*kind).to_string()),
-                base_url: "http://127.0.0.1:1".into(),
-                token: "t".into(),
-            })
-            .collect()
-    }
-
-    #[test]
-    fn a_kind_is_valid_when_an_enabled_module_answers_for_it() {
-        let answers = answering(&["rqbit", "alldebrid", "transmission"]);
-
-        assert!(is_external_engine(&answers, "alldebrid"));
-        assert!(is_external_engine(&answers, "transmission"));
-    }
-
-    #[test]
-    fn a_kind_nobody_answers_for_is_refused() {
-        let answers = answering(&["rqbit"]);
-
-        assert!(!is_external_engine(&answers, "qbittorrent"));
-        assert!(!is_external_engine(&answers, ""));
-        assert!(!is_external_engine(&[], "alldebrid"));
-    }
-
-    #[test]
-    fn the_embedded_kind_is_never_created_through_this_route() {
-        assert!(!is_external_engine(&answering(&["rqbit"]), "rqbit"));
-    }
-
-    #[test]
-    fn a_contribution_with_no_instance_answers_for_no_kind() {
-        let mut answers = answering(&["alldebrid"]);
-        answers[0].instance = None;
-
-        assert!(!is_external_engine(&answers, "alldebrid"));
-    }
-}
+mod tests;

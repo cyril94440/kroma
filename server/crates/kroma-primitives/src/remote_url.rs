@@ -6,7 +6,8 @@ use crate::address::{is_public, web_target};
 
 const MAX_URL_BYTES: usize = 8 * 1024;
 
-/// An `https` URL a module handed back for a title's bytes. Holding one is
+/// An `https` URL a module handed back for a title's bytes. Only the core's own
+/// relay fetches it: no ffmpeg or ffprobe is ever handed one. Holding one is
 /// proof that its scheme is `https`, that it carries no credentials, and that its
 /// host is a public name or a public address: the URL is a bearer link, so its
 /// path and query never appear in `Debug` or in a log line. A name that
@@ -16,7 +17,6 @@ const MAX_URL_BYTES: usize = 8 * 1024;
 pub struct RemoteUrl {
     url: String,
     host: String,
-    pub(crate) https: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,17 +46,6 @@ impl fmt::Debug for RemoteUrl {
 
 impl RemoteUrl {
     pub fn parse(url: &str) -> Result<Self, RemoteUrlError> {
-        Self::checked(url, false)
-    }
-
-    /// Like [`Self::parse`] but takes plain `http` and loopback addresses, so an
-    /// integration test can serve a title from a socket on this machine.
-    #[cfg(feature = "insecure-test-urls")]
-    pub fn parse_insecure(url: &str) -> Result<Self, RemoteUrlError> {
-        Self::checked(url, true)
-    }
-
-    fn checked(url: &str, insecure: bool) -> Result<Self, RemoteUrlError> {
         if url.is_empty()
             || url.len() > MAX_URL_BYTES
             || url.chars().any(|c| c.is_control() || c.is_whitespace())
@@ -64,16 +53,15 @@ impl RemoteUrl {
             return Err(RemoteUrlError::NotAUrl);
         }
         let target = web_target(url).ok_or(RemoteUrlError::NotAUrl)?;
-        if !target.https && !insecure {
+        if !target.https {
             return Err(RemoteUrlError::NotHttps);
         }
-        if !insecure && (target.is_local() || !names_a_public_host(&target.host)) {
+        if target.is_local() || !names_a_public_host(&target.host) {
             return Err(RemoteUrlError::PrivateHost);
         }
         Ok(Self {
             url: url.to_string(),
             host: target.host,
-            https: target.https,
         })
     }
 
@@ -103,8 +91,7 @@ fn names_a_public_host(host: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input::MediaInput;
-
+    
     #[test]
     fn a_public_https_url_is_accepted() {
         let url = RemoteUrl::parse("https://cdn.example.com/dl/a.mkv?token=abc").unwrap();
@@ -159,7 +146,7 @@ mod tests {
     fn debug_never_shows_the_path_or_the_query() {
         let url = RemoteUrl::parse("https://cdn.example.com/secret/a.mkv?token=hunter2").unwrap();
 
-        let shown = format!("{url:?} {:?}", MediaInput::Remote(url.clone()));
+        let shown = format!("{url:?}");
 
         assert!(!shown.contains("hunter2") && !shown.contains("secret"), "{shown}");
         assert!(shown.contains("cdn.example.com"));
@@ -169,7 +156,7 @@ mod tests {
     fn redact_swaps_the_whole_url_for_its_host() {
         let url = RemoteUrl::parse("https://cdn.example.com/secret/a.mkv?token=hunter2").unwrap();
 
-        let said = MediaInput::Remote(url).redact("https://cdn.example.com/secret/a.mkv?token=hunter2: Server returned 403");
+        let said = url.redact("https://cdn.example.com/secret/a.mkv?token=hunter2: Server returned 403");
 
         assert_eq!(said, "cdn.example.com: Server returned 403");
     }

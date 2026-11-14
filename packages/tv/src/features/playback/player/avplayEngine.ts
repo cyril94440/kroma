@@ -9,8 +9,8 @@
 
 import {
   AT_FILM_START_SEC,
-  AVPLAY_HLS_CAPS,
-  decodableAudioCodecs,
+  avplayHlsCapabilities,
+  copyableAudioCodecs,
   decodableVideoCodecs,
   hdrDeclaration,
   resolveMasterStart,
@@ -88,15 +88,15 @@ export class AvplayEngine extends BaseTvEngine {
   }
 
   protected override declaredAudioCodecs(): string[] {
-    return decodableAudioCodecs(AVPLAY_HLS_CAPS);
+    return copyableAudioCodecs(avplayHlsCapabilities(this.capabilities));
   }
 
   protected override declaredVideoCodecs(): string[] {
-    return decodableVideoCodecs(AVPLAY_HLS_CAPS);
+    return decodableVideoCodecs(avplayHlsCapabilities(this.capabilities));
   }
 
   protected override declaredHdr(): string[] | undefined {
-    return hdrDeclaration(this.capabilities ?? AVPLAY_HLS_CAPS);
+    return hdrDeclaration(avplayHlsCapabilities(this.capabilities));
   }
 
   /** Reloads the source at the current position with the new filter mode; a

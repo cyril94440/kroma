@@ -112,7 +112,7 @@ async fn a_ready_magnet_becomes_stubs_and_small_subtitles_and_only_then_complete
     let unlocked: Vec<String> = fake
         .calls_to("/v4/link/unlock")
         .iter()
-        .map(|c| c.query["link"].clone())
+        .map(|c| c.form()["link"].clone())
         .collect();
     assert_eq!(
         unlocked,
@@ -194,7 +194,9 @@ fn removing_a_magnet_that_has_not_finished_cancels_it_on_alldebrid() {
     let fake = script.start();
     let dir = kroma_module_sdk::testing::temp_dir("ad-remove-early");
 
-    engine(&fake, dir.path()).remove("7", true).unwrap();
+    crate::owned::Owned::new(dir.path()).claim("7");
+
+    engine(&fake, dir.path()).remove("7", true, false).unwrap();
 
     assert_eq!(fake.calls_to("/v4/magnet/delete").len(), 1);
 }
@@ -215,9 +217,9 @@ fn a_finished_magnet_stays_on_alldebrid_and_only_its_local_stubs_go() {
     std::fs::write(&cached, "x").unwrap();
     let alldebrid = engine(&fake, dir.path());
 
-    alldebrid.remove("7", false).unwrap();
+    alldebrid.remove("7", false, false).unwrap();
     assert!(stub.exists(), "keeping the data keeps the stubs");
-    alldebrid.remove("7", true).unwrap();
+    alldebrid.remove("7", true, false).unwrap();
 
     assert!(!dir.path().join("downloads/7").exists());
     assert!(cached.exists(), "the purge job owns the cache");
@@ -236,5 +238,5 @@ fn removing_a_magnet_alldebrid_forgot_succeeds() {
     });
     let dir = kroma_module_sdk::testing::temp_dir("ad-remove-gone");
 
-    assert!(engine(&fake, dir.path()).remove("7", true).is_ok());
+    assert!(engine(&fake, dir.path()).remove("7", true, false).is_ok());
 }

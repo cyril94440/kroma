@@ -1,7 +1,9 @@
 import type { ItemId } from '@kromatv/client/media';
 import {
+  type AudioDelivery,
   deviceDeclaration,
   type EngineDecision,
+  observedAudioDelivery,
   readSourceFailure,
   streamRefusal,
 } from '@kromatv/core';
@@ -22,6 +24,7 @@ export interface StreamProbe {
   baseSec: number;
   srcReady: boolean;
   serverDurSec: number;
+  delivered: AudioDelivery | null;
   failure: StreamFailure | null;
   refused: (status: number, resumeAt?: number) => void;
   fail: (failure: StreamFailure) => void;
@@ -67,6 +70,7 @@ export function useStreamProbe({
   const [baseSec, setBaseSec] = useState(0);
   const [srcReady, setSrcReady] = useState(false);
   const [serverDurSec, setServerDurSec] = useState(0);
+  const [delivered, setDelivered] = useState<AudioDelivery | null>(null);
   const [failure, setFailure] = useState<StreamFailure | null>(null);
   const [renewals, setRenewals] = useState(0);
   const renewed = useRef(false);
@@ -106,6 +110,7 @@ export function useStreamProbe({
       const direct = decision.kind === 'direct';
       setSrcReady(direct);
       setFailure(null);
+      setDelivered(null);
       if (direct) setBaseSec(0);
     }
   }
@@ -142,6 +147,7 @@ export function useStreamProbe({
       renewed.current = false;
       const start = numberHeader(r, 'X-Hls-Start');
       const total = numberHeader(r, 'X-Media-Duration');
+      setDelivered(observedAudioDelivery(r.url));
       setBaseSec(Number.isFinite(start) ? start : anchor);
       if (Number.isFinite(total) && total > 0) setServerDurSec(total);
       setSrcReady(true);
@@ -156,5 +162,5 @@ export function useStreamProbe({
     };
   }, [itemId, decision, anchor, audioIndex, booted, renewals, refused]);
 
-  return { baseSec, srcReady, serverDurSec, failure, refused, fail: setFailure };
+  return { baseSec, srcReady, serverDurSec, delivered, failure, refused, fail: setFailure };
 }

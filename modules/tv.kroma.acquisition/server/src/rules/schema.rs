@@ -87,7 +87,8 @@ pub const MIGRATIONS: &str = "
 ";
 
 /// Every change to this module's database since [`MIGRATIONS`], oldest first.
-pub const STEPS: &[Step] = &[Step {
+pub const STEPS: &[Step] = &[
+    Step {
     name: "what every instance of the module shares",
     run: Run::Sql(
         "
@@ -104,7 +105,37 @@ pub const STEPS: &[Step] = &[Step {
         ",
     ),
     rebuilds: false,
-}];
+},
+    Step {
+        name: "imports in flight, and watch-now imports awaiting the core's verdict",
+        run: Run::Sql(
+            "
+            CREATE TABLE IF NOT EXISTS import_claims (
+                download_id TEXT PRIMARY KEY,
+                claimed_at  INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS watch_now_intents (
+                magnet_or_url TEXT PRIMARY KEY,
+                created_at    INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS provisional_imports (
+                download_id   TEXT PRIMARY KEY,
+                request_id    TEXT,
+                kind          TEXT NOT NULL,
+                tmdb_id       INTEGER NOT NULL,
+                season        INTEGER,
+                episodes      TEXT,
+                release_title TEXT NOT NULL,
+                paths         TEXT NOT NULL,
+                written       TEXT NOT NULL,
+                wanted_ids    TEXT NOT NULL,
+                created_at    INTEGER NOT NULL
+            );
+            ",
+        ),
+        rebuilds: false,
+    },
+];
 
 #[cfg(test)]
 pub(crate) fn install(store: &kroma_module_sdk::db::Pool) {

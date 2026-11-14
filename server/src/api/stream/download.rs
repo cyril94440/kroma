@@ -7,7 +7,7 @@ use axum::body::Body;
 use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
-use kroma_media::hls::{AudioMode, StreamMode, ToneMap, VideoMode};
+use kroma_media::download;
 use kroma_media::input;
 use serde::Deserialize;
 
@@ -19,12 +19,7 @@ use crate::db;
 use crate::state::SharedState;
 use tokio::io::AsyncReadExt;
 
-mod audio_args;
-mod video_args;
-
 use super::byte_sink;
-use audio_args::download_audio_args;
-use video_args::video_args;
 
 /// `?hdr=` names the HDR systems the display shows (`hdr10`, `hdr10plus`, `hlg`, `dv`);
 /// absent is undeclared, empty is SDR only, and a source it cannot show is re-encoded
@@ -66,41 +61,17 @@ pub async fn download_item(
         .ok_or_else(|| json_error(StatusCode::NOT_FOUND, "no file for item"))?;
     let input = super::remote::playable(&state, &user, &abs, true).await?.input;
 
-    let source_video = item.video.as_ref().map(|v| v.codec.as_str());
-    let video_copy = match (q.video.as_deref(), source_video) {
-        (None, _) => true,
-        (Some(set), Some(codec)) => set.split(',').any(|c| c.trim().eq_ignore_ascii_case(codec)),
-        (Some(_), None) => false,
-    };
     let mut cmd = tokio::process::Command::new("ffmpeg");
-    cmd.args(["-v", "error", "-nostdin"])
-        .args(input::media(&input))
-        .args(["-map", "0:v:0"]);
-    let tone_map = item.video.as_ref().and_then(ToneMap::for_video);
-    let video_copy = video_copy
-        && StreamMode::new(VideoMode::Copy, AudioMode::Copy)
-            .for_client_hdr(item.video.as_ref(), q.hdr.as_deref(), tone_map.is_some())
-            .video
-            == VideoMode::Copy;
-    cmd.args(video_args(item.video.as_ref(), video_copy, tone_map));
-    cmd.args(download_audio_args(
-        &item.audio_tracks,
-        item.audio.as_ref().map(|a| a.codec.as_str()),
-        q.copy.as_deref(),
-    ));
-    // NO `empty_moov`: the muxer cannot write an upfront moov for EAC3 (codec params
-    // are only known after parsing packets); `frag_keyframe` emits it with the first
-    // fragment instead, which a pipe handles fine.
-    cmd.args([
-        "-dn",
-        "-map_chapters",
-        "-1",
-        "-movflags",
-        "frag_keyframe+default_base_moof",
-        "-f",
-        "mp4",
-        "pipe:1",
-    ]);
+    input::without_proxies(cmd.as_std_mut());
+    cmd.kill_on_drop(true).args(download::args(&download::Request {
+        input: &input,
+        video: item.video.as_ref(),
+        audio: item.audio.as_ref(),
+        audio_tracks: &item.audio_tracks,
+        client_video: q.video.as_deref(),
+        client_copy: q.copy.as_deref(),
+        client_hdr: q.hdr.as_deref(),
+    }));
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());

@@ -73,7 +73,7 @@ export function useVideoPlayback(item: MovieView): VideoPlayback {
   );
 
   const restartAt = useCallback((absSec: number) => setAnchor(Math.max(0, absSec)), [setAnchor]);
-  const { baseSec, srcReady, serverDurSec, failure, refused, fail } = useStreamProbe({
+  const { baseSec, srcReady, serverDurSec, delivered, failure, refused, fail } = useStreamProbe({
     itemId: item.id,
     decision,
     anchor,
@@ -255,6 +255,7 @@ export function useVideoPlayback(item: MovieView): VideoPlayback {
     waitReason: healthy ? reason : null,
     failure,
     mode: modeOf(decision),
+    delivered,
     ready,
     cur,
     dur,

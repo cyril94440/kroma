@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::warn;
 
 use kroma_module_host::call_raw;
 
-use crate::state::Contributions;
+use crate::state::{Contributions, OfficialModules};
 
-use super::SourceError;
+use super::{Refusal, SourceError};
 
 /// The bare point the core calls to find where a stubbed file's bytes are.
 pub const POINT: &str = "source";
@@ -34,16 +35,35 @@ pub struct Located {
     pub url: Option<String>,
 }
 
+/// The one official module that answers `source` for a title. A module the
+/// official registry did not ship is not asked, and two official modules
+/// naming the same instance are both refused rather than one winning.
+pub(super) fn answerer(
+    contributions: &Contributions,
+    official: &OfficialModules,
+    source: &str,
+) -> Result<kroma_module_host::Contribution, SourceError> {
+    let trusted = official();
+    let mut named = contributions(POINT)
+        .into_iter()
+        .filter(|found| found.instance.as_deref() == Some(source))
+        .filter(|found| trusted.contains(&found.module_id));
+    let first = named.next().ok_or(SourceError::NoModule)?;
+    if named.next().is_some() {
+        warn!(source, "more than one official module answers this source; none is asked");
+        return Err(SourceError::Refused(Refusal::DuplicateSource));
+    }
+    Ok(first)
+}
+
 pub(super) fn locate(
     contributions: &Contributions,
+    official: &OfficialModules,
     source: &str,
     reference: &str,
     warm: bool,
 ) -> Result<Located, SourceError> {
-    let found = contributions(POINT)
-        .into_iter()
-        .find(|found| found.instance.as_deref() == Some(source))
-        .ok_or(SourceError::NoModule)?;
+    let found = answerer(contributions, official, source)?;
     let reply: Result<Answer, String> = call_raw(
         &found.resolver(),
         LOCATE_PATH,

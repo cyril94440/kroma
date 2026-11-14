@@ -6,11 +6,6 @@ rust-version.workspace = true
 description = "KROMA business logic: infra adapters + services + app state (everything the HTTP layer drives)"
 license.workspace = true
 
-[features]
-# Lets a test serve a title from a socket on this machine. No build of the
-# server enables it: only the integration tests do, as a dev-dependency.
-insecure-test-sources = ["kroma-primitives/insecure-test-urls"]
-
 [dependencies]
 # Lower layers (aliased inside lib.rs as crate::{db,config,domain}).
 kroma-domain = { workspace = true }
@@ -63,7 +58,12 @@ rusty-chromaprint = { workspace = true }
 # The interfaces and addresses this machine holds, for the direct LAN route.
 if-addrs = "0.15"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
+# A title can be served from a socket on this machine under a public-looking name.
+kroma-http = { workspace = true, features = ["test-hosts"] }
 # The shared HostCtx doubles: `testing::Recording` taps a real app host's bus,
 # `testing::StubHost` stands in where there is no app at all.
 kroma-module-host = { workspace = true, features = ["testing"] }

@@ -111,11 +111,19 @@ impl StreamMode {
 }
 
 fn transcode_target(channels: Option<u32>, client_set: &str) -> AudioMode {
+    transcode_target_with(channels, client_set, crate::capabilities::audio_targets())
+}
+
+fn transcode_target_with(
+    channels: Option<u32>,
+    client_set: &str,
+    encoders: crate::capabilities::AudioTargets,
+) -> AudioMode {
     if !channels.is_some_and(|c| c >= SURROUND_MIN_CHANNELS) {
         AudioMode::Aac
-    } else if declares(client_set, "eac3") {
+    } else if encoders.eac3 && declares(client_set, "eac3") {
         AudioMode::Eac3
-    } else if declares(client_set, "ac3") {
+    } else if encoders.ac3 && declares(client_set, "ac3") {
         AudioMode::Ac3
     } else {
         AudioMode::Aac

@@ -1,5 +1,7 @@
+export * from './hevc/audio-delivery';
 export * from './hevc/audio-support';
 export * from './hevc/capabilities';
+export * from './hevc/delivered-picture';
 export * from './hevc/directplay';
 export * from './hevc/dolby-vision';
 export * from './hevc/engine';

@@ -1,6 +1,6 @@
-//! One poll of one magnet: AllDebrid's own phase first, then the transfer onto
-//! this server. Progress is a single monotonic number across both, with the
-//! remote phase on the first half.
+//! One poll of one magnet: AllDebrid's own phase, then the stubs and sidecar
+//! files saved here once it is ready. Progress is a single monotonic number,
+//! with the remote phase on the first half.
 
 use anyhow::Result;
 

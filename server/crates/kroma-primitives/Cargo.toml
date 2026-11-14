@@ -6,9 +6,6 @@ rust-version.workspace = true
 description = "Shared low-level primitives: timestamps, short hashes, random tokens"
 license.workspace = true
 
-[features]
-insecure-test-urls = []
-
 [dependencies]
 http = "1"
 time = { workspace = true }

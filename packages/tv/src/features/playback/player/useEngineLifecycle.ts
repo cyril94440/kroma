@@ -138,14 +138,19 @@ export function useEngineLifecycle(
     }
     setError(failure);
     void probeSourceFailure(client.media.streamUrl(item.id)).then((source) => {
-      if (source) setError({ messageKey: source, hintKey: 'player.sourceFailedHint' });
+      if (source) setError({ ...source, hintKey: 'player.sourceFailedHint' });
     });
   });
+  const [opening, setOpening] = useState({ itemId: item.id, index: audioIndex });
+  if (opening.itemId !== item.id) {
+    setOpening({ itemId: item.id, index: openingAudioIndex(item, audioLanguage) });
+  }
   const plan = backend.planEngine(
     item,
     env,
     fellBackToVlc ? 'vlc' : enginePref,
     playbackCapabilities,
+    opening.index,
   );
   const { surface, playbackMode, deviceLabel, rebuildKey } = plan;
   const durationSec = item.durationMs ? item.durationMs / 1000 : 0;

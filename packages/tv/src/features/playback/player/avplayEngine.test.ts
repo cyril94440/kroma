@@ -211,7 +211,7 @@ describe('AvplayEngine construction', () => {
     expect(lastArgs('open')).toEqual(['master:sm1:false:0:0']);
   });
 
-  it('opens the copy program declaring only Dolby and the codecs AVPlay carries, never DTS or TrueHD, so the server re-encodes those to surround', () => {
+  it('opens the copy program declaring only the codecs an fMP4 carries and AVPlay plays, never DTS, TrueHD or MP3, so the server re-encodes those to surround', () => {
     const { client: real } = recordingClient();
 
     const { lastArgs } = make({
@@ -220,7 +220,7 @@ describe('AvplayEngine construction', () => {
     });
 
     expect(lastArgs('open')).toEqual([
-      'http://kroma.test/api/items/sm1/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3%2Cmp3&video=hevc%2Ch264%2Cvp9&hdr=hdr10%2Chdr10plus%2Chlg',
+      'http://kroma.test/api/items/sm1/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3&video=hevc%2Ch264%2Cvp9&hdr=hdr10%2Chdr10plus%2Chlg',
     ]);
   });
 
@@ -236,7 +236,7 @@ describe('AvplayEngine audio declaration', () => {
   it('asks the server to copy only the audio its HLS path plays', () => {
     make({ direct: false, startSec: 0 });
 
-    expect(declared.at(-1)?.copyCodecs).toEqual(['aac', 'ac3', 'eac3', 'mp3']);
+    expect(declared.at(-1)?.copyCodecs).toEqual(['aac', 'ac3', 'eac3']);
   });
 
   it('declares the picture the same silicon draws from a file', () => {

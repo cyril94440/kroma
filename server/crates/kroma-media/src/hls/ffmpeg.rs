@@ -14,6 +14,7 @@ use super::args::{build, Spec};
 use super::naming::contains;
 
 pub(super) const SEGMENT_SECONDS: u32 = 6;
+const KEYFRAME_BUDGET: std::time::Duration = std::time::Duration::from_secs(60);
 /// The write pattern handed to `-hls_segment_filename`; `naming::seg_index`
 /// parses what it produces.
 pub const SEGMENT_PATTERN: &str = "seg_%05d.m4s";
@@ -64,7 +65,10 @@ pub async fn keyframe_before(input: &MediaInput, anchor: f64) -> f64 {
     if anchor <= 0.5 {
         return 0.0;
     }
-    let out = Command::new("ffprobe")
+    let mut command = Command::new("ffprobe");
+    input::without_proxies(command.as_std_mut());
+    let probing = command
+        .kill_on_drop(true)
         .args([
             "-v",
             "error",
@@ -77,9 +81,8 @@ pub async fn keyframe_before(input: &MediaInput, anchor: f64) -> f64 {
         .arg(format!("{anchor:.3}%+#1"))
         .args(["-show_entries", "frame=pts_time", "-of", "csv=p=0"])
         .args(input::media(input))
-        .output()
-        .await;
-    let Ok(out) = out else {
+        .output();
+    let Ok(Ok(out)) = tokio::time::timeout(KEYFRAME_BUDGET, probing).await else {
         return anchor;
     };
     String::from_utf8_lossy(&out.stdout)
@@ -97,6 +100,7 @@ pub async fn keyframe_before(input: &MediaInput, anchor: f64) -> f64 {
 // A language switch is therefore a reload with a different `audio` (a new session).
 pub(super) fn spawn_stream(spec: &Spec) -> std::io::Result<Child> {
     let mut cmd = Command::new("ffmpeg");
+    input::without_proxies(cmd.as_std_mut());
     cmd.args(build(spec))
         .stdin(Stdio::null())
         .stdout(Stdio::null())

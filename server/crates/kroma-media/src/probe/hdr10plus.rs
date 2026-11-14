@@ -70,7 +70,9 @@ fn args(input: &MediaInput, stream: u32) -> Vec<OsString> {
 }
 
 fn run(program: &str, args: &[OsString], budget: Duration) -> Option<Vec<u8>> {
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    input::without_proxies(&mut command);
+    let mut child = command
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

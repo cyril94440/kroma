@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use axum::routing::post;
 use axum::{Json, Router};
@@ -14,10 +15,11 @@ use crate::downloads::test_support::host_over;
 const CLIENT: &str = "tv.kroma.torrents/client";
 
 #[derive(Default)]
-struct Engine {
-    asked: Mutex<Vec<Value>>,
-    adds: Mutex<u32>,
-    removed: Mutex<Vec<String>>,
+pub(super) struct Engine {
+    pub(super) asked: Mutex<Vec<Value>>,
+    pub(super) adds: Mutex<u32>,
+    pub(super) removed: Mutex<Vec<String>>,
+    pub(super) discarded: Mutex<Vec<String>>,
 }
 
 fn status_json(state: &str, progress: f64) -> Value {
@@ -30,14 +32,14 @@ fn status_json(state: &str, progress: f64) -> Value {
     })
 }
 
-struct Fake {
-    engine: Arc<Engine>,
+pub(super) struct Fake {
+    pub(super) engine: Arc<Engine>,
     instant: Option<Value>,
-    state: &'static str,
+    pub(super) state: &'static str,
 }
 
 impl Fake {
-    fn answering(instant: Value) -> Self {
+    pub(super) fn answering(instant: Value) -> Self {
         Self {
             engine: Arc::default(),
             instant: Some(instant),
@@ -45,7 +47,7 @@ impl Fake {
         }
     }
 
-    fn without_instant() -> Self {
+    pub(super) fn without_instant() -> Self {
         Self {
             engine: Arc::default(),
             instant: None,
@@ -54,7 +56,7 @@ impl Fake {
     }
 }
 
-async fn host_with(fake: &Fake, rows: &[(&str, &str)]) -> (StubHost, Arc<DownloadManager>) {
+pub(super) async fn host_with(fake: &Fake, rows: &[(&str, &str)]) -> (StubHost, Arc<DownloadManager>) {
     let mut router = Router::new();
     let engine = fake.engine.clone();
     if let Some(answer) = fake.instant.clone() {
@@ -103,6 +105,13 @@ async fn host_with(fake: &Fake, rows: &[(&str, &str)]) -> (StubHost, Arc<Downloa
                     .lock()
                     .unwrap()
                     .push(body["args"]["client_ref"].to_string());
+                if body["args"]["discard"] == true {
+                    removing
+                        .discarded
+                        .lock()
+                        .unwrap()
+                        .push(body["args"]["client_ref"].to_string());
+                }
                 Json(Ok::<_, String>(()))
             }
         }),
@@ -129,7 +138,7 @@ async fn host_with(fake: &Fake, rows: &[(&str, &str)]) -> (StubHost, Arc<Downloa
     (host, manager)
 }
 
-fn release(key: &str) -> InstantRelease {
+pub(super) fn release(key: &str) -> InstantRelease {
     InstantRelease {
         key: key.into(),
         spec: GrabSpec {
@@ -144,20 +153,20 @@ fn release(key: &str) -> InstantRelease {
     }
 }
 
-fn releases(count: usize) -> Vec<InstantRelease> {
+pub(super) fn releases(count: usize) -> Vec<InstantRelease> {
     (0..count).map(|n| release(&format!("r{n}"))).collect()
 }
 
-async fn grab(
+pub(super) async fn grab(
     host: &StubHost,
     manager: &Arc<DownloadManager>,
     list: Vec<InstantRelease>,
 ) -> Result<InstantOutcome> {
     let (host, manager) = (host.clone(), manager.clone());
-    blocking(move || manager.grab_instant(&host, list)).await
+    blocking(move || manager.grab_instant(&host, list, Duration::from_secs(5))).await
 }
 
-fn stored(manager: &DownloadManager, id: &str) -> db::DownloadRow {
+pub(super) fn stored(manager: &DownloadManager, id: &str) -> db::DownloadRow {
     db::get_download(&manager.core().get().unwrap(), id)
         .unwrap()
         .unwrap()
@@ -194,7 +203,7 @@ async fn the_engine_is_asked_in_rank_order_with_each_releases_link() {
 
     grab(&host, &manager, releases(3)).await.unwrap();
 
-    let asked = fake.engine.asked.lock().unwrap()[0].clone();
+    let asked = fake.engine.asked.lock().unwrap().last().unwrap().clone();
     let keys: Vec<&str> = asked["args"]["candidates"]
         .as_array()
         .unwrap()
@@ -247,19 +256,6 @@ async fn the_embedded_engine_is_unsupported_without_any_call() {
 }
 
 #[tokio::test]
-async fn a_closed_kill_switch_does_not_hold_an_engine_that_moves_no_peer_data() {
-    let fake = Fake::answering(json!({ "Ok": { "key": "r0", "client_ref": "42" } }));
-    let (host, manager) = host_with(&fake, &[]).await;
-    manager
-        .gate_open
-        .store(false, std::sync::atomic::Ordering::Relaxed);
-
-    let outcome = grab(&host, &manager, releases(1)).await.unwrap();
-
-    assert_eq!(outcome.status, InstantStatus::Grabbed);
-}
-
-#[tokio::test]
 async fn no_more_than_the_cap_is_offered_to_the_engine() {
     let fake = Fake::answering(json!({ "Ok": null }));
     let (host, manager) = host_with(&fake, &[]).await;
@@ -268,7 +264,7 @@ async fn no_more_than_the_cap_is_offered_to_the_engine() {
         .await
         .unwrap();
 
-    let asked = fake.engine.asked.lock().unwrap()[0].clone();
+    let asked = fake.engine.asked.lock().unwrap().last().unwrap().clone();
     assert_eq!(
         asked["args"]["candidates"].as_array().unwrap().len(),
         MAX_INSTANT_CANDIDATES
@@ -282,55 +278,7 @@ async fn a_release_already_in_the_queue_is_not_offered_again() {
 
     grab(&host, &manager, releases(2)).await.unwrap();
 
-    let asked = fake.engine.asked.lock().unwrap()[0].clone();
+    let asked = fake.engine.asked.lock().unwrap().last().unwrap().clone();
     assert_eq!(asked["args"]["candidates"].as_array().unwrap().len(), 1);
     assert_eq!(asked["args"]["candidates"][0]["key"], "r1");
-}
-
-#[tokio::test]
-async fn an_engine_that_fails_the_kept_release_fails_its_row_and_frees_the_magnet() {
-    let mut fake = Fake::answering(json!({ "Ok": { "key": "r0", "client_ref": "42" } }));
-    fake.state = "error";
-    let (host, manager) = host_with(&fake, &[]).await;
-
-    let error = grab(&host, &manager, releases(1)).await.unwrap_err();
-
-    assert!(error.to_string().contains("engine"), "{error:#}");
-    assert_eq!(fake.engine.removed.lock().unwrap().len(), 1);
-    assert!(db::active_downloads(&manager.core().get().unwrap())
-        .unwrap()
-        .is_empty());
-}
-
-#[tokio::test]
-async fn the_capability_is_the_engines_own_answer_to_an_empty_list() {
-    let (_, capable) = host_with(&Fake::answering(json!({ "Ok": null })), &[]).await;
-    let (_, incapable) = host_with(&Fake::without_instant(), &[]).await;
-    let (capable, incapable) = (capable, incapable);
-
-    assert!(blocking(move || capable.instant_capable()).await);
-    assert!(!blocking(move || incapable.instant_capable()).await);
-}
-
-#[test]
-fn an_instant_release_tolerates_a_spec_missing_every_optional_field() {
-    let parsed: InstantRelease = serde_json::from_value(json!({
-        "key": "k", "spec": { "magnet_or_url": "magnet:?xt=urn:btih:a", "kind": "movie", "release_title": "R" }
-    }))
-    .unwrap();
-
-    assert_eq!(parsed.spec.tmdb_id, None);
-    assert!(parsed.spec.wanted_ids.is_empty());
-}
-
-#[test]
-fn the_outcome_crosses_as_a_lowercase_status_with_the_key_and_the_row() {
-    let none = serde_json::to_value(InstantOutcome::of(InstantStatus::Nothing)).unwrap();
-    let unsupported = serde_json::to_value(InstantOutcome::of(InstantStatus::Unsupported)).unwrap();
-
-    assert_eq!(
-        none,
-        json!({ "status": "nothing", "key": null, "download": null })
-    );
-    assert_eq!(unsupported["status"], "unsupported");
 }

@@ -85,6 +85,7 @@ impl FileJob {
                 .filesize
                 .ok_or_else(|| anyhow!("AllDebrid did not report this file's size"))?;
         }
+        crate::transfer_hosts::warn_if_unlisted(&unlocked.link);
         self.direct = Some(unlocked.link);
         Ok(())
     }
@@ -101,27 +102,45 @@ impl FileJob {
         let sent = Fetch::new()
             .purpose(PURPOSE)
             .max_time(CHUNK_SECS)
+            .max_bytes(self.size)
             .header("range", format!("bytes={have}-{end}"))
             .download(&direct, &chunk);
-        let status = match sent {
-            Ok(response) => response.status,
+        let response = match sent {
+            Ok(response) => response,
             Err(error) => return self.stumbled(&chunk, error),
         };
         let got = disk::len(&chunk).unwrap_or(0);
-        let outcome = match status {
-            206 if got > 0 && got <= end - have + 1 => append(&chunk, &part).map(|()| got),
-            200 if got == self.size => replace(&chunk, &part).map(|()| got - have),
+        let asked = end - have + 1;
+        let outcome = match response.status {
+            206 => match content_range(response.header("content-range")) {
+                Some(range)
+                    if range.start == have
+                        && got > 0
+                        && range.end == have + got - 1
+                        && got <= asked
+                        && range.total.is_none_or(|total| total == self.size) =>
+                {
+                    append(&chunk, &part).map(|()| got)
+                }
+                _ => Err(anyhow!(
+                    "the download server answered a range other than bytes {have}-{end}"
+                )),
+            },
+            200 if got == self.size => replace(&chunk, &part).map(|()| got.saturating_sub(have)),
             401 | 403 | 404 | 410 if self.relocks < MAX_RELOCKS => {
                 self.relocks += 1;
                 self.direct = None;
                 Ok(0)
             }
-            206 | 200 => Err(anyhow!("the download server sent {got} unexpected bytes")),
+            200 => Err(anyhow!("the download server sent {got} unexpected bytes")),
             other => Err(anyhow!("the download server answered HTTP {other}")),
         };
         let _ = std::fs::remove_file(&chunk);
         let moved = outcome?;
         self.failures = 0;
+        if moved > 0 {
+            self.relocks = 0;
+        }
         if disk::len(&part) == Some(self.size) {
             return self.finish(moved);
         }
@@ -153,6 +172,24 @@ impl FileJob {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct ContentRange {
+    start: u64,
+    end: u64,
+    total: Option<u64>,
+}
+
+fn content_range(header: Option<&str>) -> Option<ContentRange> {
+    let spec = header?.trim().strip_prefix("bytes")?.trim_start();
+    let (span, total) = spec.split_once('/')?;
+    let (start, end) = span.trim().split_once('-')?;
+    Some(ContentRange {
+        start: start.parse().ok()?,
+        end: end.parse().ok()?,
+        total: total.trim().parse().ok(),
+    })
+}
+
 fn append(chunk: &std::path::Path, part: &std::path::Path) -> Result<()> {
     let mut from = File::open(chunk).context("open the chunk")?;
     let mut to = OpenOptions::new()
@@ -166,4 +203,36 @@ fn append(chunk: &std::path::Path, part: &std::path::Path) -> Result<()> {
 
 fn replace(chunk: &std::path::Path, part: &std::path::Path) -> Result<()> {
     std::fs::rename(chunk, part).context("keep the whole file")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_content_range_is_read_with_or_without_a_known_total() {
+        assert_eq!(
+            content_range(Some("bytes 0-99/1000")),
+            Some(ContentRange {
+                start: 0,
+                end: 99,
+                total: Some(1000)
+            })
+        );
+        assert_eq!(
+            content_range(Some("bytes 5-9/*")),
+            Some(ContentRange {
+                start: 5,
+                end: 9,
+                total: None
+            })
+        );
+    }
+
+    #[test]
+    fn anything_else_is_no_range() {
+        assert_eq!(content_range(None), None);
+        assert_eq!(content_range(Some("bytes */1000")), None);
+        assert_eq!(content_range(Some("items 0-9/10")), None);
+    }
 }

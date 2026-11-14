@@ -41,7 +41,9 @@ fn sig_of(subjects: &[(String, String)], id: &str) -> String {
 #[test]
 fn a_stub_with_no_copy_is_signed_unreadable_by_every_whole_file_stage_so_no_task_is_made() {
     let (state, server) = test_state_with_source(url_answer);
-    stubbed_movie(&state, "m1");
+    let stub = stubbed_movie(&state, "m1");
+    let answered = state.sources.find(&stub, false).expect("the source answered, it did not fail");
+    assert!(matches!(answered.place, crate::services::source::Place::Upstream(_)), "no copy, by the source's own answer");
 
     assert_eq!(sig_of(&storyboard::enumerate(&state).unwrap(), "m1"), UNREADABLE_SIG);
     assert_eq!(sig_of(&credits::enumerate(&state).unwrap(), "m1"), UNREADABLE_SIG);
@@ -68,8 +70,9 @@ fn a_stub_with_a_complete_copy_enters_every_stage_signed_by_the_stub_itself() {
     let stub = stubbed_movie(&state, "m1");
     let own = super::sig_for_path(&stub);
 
-    assert_eq!(sig_of(&storyboard::enumerate(&state).unwrap(), "m1"), own);
-    assert_eq!(sig_of(&subtitles::enumerate(&state).unwrap(), "m1"), own);
+    for sig in [sig_of(&storyboard::enumerate(&state).unwrap(), "m1"), sig_of(&subtitles::enumerate(&state).unwrap(), "m1")] {
+        assert!(sig.starts_with(&format!("{own}|")), "{sig}");
+    }
     assert_ne!(sig_of(&credits::enumerate(&state).unwrap(), "m1"), UNREADABLE_SIG);
     assert_ne!(sig_of(&loudness::enumerate(&state).unwrap(), "m1-f"), UNREADABLE_SIG);
 }
@@ -123,4 +126,26 @@ fn an_episode_with_a_copy_puts_its_season_in_scope() {
     let subjects = markers::enumerate(&state).unwrap();
 
     assert!(subjects.iter().any(|(id, sig)| id.starts_with(&show) && sig != UNREADABLE_SIG), "{subjects:?}");
+}
+
+#[test]
+fn a_failed_task_runs_again_once_the_copy_was_evicted_and_cached_anew() {
+    let (state, _) = test_state_with_source(path_answer);
+    let stub = stubbed_movie(&state, "m1");
+    let first = sig_of(&storyboard::enumerate(&state).unwrap(), "m1");
+    crate::db::pipeline::reconcile(&state.db, "storyboard", "item", &[("m1".to_string(), first)], 1).unwrap();
+    let conn = state.db.get().unwrap();
+    conn.execute("UPDATE pipeline_tasks SET status='failed', attempts=5 WHERE subject_id='m1'", []).unwrap();
+    drop(conn);
+
+    let copy = state.config.data_dir.join("sources/tv.example.debrid/copy.mkv");
+    std::fs::remove_file(&copy).unwrap();
+    state.sources.forget(&stub);
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::fs::write(&copy, vec![0u8; SIZE as usize]).unwrap();
+    let second = sig_of(&storyboard::enumerate(&state).unwrap(), "m1");
+    crate::db::pipeline::reconcile(&state.db, "storyboard", "item", &[("m1".to_string(), second)], 2).unwrap();
+
+    let (pending, _, _, failed, _) = crate::db::pipeline::counts(&state.db, "storyboard").unwrap();
+    assert_eq!((pending, failed), (1, 0), "the new copy resets the failed task");
 }

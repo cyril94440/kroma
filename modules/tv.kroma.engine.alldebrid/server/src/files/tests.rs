@@ -133,3 +133,69 @@ fn files_are_told_apart_by_what_the_library_will_do_with_them() {
     assert_eq!(kind_of("b.nfo"), Kind::Other);
     assert_eq!(kind_of("mkv"), Kind::Other);
 }
+
+fn long_name(stem_chars: usize, extension: &str) -> String {
+    format!("{}.{extension}", "é".repeat(stem_chars))
+}
+
+#[test]
+fn a_long_name_keeps_its_extension_so_the_video_is_still_a_video() {
+    let long = long_name(300, "mkv");
+
+    let cleaned = component(&long);
+
+    assert!(cleaned.len() <= 200, "{}", cleaned.len());
+    assert!(cleaned.ends_with(".mkv"));
+    assert_eq!(kind_of(&cleaned), Kind::Video);
+}
+
+#[test]
+fn cleaning_a_name_twice_changes_nothing() {
+    let names = [
+        long_name(300, "mkv"),
+        long_name(100, "mkv"),
+        format!("{} .srt", "a".repeat(250)),
+        "a".repeat(400),
+        format!("{}.{}", "b".repeat(250), "x".repeat(40)),
+        "  spaced  ".to_string(),
+        "..".to_string(),
+        "a/b\\c".to_string(),
+    ];
+
+    for name in names {
+        let once = component(&name);
+        assert_eq!(component(&once), once, "{name}");
+        assert!(once.len() <= 200, "{name}");
+    }
+}
+
+#[test]
+fn a_collision_suffix_on_a_long_name_stays_within_the_limit_and_stable() {
+    let long = long_name(300, "mkv");
+    let tree = [file(&long, 1), file(&long, 2), file(&long, 3)];
+
+    let rels = rels(&tree);
+
+    assert_eq!(rels.len(), 3);
+    for rel in &rels {
+        assert!(rel.len() <= 200);
+        assert_eq!(component(rel), *rel);
+        assert!(rel.ends_with(".mkv"));
+    }
+    assert_eq!(
+        rels.iter().collect::<std::collections::HashSet<_>>().len(),
+        3
+    );
+}
+
+#[test]
+fn every_planned_path_is_one_the_cache_will_accept() {
+    let dir = kroma_module_sdk::testing::temp_dir("ad-files-cache");
+    let cache = crate::cache::Cache::new(dir.path());
+    let long = long_name(300, "mkv");
+    let tree = [folder("S".repeat(250).as_str(), vec![file(&long, 1), file(&long, 1)])];
+
+    for planned in flatten(&tree).unwrap() {
+        assert!(cache.path_of("7", &planned.rel).is_ok(), "{}", planned.rel);
+    }
+}

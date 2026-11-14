@@ -3,13 +3,31 @@
 
 use std::collections::HashSet;
 
-use anyhow::{bail, Result};
+use std::fmt;
+
+use anyhow::Result;
 
 use crate::api::Node;
 
 const MAX_DEPTH: usize = 16;
 const MAX_FILES: usize = 5_000;
 const MAX_NAME_BYTES: usize = 200;
+const MAX_EXTENSION_BYTES: usize = 16;
+
+#[derive(Debug)]
+pub struct Unusable(String);
+
+impl fmt::Display for Unusable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for Unusable {}
+
+pub(crate) fn unusable(reason: impl Into<String>) -> anyhow::Error {
+    Unusable(reason.into()).into()
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -46,7 +64,7 @@ pub fn flatten(tree: &[Node]) -> Result<Vec<Planned>> {
     let mut taken = HashSet::new();
     walk(tree, &mut Vec::new(), &mut out, &mut taken)?;
     if out.is_empty() {
-        bail!("the magnet holds no file");
+        return Err(unusable("the magnet holds no file with a download link"));
     }
     Ok(out)
 }
@@ -58,7 +76,7 @@ fn walk(
     taken: &mut HashSet<String>,
 ) -> Result<()> {
     if parents.len() >= MAX_DEPTH {
-        bail!("the magnet nests its folders too deeply");
+        return Err(unusable("the magnet nests its folders too deeply"));
     }
     for node in nodes {
         let name = component(&node.n);
@@ -72,7 +90,7 @@ fn walk(
             continue;
         };
         if out.len() >= MAX_FILES {
-            bail!("the magnet holds more than {MAX_FILES} files");
+            return Err(unusable(format!("the magnet holds more than {MAX_FILES} files")));
         }
         out.push(Planned {
             rel: unique(parents, &name, taken),
@@ -102,9 +120,16 @@ fn unique(parents: &[String], name: &str, taken: &mut HashSet<String>) -> String
 }
 
 fn numbered(name: &str, copy: u32) -> String {
+    let tail = format!(" ({copy})");
     match name.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() => format!("{stem} ({copy}).{ext}"),
-        _ => format!("{name} ({copy})"),
+        Some((stem, ext)) if !stem.is_empty() && ext.len() <= MAX_EXTENSION_BYTES => {
+            let room = MAX_NAME_BYTES.saturating_sub(ext.len() + 1 + tail.len());
+            format!("{}{tail}.{ext}", cut(stem, room).trim_end())
+        }
+        _ => {
+            let room = MAX_NAME_BYTES.saturating_sub(tail.len());
+            format!("{}{tail}", cut(name, room).trim_end())
+        }
     }
 }
 
@@ -130,11 +155,25 @@ fn truncated(name: &str) -> String {
     if name.len() <= MAX_NAME_BYTES {
         return name.to_string();
     }
-    let mut end = MAX_NAME_BYTES;
-    while !name.is_char_boundary(end) {
+    match name.rsplit_once('.') {
+        Some((stem, extension))
+            if !stem.is_empty()
+                && extension.len() <= MAX_EXTENSION_BYTES
+                && !extension.contains(char::is_whitespace) =>
+        {
+            let room = MAX_NAME_BYTES - extension.len() - 1;
+            format!("{}.{extension}", cut(stem, room).trim_end())
+        }
+        _ => cut(name, MAX_NAME_BYTES).trim_end().to_string(),
+    }
+}
+
+fn cut(text: &str, bytes: usize) -> &str {
+    let mut end = bytes.min(text.len());
+    while !text.is_char_boundary(end) {
         end -= 1;
     }
-    name[..end].to_string()
+    &text[..end]
 }
 
 #[cfg(test)]

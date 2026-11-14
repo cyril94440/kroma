@@ -167,6 +167,17 @@ fn build_app_wired(
     configure: impl FnOnce(&mut Config),
     contributions: kroma_engine::state::Contributions,
 ) -> TestApp {
+    build_app_official(tmdb_api_key, web, configure, contributions, &[])
+}
+
+fn build_app_official(
+    tmdb_api_key: Option<&str>,
+    web: &[(&str, &str)],
+    configure: impl FnOnce(&mut Config),
+    contributions: kroma_engine::state::Contributions,
+    official: &[&str],
+) -> TestApp {
+    let official: Vec<String> = official.iter().map(ToString::to_string).collect();
     let tmp = unique_data_dir();
     let data_dir = tmp.path().to_path_buf();
     let db = db::init(&data_dir.join("kroma.db")).expect("init db");
@@ -219,7 +230,7 @@ fn build_app_wired(
             services,
             jobs: &[],
             contributions,
-            official_modules: std::sync::Arc::new(Vec::new),
+            official_modules: std::sync::Arc::new(move || official.clone()),
             permissions: std::sync::Arc::new(|_| None),
             network_providers: std::sync::Arc::new(Vec::new),
             network_listeners: std::sync::Arc::new(Vec::new),

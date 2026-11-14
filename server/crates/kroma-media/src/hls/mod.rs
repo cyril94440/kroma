@@ -74,6 +74,7 @@ pub struct Asked<'a> {
 pub fn prime_hwaccel() {
     hwaccel::prime();
     tonemap::filters();
+    crate::capabilities::prime();
 }
 
 pub struct HlsEngine {

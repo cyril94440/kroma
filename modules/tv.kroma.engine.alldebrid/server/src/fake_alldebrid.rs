@@ -39,6 +39,7 @@ impl Req {
 pub(crate) struct Resp {
     status: u16,
     body: Vec<u8>,
+    extra: Vec<(String, String)>,
 }
 
 impl Resp {
@@ -57,14 +58,27 @@ impl Resp {
     }
 
     pub(crate) fn raw(status: u16, body: Vec<u8>) -> Self {
-        Self { status, body }
+        Self {
+            status,
+            body,
+            extra: Vec::new(),
+        }
+    }
+
+    pub(crate) fn header(mut self, name: &str, value: String) -> Self {
+        self.extra.push((name.to_string(), value));
+        self
     }
 
     pub(crate) fn bytes(req: &Req, whole: &[u8], honour_range: bool) -> Self {
         match req.range().filter(|_| honour_range) {
             Some((from, to)) => {
                 let end = (to as usize + 1).min(whole.len());
-                Self::raw(206, whole[(from as usize).min(end)..end].to_vec())
+                let start = (from as usize).min(end);
+                Self::raw(206, whole[start..end].to_vec()).header(
+                    "Content-Range",
+                    format!("bytes {start}-{}/{}", end.saturating_sub(1), whole.len()),
+                )
             }
             None => Self::raw(200, whole.to_vec()),
         }
@@ -116,6 +130,12 @@ fn serve(stream: std::net::TcpStream, handler: &dyn Fn(&Req) -> Resp, log: &Mute
         resp.status,
         resp.body.len()
     );
+    let extra: String = resp
+        .extra
+        .iter()
+        .map(|(name, value)| format!("{name}: {value}\r\n"))
+        .collect();
+    let head = head.replacen("Connection: close\r\n", &format!("{extra}Connection: close\r\n"), 1);
     let _ = out.write_all(head.as_bytes());
     let _ = out.write_all(&resp.body);
     let _ = out.flush();
@@ -262,7 +282,7 @@ impl Script {
                 }
                 "/v4/magnet/delete" => Resp::data(json!({ "message": "deleted" })),
                 "/v4/link/unlock" => {
-                    let link = req.query.get("link").cloned().unwrap_or_default();
+                    let link = req.form().get("link").cloned().unwrap_or_default();
                     let name = link.rsplit('/').next().unwrap_or_default().to_string();
                     match files.get(name.as_str()) {
                         Some(body) => Resp::data(json!({

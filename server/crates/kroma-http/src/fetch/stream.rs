@@ -6,12 +6,12 @@ use std::task::{Context, Poll};
 use std::time::Instant;
 
 use anyhow::{anyhow, bail, Context as _, Result};
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader, ReadBuf};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader, ReadBuf};
 use tokio::process::{Child, ChildStdout, Command};
 
 use crate::address::WebTarget;
 use crate::config::option_line;
-use crate::egress::{self, scrubbed, Exchange, Route, Ruling, BLOCKED};
+use crate::egress::{self, scrubbed, Route, Ruling, BLOCKED};
 
 use super::render::{gateway_lines, proxy_lines};
 use super::send::chosen_proxy;
@@ -19,7 +19,6 @@ use super::Fetch;
 
 const CONNECT_SECONDS: u32 = 15;
 const STALLED_SECONDS: u32 = 30;
-const MAX_HEADER_BYTES: usize = 64 * 1024;
 
 /// A response whose body is still on its way: the status and headers are read,
 /// the bytes come out of [`AsyncRead`]. Dropping it kills the curl process
@@ -30,18 +29,8 @@ pub struct Streamed {
     pub headers: Vec<(String, String)>,
     body: BufReader<ChildStdout>,
     _child: Child,
-    record: Option<Record>,
+    record: Option<record::Record>,
     bytes_in: u64,
-}
-
-struct Record {
-    purpose: &'static str,
-    host: String,
-    port: u16,
-    route: Route,
-    rule: Option<String>,
-    started: Instant,
-    status: u16,
 }
 
 impl Streamed {
@@ -68,28 +57,6 @@ impl AsyncRead for Streamed {
     }
 }
 
-impl Drop for Streamed {
-    fn drop(&mut self) {
-        if let Some(record) = self.record.take() {
-            egress::record(Exchange {
-                purpose: record.purpose,
-                method: "GET",
-                host: record.host,
-                port: record.port,
-                route: record.route,
-                status: Some(record.status),
-                bytes_in: self.bytes_in,
-                bytes_out: 0,
-                duration_ms: u64::try_from(record.started.elapsed().as_millis())
-                    .unwrap_or(u64::MAX),
-                error: None,
-                rule: record.rule,
-                carried: egress::gateway().is_some(),
-            });
-        }
-    }
-}
-
 impl Fetch {
     /// GET `url` and return as soon as the response headers are in, with the
     /// body left to read. For a body too large to hold that a caller relays: it
@@ -108,7 +75,7 @@ impl Fetch {
             Ok(proxy) => proxy,
             Err(reason) => {
                 let (host, port) = host_port(&target);
-                egress::record(blocked(self.purpose, host, port, rule, &reason));
+                egress::record(record::blocked(self.purpose, host, port, rule, &reason));
                 bail!("{BLOCKED}: {reason}");
             }
         };
@@ -119,10 +86,12 @@ impl Fetch {
             &CONNECT_SECONDS.to_string(),
         ));
         config.push_str(&option_line("speed-limit", "1"));
-        config.push_str(&option_line("speed-time", &STALLED_SECONDS.to_string()));
+        config.push_str(&option_line(
+            "speed-time",
+            &self.stall_seconds.unwrap_or(STALLED_SECONDS).to_string(),
+        ));
         config.push_str(&option_line("dump-header", "-"));
         config.push_str(CONNECT_ANSWER_HIDDEN);
-        config.push_str(&option_line("url", url));
         let route = if let Some(gateway) = egress::gateway() {
             let username =
                 egress::Gateway::username(self.purpose, self.public_only, self.socks5.is_some());
@@ -130,7 +99,11 @@ impl Fetch {
             Route::Proxy
         } else {
             if self.public_only {
-                config.push_str(&crate::pin::public_resolve_line(url)?);
+                let checked = url.to_string();
+                let line = tokio::task::spawn_blocking(move || crate::pin::public_resolve_line(&checked))
+                    .await
+                    .context("resolve the host")??;
+                config.push_str(&line);
             }
             if let Some(proxy) = &proxy {
                 config.push_str(&proxy_lines(proxy));
@@ -141,6 +114,7 @@ impl Fetch {
                 Route::Direct
             }
         };
+        config.push_str(&request_target(url));
         let (host, port) = host_port(&target);
         let mut child = Command::new("curl")
             .arg("-q")
@@ -161,7 +135,7 @@ impl Fetch {
         let stdout = child.stdout.take().context("curl stdout was not piped")?;
         let mut stderr = child.stderr.take();
         let mut body = BufReader::new(stdout);
-        let (status, headers) = match read_head(&mut body).await {
+        let (status, headers) = match head::read_head(&mut body).await {
             Ok(head) => head,
             Err(read) => {
                 let mut said = String::new();
@@ -169,7 +143,7 @@ impl Fetch {
                     let _ = stderr.take(4096).read_to_string(&mut said).await;
                 }
                 let reason = scrubbed(said.trim(), url, &host);
-                egress::record(failed(
+                egress::record(record::failed(
                     self.purpose,
                     host,
                     port,
@@ -193,7 +167,7 @@ impl Fetch {
             headers,
             body,
             _child: child,
-            record: Some(Record {
+            record: Some(record::Record {
                 purpose: self.purpose,
                 host,
                 port,
@@ -207,96 +181,28 @@ impl Fetch {
     }
 }
 
-/// Behind an HTTP proxy curl dumps the proxy's `200 Connection Established`
-/// ahead of the origin's head, and `read_head` would take it for the answer.
+// curl dumps a proxy's `200 Connection Established` ahead of the origin's head, which `read_head` would take for the answer.
 const CONNECT_ANSWER_HIDDEN: &str = "suppress-connect-headers\n";
 
-async fn read_head(body: &mut BufReader<ChildStdout>) -> Result<(u16, Vec<(String, String)>)> {
-    let mut seen = 0usize;
-    loop {
-        let mut status = None;
-        let mut headers = Vec::new();
-        loop {
-            let mut line = String::new();
-            let read = body
-                .read_line(&mut line)
-                .await
-                .context("read the response headers")?;
-            if read == 0 {
-                bail!("the connection closed before the response headers");
-            }
-            seen += read;
-            if seen > MAX_HEADER_BYTES {
-                bail!("the response headers are too large");
-            }
-            let line = line.trim_end_matches(['\r', '\n']);
-            if line.is_empty() {
-                break;
-            }
-            if let Some(rest) = line.strip_prefix("HTTP/") {
-                status = rest
-                    .split_whitespace()
-                    .nth(1)
-                    .and_then(|code| code.parse::<u16>().ok());
-            } else if let Some((name, value)) = line.split_once(':') {
-                headers.push((name.trim().to_string(), value.trim().to_string()));
-            }
-        }
-        match status {
-            Some(code) if (100..200).contains(&code) => continue,
-            Some(code) => return Ok((code, headers)),
-            None => bail!("no HTTP status line in the response"),
-        }
+#[cfg(feature = "test-hosts")]
+fn request_target(url: &str) -> String {
+    match crate::test_hosts::transport_url(url) {
+        Some(moved) => format!(
+            "{}{}{}",
+            option_line("proto", "=http"),
+            option_line("proto-redir", "=http"),
+            option_line("url", &moved)
+        ),
+        None => option_line("url", url),
     }
 }
 
-fn blocked(
-    purpose: &'static str,
-    host: String,
-    port: u16,
-    rule: Option<String>,
-    reason: &str,
-) -> Exchange {
-    Exchange {
-        purpose,
-        method: "GET",
-        host,
-        port,
-        route: Route::Blocked,
-        status: None,
-        bytes_in: 0,
-        bytes_out: 0,
-        duration_ms: 0,
-        error: Some(format!("{BLOCKED}: {reason}")),
-        rule,
-        carried: false,
-    }
+#[cfg(not(feature = "test-hosts"))]
+fn request_target(url: &str) -> String {
+    option_line("url", url)
 }
 
-fn failed(
-    purpose: &'static str,
-    host: String,
-    port: u16,
-    route: Route,
-    rule: Option<String>,
-    started: Instant,
-    reason: &str,
-) -> Exchange {
-    Exchange {
-        purpose,
-        method: "GET",
-        host,
-        port,
-        route,
-        status: None,
-        bytes_in: 0,
-        bytes_out: 0,
-        duration_ms: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
-        error: Some(reason.to_string()),
-        rule,
-        carried: egress::gateway().is_some(),
-    }
-}
-
+mod head;
+mod record;
 #[cfg(test)]
 mod tests;

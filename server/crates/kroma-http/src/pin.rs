@@ -14,6 +14,11 @@ pub(crate) fn public_resolve_line(url: &str) -> Result<String> {
     let target =
         web_target(url).with_context(|| format!("{url} is not a plain http or https URL"))?;
     let (host, port) = (target.host.as_str(), target.port);
+    #[cfg(feature = "test-hosts")]
+    if let Some(address) = crate::test_hosts::address_of(host) {
+        ensure_public(host, address)?;
+        return Ok(String::new());
+    }
     if let Some(literal) = target.literal() {
         ensure_public(host, literal)?;
         return Ok(String::new());

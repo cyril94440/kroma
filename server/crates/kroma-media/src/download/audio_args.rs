@@ -1,7 +1,9 @@
 //! Which audio tracks the download stream-copies and which it re-encodes,
 //! as the ffmpeg flags that say so.
 
-use kroma_media::hls::SURROUND_MIN_CHANNELS;
+use kroma_module_wire::AudioStream;
+
+use crate::hls::SURROUND_MIN_CHANNELS;
 
 // Copy-safe means fMP4-muxable (mirrors the clients' `FMP4_COPY_CODECS`) AND, when
 // the client declared a `copy` set, present in it - Android phones usually lack
@@ -26,7 +28,7 @@ enum Treatment {
 // A track that cannot be copied keeps its 5.1 bed only where the client said it
 // decodes the codec: no declaration is the default set, which a phone may not
 // have, so it stays the stereo AAC it always was.
-fn treatment(track: Option<&crate::model::AudioStream>, fallback: Option<&str>, set: Option<&str>) -> Treatment {
+fn treatment(track: Option<&AudioStream>, fallback: Option<&str>, set: Option<&str>) -> Treatment {
     let codec = track.map(|t| t.codec.as_str()).or(fallback);
     if download_copies_audio(codec, set) {
         return Treatment::Copy;
@@ -37,7 +39,16 @@ fn treatment(track: Option<&crate::model::AudioStream>, fallback: Option<&str>, 
     let declares = |name: &str| {
         set.is_some_and(|set| set.split(',').any(|c| c.trim().eq_ignore_ascii_case(name)))
     };
-    match (surround, declares("eac3"), declares("ac3")) {
+    surround_target(surround, declares("eac3"), declares("ac3"), crate::capabilities::audio_targets())
+}
+
+fn surround_target(
+    surround: bool,
+    eac3: bool,
+    ac3: bool,
+    encoders: crate::capabilities::AudioTargets,
+) -> Treatment {
+    match (surround, eac3 && encoders.eac3, ac3 && encoders.ac3) {
         (true, true, _) => Treatment::Surround("eac3"),
         (true, false, true) => Treatment::Surround("ac3"),
         _ => Treatment::Stereo,
@@ -48,7 +59,7 @@ fn treatment(track: Option<&crate::model::AudioStream>, fallback: Option<&str>, 
 // selection from the MP4 muxer's single alternate group, so offline pickers select
 // by ordinal.
 pub(super) fn download_audio_args(
-    tracks: &[crate::model::AudioStream],
+    tracks: &[AudioStream],
     fallback_codec: Option<&str>,
     client_set: Option<&str>,
 ) -> Vec<String> {
@@ -58,7 +69,7 @@ pub(super) fn download_audio_args(
         args.extend(audio_codec_args(":a", treatment(None, fallback_codec, client_set)));
         return args;
     }
-    let mut sorted: Vec<&crate::model::AudioStream> = tracks.iter().collect();
+    let mut sorted: Vec<&AudioStream> = tracks.iter().collect();
     sorted.sort_by_key(|t| t.index);
     let mut args: Vec<String> = Vec::new();
     for (out, t) in sorted.iter().enumerate() {
@@ -94,8 +105,19 @@ fn audio_codec_args(spec: &str, treatment: Treatment) -> Vec<String> {
 mod tests {
     use super::*;
 
-    fn track(index: u32, codec: &str) -> crate::model::AudioStream {
-        crate::model::AudioStream {
+    #[test]
+    fn a_build_without_the_dolby_encoders_keeps_the_stereo_aac_it_always_had() {
+        use crate::capabilities::AudioTargets;
+        let none = AudioTargets { ac3: false, eac3: false };
+        let all = AudioTargets { ac3: true, eac3: true };
+
+        assert!(matches!(surround_target(true, true, true, all), Treatment::Surround("eac3")));
+        assert!(matches!(surround_target(true, true, true, none), Treatment::Stereo));
+        assert!(matches!(surround_target(true, false, true, AudioTargets { ac3: true, eac3: false }), Treatment::Surround("ac3")));
+    }
+
+    fn track(index: u32, codec: &str) -> AudioStream {
+        AudioStream {
             index,
             codec: codec.into(),
             channels: None,
@@ -158,8 +180,8 @@ mod tests {
         );
     }
 
-    fn surround_track(index: u32, codec: &str, channels: u32) -> crate::model::AudioStream {
-        crate::model::AudioStream {
+    fn surround_track(index: u32, codec: &str, channels: u32) -> AudioStream {
+        AudioStream {
             channels: Some(channels),
             ..track(index, codec)
         }

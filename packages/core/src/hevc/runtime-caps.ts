@@ -91,18 +91,22 @@ export const WEBOS_CAPS: PlaybackCapabilities = {
 
 const APPLE_TV_AUDIO: AudioCapabilities = { ...TV_AUDIO, dts: false, truehd: false };
 
-/** tvOS (AVPlayer): Dolby Digital and Digital+ natively, neither DTS nor TrueHD. */
+/** tvOS (AVPlayer): Dolby Digital and Digital+ natively, neither DTS nor TrueHD.
+ * Dolby Vision depends on the connected display and nothing exposed to JS asks it,
+ * so it is not claimed. */
 export const APPLE_TV_CAPS: PlaybackCapabilities = {
   ...NATIVE_TV_CAPS,
+  hdr: { ...NATIVE_TV_CAPS.hdr, dolbyVision: false },
   audio: APPLE_TV_AUDIO,
   hdrDeclared: true,
 };
 
 /** Android TV and Fire TV (Media3): the FFmpeg audio extension decodes every
  * audio codec the table names in software, ahead of any passthrough. Dolby Vision
- * is the one claim nothing here can ask the set about. */
+ * is per device and nothing here can ask the set, so it is not claimed. */
 export const ANDROID_TV_CAPS: PlaybackCapabilities = {
   ...NATIVE_TV_CAPS,
+  hdr: { ...NATIVE_TV_CAPS.hdr, dolbyVision: false },
   hdrDeclared: true,
 };
 
@@ -129,6 +133,13 @@ export const AVPLAY_HLS_CAPS: PlaybackCapabilities = {
   ...TIZEN_CAPS,
   audio: AVPLAY_HLS_AUDIO,
 };
+
+/** The capabilities AVPlay reads the server's HLS master with: the runtime's own
+ * picture and display answers (HDR refined by the set), and the narrower audio set
+ * AVPlay opens from an fMP4. */
+export function avplayHlsCapabilities(runtime?: PlaybackCapabilities): PlaybackCapabilities {
+  return runtime ? { ...runtime, audio: AVPLAY_HLS_AUDIO } : AVPLAY_HLS_CAPS;
+}
 
 /** mpv on the desktop shell: ffmpeg's own decoders behind whatever the box
  * accelerates, so a profile no silicon takes falls to software rather than to a

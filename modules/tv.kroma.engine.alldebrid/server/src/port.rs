@@ -2,6 +2,8 @@
 //! `alldebrid`. Every call carries the client it is for; this process holds no
 //! record of which of the operator's clients it is serving.
 
+use std::time::Duration;
+
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::post;
@@ -12,6 +14,8 @@ use kroma_module_sdk::host::{port_reply, run_blocking, HostCtx};
 
 use crate::settings::CacheSettings;
 use crate::{AllDebrid, ClientDef, DATA_DIR};
+
+const DEFAULT_BUDGET_MS: u64 = 20_000;
 
 pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
@@ -76,7 +80,9 @@ struct Args {
     magnet_or_url: String,
     client_ref: String,
     delete_data: bool,
+    discard: bool,
     candidates: Vec<InstantCandidate>,
+    budget_ms: Option<u64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -87,9 +93,15 @@ struct InstantCandidate {
 }
 
 #[derive(Debug, Serialize)]
-struct InstantReply {
+struct InstantHit {
     key: String,
     client_ref: String,
+}
+
+#[derive(Debug, Serialize)]
+struct InstantReply {
+    peerless: bool,
+    hit: Option<InstantHit>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -182,7 +194,7 @@ fn wire(s: crate::TorrentStatus) -> Status {
 async fn instant<S: HostCtx + Clone + Send + Sync + 'static>(
     State(host): State<S>,
     Json(call): Json<Call>,
-) -> Json<Result<Option<InstantReply>, String>> {
+) -> Json<Result<InstantReply, String>> {
     port_reply(move || {
         let candidates: Vec<crate::Candidate> = call
             .args
@@ -193,12 +205,16 @@ async fn instant<S: HostCtx + Clone + Send + Sync + 'static>(
                 magnet_or_url: c.magnet_or_url,
             })
             .collect();
-        Ok(engine(&host, &call.client)?
-            .instant(&candidates)?
-            .map(|found| InstantReply {
-                key: found.key,
-                client_ref: found.client_ref,
-            }))
+        let budget = Duration::from_millis(call.args.budget_ms.unwrap_or(DEFAULT_BUDGET_MS));
+        Ok(InstantReply {
+            peerless: true,
+            hit: engine(&host, &call.client)?
+                .instant(&candidates, budget)?
+                .map(|found| InstantHit {
+                    key: found.key,
+                    client_ref: found.client_ref,
+                }),
+        })
     })
     .await
 }
@@ -229,7 +245,11 @@ async fn remove<S: HostCtx + Clone + Send + Sync + 'static>(
     Json(call): Json<Call>,
 ) -> Json<Result<(), String>> {
     port_reply(move || {
-        engine(&host, &call.client)?.remove(&call.args.client_ref, call.args.delete_data)
+        engine(&host, &call.client)?.remove(
+            &call.args.client_ref,
+            call.args.delete_data,
+            call.args.discard,
+        )
     })
     .await
 }

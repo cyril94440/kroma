@@ -55,6 +55,6 @@ for p in https tls crypto udp rtp rtmp; do
 done
 run encode-eac3 $F/ffmpeg -y -hide_banner -f lavfi -i sine=d=1 -c:a eac3 -b:a 384k e.mka
 run encode-ac3 $F/ffmpeg -y -hide_banner -f lavfi -i sine=d=1 -c:a ac3 -b:a 384k a.mka
-run file-whitelist-refuses-http sh -c "! $F/ffmpeg -hide_banner -protocol_whitelist file -i http://127.0.0.1:9/a.mkv -f null - 2>&1 | grep -qv 'not on whitelist'"
+run file-whitelist-refuses-http sh -c "$F/ffmpeg -hide_banner -protocol_whitelist file -i http://127.0.0.1:9/a.mkv -f null - 2>&1 | grep -q 'not on whitelist'"
 echo "ok=$ok bad=$bad"
 [ "$bad" -eq 0 ]
