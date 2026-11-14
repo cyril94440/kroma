@@ -96,3 +96,17 @@ fn the_acquisition_modules_reasons_map_onto_the_ones_clients_know() {
     assert_eq!(reason_of(Why::NoRelease), Reason::NoRelease);
     assert_eq!(reason_of(Why::Other), Reason::NoEngine);
 }
+
+#[test]
+fn a_title_nobody_holds_any_more_leaves_the_map_the_next_time_one_is_asked_for() {
+    let flights = Flights::default();
+    for n in 0..50 {
+        drop(flights.lock_for(&format!("title-{n}")));
+    }
+    let kept = flights.lock_for("kept");
+
+    let _ = flights.lock_for("another");
+
+    assert_eq!(flights.held(), 2, "only the held lock and the one just asked for remain");
+    drop(kept);
+}

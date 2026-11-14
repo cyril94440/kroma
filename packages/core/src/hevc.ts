@@ -5,5 +5,6 @@ export * from './hevc/delivered-picture';
 export * from './hevc/directplay';
 export * from './hevc/dolby-vision';
 export * from './hevc/engine';
+export * from './hevc/hdr-support';
 export * from './hevc/runtime-caps';
 export * from './hevc/stream-notice';

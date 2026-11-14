@@ -199,6 +199,7 @@ fn run_rss<S: HostStorage>(host: &S) -> anyhow::Result<()> {
 fn run_import<S: HostStorage>(host: &S) -> anyhow::Result<()> {
     let log = |l: String| tracing::info!(target: "acquisition", "{l}");
     import::import_pass(host, &log)?;
+    watch_now::reconcile(host, &log)?;
     failures::failure_pass(host, &log)?;
     Ok(())
 }

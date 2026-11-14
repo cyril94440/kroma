@@ -14,6 +14,10 @@ use kroma_primitives::remote_file;
 use crate::domain::naming;
 use crate::model::{MediaFile, MediaItem, Show};
 
+mod stub;
+
+use stub::{named_as, readable_stub};
+
 use super::ids::{detect_edition, short_hash};
 use super::index::index_parsed;
 use super::now_iso8601;
@@ -194,50 +198,6 @@ pub(super) fn index_file(
     );
 }
 
-struct StubFacts {
-    container: String,
-    size: u64,
-}
-
-// A stub the library cannot index is skipped with a warning: one that is not
-// readable, or whose original name is not a video container, stands for nothing
-// a player could open.
-fn readable_stub(path: &Path) -> Option<StubFacts> {
-    let stub = match remote_file::read(path) {
-        Ok(stub) => stub,
-        Err(error) => {
-            warn!(file = %path.display(), %error, "skipping a remote file stub that cannot be read");
-            return None;
-        }
-    };
-    let Some(container) = stub.container() else {
-        warn!(file = %path.display(), name = %stub.name, "skipping a remote file stub that names no video container");
-        return None;
-    };
-    Some(StubFacts {
-        container,
-        size: stub.size,
-    })
-}
-
-// The path the title is read off: a stub is named like the video it stands for,
-// so `Film (2020).kremote` parses as `Film (2020)`, and so does
-// `Film (2020).mkv.kremote`.
-fn named_as(path: &Path) -> PathBuf {
-    if !remote_file::is_remote_file(path) {
-        return path.to_path_buf();
-    }
-    let inner = path.with_extension("");
-    if has_video_extension(&inner) {
-        inner
-    } else {
-        path.to_path_buf()
-    }
-}
-
-// jwalk `process_read_dir` body: prune Synology/hidden dirs and already-visited
-// symlink targets from the descent, and stat each file *in the walk's thread
-// pool* (so the SMB round-trips overlap).
 fn prepare_children(
     descended: &Mutex<HashSet<PathBuf>>,
     children: &mut Vec<jwalk::Result<jwalk::DirEntry<((), FileMeta)>>>,

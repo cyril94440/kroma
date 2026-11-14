@@ -80,6 +80,7 @@ pub(in crate::hls) fn fake_session(
         opener: opener.map(str::to_owned),
         superseded: std::sync::atomic::AtomicBool::new(false),
         _cpu: None,
+        _input: crate::input::MediaInput::Local(std::path::PathBuf::new()),
     })
 }
 

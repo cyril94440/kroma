@@ -22,7 +22,7 @@ pub enum Why {
     NoRelease,
 }
 
-/// The release that was imported, as the core needs it to read the file back
+/// The release that was placed, as the core needs it to read the file back
 /// against what it was promised to be.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Release {
@@ -31,6 +31,8 @@ pub struct Release {
     pub claimed_height: Option<u32>,
 }
 
+/// A placed release awaiting the core's verdict: `paths` are the files this
+/// call wrote and no others, and nothing is announced until `watch-now-confirm`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Imported {
     pub request_id: String,
@@ -47,22 +49,28 @@ pub enum Reply {
     Requested {
         request_id: String,
     },
+    Present {
+        request_id: Option<String>,
+    },
     Unavailable {
         reason: Why,
         request_id: Option<String>,
     },
 }
 
-/// A file the core read back and found not to be what its release promised.
+/// The core read the file back and found it not to be what its release
+/// promised. Only the download is named: what is undone is what this module
+/// recorded for it, never anything the caller lists.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct Rejection {
     pub download_id: String,
-    pub release_title: String,
-    pub kind: String,
-    pub tmdb_id: u64,
     pub reason: String,
-    pub paths: Vec<String>,
-    pub request_id: Option<String>,
-    pub season: Option<u32>,
+}
+
+/// The core read the file back and it is what its release promised.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct Confirmation {
+    pub download_id: String,
 }

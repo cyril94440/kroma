@@ -91,7 +91,13 @@ impl Flights {
             .0
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        map.retain(|_, lock| Arc::strong_count(lock) > 1);
         map.entry(key.to_string()).or_default().clone()
+    }
+
+    #[cfg(test)]
+    fn held(&self) -> usize {
+        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).len()
     }
 }
 

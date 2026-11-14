@@ -220,7 +220,9 @@ async fn a_host_that_drops_the_connection_ends_the_body_short_rather_than_foreve
     let (status, _, body) = p.fetch(&p.stream(), &[]).await;
 
     assert_eq!(status, StatusCode::OK);
+    assert!(body.len() >= 100_000, "everything the host sent before it dropped arrived: {}", body.len());
     assert!(body.len() < p.bytes.len(), "{} of {}", body.len(), p.bytes.len());
+    assert_eq!(body, &p.bytes[..body.len()], "what arrived is the start of the file, in order");
 }
 
 #[tokio::test]
@@ -236,127 +238,5 @@ async fn a_host_that_refuses_the_range_is_a_translated_502() {
     assert!(!said.to_string().contains("hunter2"));
 }
 
-#[tokio::test]
-async fn a_cached_copy_is_served_from_the_disk_and_the_host_is_left_alone() {
-    let p = bytes_playground().await;
-    p.fake.answers_path(&p.held_copy(), p.bytes.len() as u64);
-
-    let (status, headers, body) = p.fetch(&p.stream(), &[("range", "bytes=100-199")]).await;
-
-    assert_eq!(status, StatusCode::PARTIAL_CONTENT);
-    assert_eq!(headers["content-range"], format!("bytes 100-199/{}", p.bytes.len()));
-    assert_eq!(body, &p.bytes[100..200]);
-    assert!(p.stubbed.cdn.heard().is_empty());
-}
-
-#[tokio::test]
-async fn a_copy_outside_the_sources_own_folders_is_refused() {
-    let p = bytes_playground().await;
-    p.fake.answers_path(&p.real, p.bytes.len() as u64);
-
-    let (status, _, body) = p.fetch(&p.stream(), &[]).await;
-
-    assert_eq!(status, StatusCode::BAD_GATEWAY);
-    let said: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(said["code"], "error.sourceRefused");
-}
-
-#[tokio::test]
-async fn a_copy_of_the_wrong_length_is_refused() {
-    let p = bytes_playground().await;
-    let copy = p.held_copy();
-    std::fs::write(&copy, &p.bytes[..1000]).unwrap();
-    p.fake.answers_path(&copy, p.bytes.len() as u64);
-
-    let (status, _, _) = p.fetch(&p.stream(), &[]).await;
-
-    assert_eq!(status, StatusCode::BAD_GATEWAY);
-}
-
-#[tokio::test]
-async fn a_source_that_has_lost_the_file_is_a_translated_error_not_a_500() {
-    let p = bytes_playground().await;
-    p.fake.answers_error("the magnet no longer has Movie.mkv");
-
-    let (status, _, body) = p.fetch(&p.stream(), &[]).await;
-
-    assert_eq!(status, StatusCode::BAD_GATEWAY);
-    let said: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(said["code"], "error.sourceGone");
-    assert_ne!(said["error"], "error.sourceGone", "the message is the catalog's, not the key");
-    assert!(!said["error"].as_str().unwrap().contains("magnet"), "the module's own words stay in the log");
-}
-
-#[tokio::test]
-async fn a_stub_whose_source_no_module_answers_for_is_a_503() {
-    let p = bytes_playground().await;
-    std::fs::write(
-        &p.stubbed.abs,
-        serde_json::json!({ "source": "ghost", "ref": "r", "name": "a.mp4", "size": p.bytes.len() }).to_string(),
-    )
-    .unwrap();
-
-    let (status, _, body) = p.fetch(&p.stream(), &[]).await;
-
-    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-    let said: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(said["code"], "error.sourceDisabled");
-}
-
-#[tokio::test]
-async fn hls_remuxes_a_stub_from_the_url_and_serves_its_segments() {
-    let p = clip_playground().await;
-    probe(&p.t, &p.stubbed).await.unwrap();
-    let master = format!("/api/items/{}/hls/copy/0/0/index.m3u8", p.stubbed.item);
-
-    let (status, _, playlist) = p.fetch(&master, &[]).await;
-
-    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&playlist));
-    let playlist = String::from_utf8(playlist).unwrap();
-    assert!(playlist.contains("#EXT-X-TARGETDURATION"), "{playlist}");
-    let base = format!("/api/items/{}/hls/copy/0/0", p.stubbed.item);
-    let (status, _, init) = p.fetch(&format!("{base}/init.mp4"), &[]).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(&init[4..8], b"ftyp");
-    let (status, _, segment) = p.fetch(&format!("{base}/seg_00000.m4s"), &[]).await;
-    assert_eq!(status, StatusCode::OK);
-    assert!(!segment.is_empty());
-    assert!(p.stubbed.cdn.heard().iter().any(|r| r.range.is_some()));
-}
-
-#[tokio::test]
-async fn hls_of_a_stub_whose_source_is_down_is_a_translated_502() {
-    let p = clip_playground().await;
-    probe(&p.t, &p.stubbed).await.unwrap();
-    p.fake.answers_error("down");
-
-    let (status, _, body) = p.fetch(&format!("/api/items/{}/hls/copy/0/0/index.m3u8", p.stubbed.item), &[]).await;
-
-    assert_eq!(status, StatusCode::BAD_GATEWAY);
-    let said: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(said["code"], "error.sourceGone");
-}
-
-#[tokio::test]
-async fn a_stub_is_downloaded_as_a_remuxed_mp4_read_from_the_url() {
-    let p = clip_playground().await;
-    probe(&p.t, &p.stubbed).await.unwrap();
-
-    let (status, _, body) = p.fetch(&format!("/api/items/{}/download", p.stubbed.item), &[]).await;
-
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(&body[4..8], b"ftyp");
-}
-
-#[tokio::test]
-async fn a_scrub_sheet_waits_for_a_local_copy_and_is_never_drawn_over_the_network() {
-    let p = clip_playground().await;
-    probe(&p.t, &p.stubbed).await.unwrap();
-    let uri = format!("/api/items/{}/storyboard", p.stubbed.item);
-    let read_so_far = p.stubbed.cdn.heard().len();
-
-    let (status, _, _) = p.fetch(&uri, &[]).await;
-
-    assert_eq!(status, StatusCode::NOT_FOUND);
-    assert_eq!(p.stubbed.cdn.heard().len(), read_so_far, "nothing was read for a sheet");
-}
+mod derived;
+mod sources;

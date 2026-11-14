@@ -24,20 +24,6 @@ pub(super) fn retire_with_subtitles(host: &dyn HostCtx, video: &Path) -> std::io
     retire(host, video)
 }
 
-/// Deletes a file and the subtitles beside it, whatever the recycle bin says:
-/// what it removes was never the viewer's to keep.
-pub(super) fn delete_with_subtitles(video: &Path) -> usize {
-    let mut removed = 0;
-    for path in subtitles_of(video).into_iter().chain([video.to_path_buf()]) {
-        match std::fs::remove_file(&path) {
-            Ok(()) => removed += 1,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => tracing::warn!(file = %path.display(), "a rejected file stayed behind: {e}"),
-        }
-    }
-    removed
-}
-
 fn subtitles_of(video: &Path) -> Vec<PathBuf> {
     let folder = video.parent().unwrap_or_else(|| Path::new("."));
     let siblings: Vec<PathBuf> = std::fs::read_dir(folder)

@@ -221,4 +221,12 @@ pub fn finalize_placed<S: HostStorage>(state: &S, row: &DownloadRow, paths: &[St
 }
 
 #[cfg(test)]
+pub(crate) fn hold_for_test<'a>(
+    store: &'a kroma_module_sdk::db::Pool,
+    download_id: &str,
+) -> impl Drop + 'a {
+    claim::Claim::take(store, download_id).expect("a free claim")
+}
+
+#[cfg(test)]
 mod tests;

@@ -216,3 +216,20 @@ async fn a_seek_into_a_url_starts_on_a_keyframe_read_over_the_network() {
 
     assert!((start - 3.0).abs() < 0.1, "{start}");
 }
+
+#[tokio::test]
+async fn a_session_keeps_the_grant_of_its_input_for_as_long_as_ffmpeg_reads_it() {
+    let dir = kroma_testing::temp_dir("hls-grant-held");
+    let clip = kroma_testing::clip(dir.path());
+    let server = kroma_testing::RangedServer::serve(&clip);
+    let grant = std::sync::Arc::new(());
+    let relayed = kroma_primitives::input::Relayed::new(server.port(), "secret", "grant", "mp4", grant.clone())
+        .expect("plain tokens");
+    let input = MediaInput::Remote(relayed);
+    let engine = engine(dir.path());
+    engine.master(asked(&input, 0)).await.expect("a playlist");
+
+    drop(input);
+
+    assert_eq!(std::sync::Arc::strong_count(&grant), 2, "the running session still holds the grant");
+}

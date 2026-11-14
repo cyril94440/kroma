@@ -147,9 +147,27 @@ the module `POST /_port/source/locate` with `{ "ref", "warm" }`. The answer is a
 local `path` to a complete copy, or a short-lived `https` `url`. The core never
 learns what the module is or where the bytes come from; it vets the answer (an
 `https` URL on a public host the module declared, a path inside the module's own
-data directories and as long as the stub says) and hands the resulting input to
-ffmpeg or to the relay behind `GET /items/{id}/stream`. See
-[`modules/README.md`](../modules/README.md#holding-a-title-for-the-core-source)
+data directories and as long as the stub says).
+
+Only an **official** module (one the official registry shipped, see
+[`module-registries.md`](module-registries.md)) is asked: a module installed from
+anywhere else that contributes `source` is never called, so it cannot capture the
+stubs of another source by contributing the same instance id. Two official
+modules naming one instance id are both refused, with a log line, rather than
+one of them winning. A stub is untrusted text too: it can name any contribution,
+so it is only ever resolved by that rule.
+
+The core reads a URL answer itself, over its own relay, and never hands the URL
+to ffmpeg: direct play (`GET /items/{id}/stream`) relays ranges, and ffmpeg and
+ffprobe read the title from a loopback address of this server (`127.0.0.1`, a
+separate listener, `http` and `tcp` only) that serves the stub through the same
+relay, with the same network policy, address checks and journal. The address
+carries a per-process secret and a grant for that one stub that lasts as long as
+the session reading it. An ffmpeg built without the `http` protocol (the
+Synology and Docker builds enable `http` and `tcp` only, never `https`) reads a
+title only once its local copy exists; until then direct play works, and a probe
+asks the source to cache the title (a few at a time) and runs once the copy
+lands.
 for the contract and the rules a module must meet.
 
 ## The rule that keeps the core ignorant

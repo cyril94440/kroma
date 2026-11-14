@@ -141,6 +141,24 @@ fn a_setting_destination_allows_the_hosts_its_urls_name_and_no_other() {
 }
 
 #[test]
+fn a_title_host_named_by_a_setting_destination_is_declared_and_no_other_is() {
+    let block = json!({ "net": { "connect": [{ "purpose": "debrid-transfer", "to": ["setting:cdnUrl"] }] } });
+    let (network, pool) = network("permissions-declares-setting", Some(block));
+    network.settings.set_internal(&pool, "cdnUrl", json!("https://cdn.example.com/base")).unwrap();
+    let target = |host: &str| kroma_http::address::WebTarget { https: true, host: host.into(), port: 443 };
+
+    assert!(network.declares_connect(MODULE, &target("cdn.example.com")));
+    assert!(!network.declares_connect(MODULE, &target("other.example.com")));
+}
+
+#[test]
+fn a_module_with_no_permissions_block_declares_nothing_to_refuse() {
+    let (network, _pool) = network("permissions-declares-none", None);
+
+    assert!(network.declares_connect(MODULE, &kroma_http::address::WebTarget { https: true, host: "any.example".into(), port: 443 }));
+}
+
+#[test]
 fn the_refusal_the_module_reports_is_journaled_with_the_permission() {
     let (network, _pool) = network("permissions-journal", indexer_on_the_internet());
     let answer = NetworkPolicy::decide(&network, MODULE, &ask("peers", "tracker.example", 443));

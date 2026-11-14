@@ -53,7 +53,7 @@ fn ffmpeg_is_given_a_loopback_address_and_never_the_modules_url() {
         .map(|a| a.to_string_lossy().into_owned())
         .collect();
     let said = args.join(" ");
-    assert!(said.contains("-protocol_whitelist http,tcp"), "{said}");
+    assert!(said.contains("http,tcp") && !said.contains("https"), "{said}");
     assert!(said.contains("http://127.0.0.1:"), "{said}");
     assert!(!said.contains("example.com") && !said.contains("hunter2"), "{said}");
 }

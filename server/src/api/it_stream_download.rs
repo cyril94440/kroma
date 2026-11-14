@@ -79,7 +79,9 @@ struct Picture {
 fn picture_of(dir: &Path, body: &[u8]) -> Picture {
     let file: PathBuf = dir.join("downloaded.mp4");
     std::fs::write(&file, body).unwrap();
-    let probed = Command::new("ffprobe")
+    let mut command = Command::new("ffprobe");
+    input::without_proxies(&mut command);
+    let probed = command
         .args(["-v", "error", "-select_streams", "v:0", "-of", "json"])
         .args(["-show_entries", "stream=codec_name,pix_fmt,color_transfer"])
         .args(input::media(&file.into()))

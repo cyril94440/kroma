@@ -1,5 +1,5 @@
 use std::cell::Cell;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 const WIDEST_CALL_SECS: u32 = 30;
 
@@ -24,14 +24,10 @@ pub(crate) fn call_secs() -> u32 {
     })
 }
 
-pub(crate) fn left() -> Option<Duration> {
-    DEADLINE
-        .with(Cell::get)
-        .map(|deadline| deadline.saturating_duration_since(Instant::now()))
-}
-
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
     #[test]

@@ -28,16 +28,16 @@ pub struct FailureSummary {
 
 /// One download as this pass reads it from the shared ledger.
 #[derive(Debug, Clone)]
-struct Download {
-    id: String,
-    kind: String,
-    tmdb_id: u64,
-    season: Option<u32>,
-    episodes: Option<Vec<u32>>,
-    release_title: String,
+pub(crate) struct Download {
+    pub(crate) id: String,
+    pub(crate) kind: String,
+    pub(crate) tmdb_id: u64,
+    pub(crate) season: Option<u32>,
+    pub(crate) episodes: Option<Vec<u32>>,
+    pub(crate) release_title: String,
     info_hash: Option<String>,
     indexer_id: Option<String>,
-    status: String,
+    pub(crate) status: String,
     error: Option<String>,
     progress: f64,
     grabbed_at: i64,
@@ -52,7 +52,7 @@ impl Download {
         !matches!(self.status.as_str(), "failed" | "error" | "removed")
     }
 
-    fn unfinished(&self) -> bool {
+    pub(crate) fn unfinished(&self) -> bool {
         matches!(self.status.as_str(), "queued" | "downloading" | "paused")
     }
 
@@ -173,7 +173,7 @@ fn blocklist_once<S: HostStorage>(state: &S, d: &Download, now: i64) -> Result<b
     Ok(true)
 }
 
-fn read_downloads<S: HostStorage>(state: &S) -> Result<Vec<Download>> {
+pub(crate) fn read_downloads<S: HostStorage>(state: &S) -> Result<Vec<Download>> {
     let conn = state.db().get()?;
     let mut stmt = conn.prepare(
         "SELECT id, kind, tmdb_id, season, episodes, release_title, info_hash, indexer_id, \

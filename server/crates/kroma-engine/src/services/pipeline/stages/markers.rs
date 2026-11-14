@@ -74,8 +74,6 @@ fn season_signature(
     }
 }
 
-// An episode a source only streams is not part of the season until its copy
-// lands, and the season is signed again then, so the detection runs again.
 fn readable_now(state: &SharedState, abs: &str) -> bool {
     super::when_cached(state, abs, String::new()) != crate::db::pipeline::UNREADABLE_SIG
 }

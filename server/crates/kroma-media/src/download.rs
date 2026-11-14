@@ -145,7 +145,7 @@ mod tests {
             .collect();
 
         let at = |needle: &str| said.iter().position(|a| a == needle).unwrap();
-        assert!(at("-i") < at("0:v:0") && at("0:v:0") < at("pipe:1"));
+        assert!(at("/m/a.mkv") < at("0:v:0") && at("0:v:0") < at("pipe:1"));
         assert_eq!(said.last().map(String::as_str), Some("pipe:1"));
         assert!(said.contains(&"0:a:0?".to_string()), "{said:?}");
     }

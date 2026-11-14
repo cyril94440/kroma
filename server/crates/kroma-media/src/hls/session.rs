@@ -50,6 +50,7 @@ pub(super) struct Session {
     // session: for as long as it lives, background media passes are held to one
     // at a time (see [`crate::ffmpeg_gate`]).
     _cpu: Option<ffmpeg_gate::Reservation>,
+    _input: crate::input::MediaInput,
 }
 
 impl Session {
@@ -264,6 +265,7 @@ impl Sessions {
             opener: asked.opener.map(str::to_owned),
             superseded: AtomicBool::new(false),
             _cpu: on_the_cpu.then(ffmpeg_gate::reserve),
+            _input: input.clone(),
         });
         map.insert(key.to_string(), session.clone());
         Ok(session)

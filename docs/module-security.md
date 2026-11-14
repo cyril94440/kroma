@@ -121,6 +121,7 @@ what enforces it. See
 | `run` | `process` starts only what `run` names, for a first-party module |
 | `env` | only the declared variables exist |
 | `media` | `media.decode-audio` checks both paths against the module's folders, then runs the core's ffmpeg |
+| `source` (a point, not a permission) | only an official module is asked where a stub's bytes are, and two official modules with one instance id are both refused; a path answer must sit in the module's own data folders and be opened without following a link, and a URL answer must be `https` on a host the module declared, and is fetched by the core's relay (network policy, public addresses only, no redirect, journaled), never by ffmpeg: ffmpeg reads a title from the loopback relay behind a per-process secret and a grant for that one stub, with the proxy variables removed |
 | `storage` | the host holds both databases, the module's own in a folder no module holds; the component has no SQLite |
 | `settings` | the host API answers only a declared key, and never one the core keeps |
 | `config` | the host API answers only the caller's own declared `config` fields |

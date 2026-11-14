@@ -13,6 +13,7 @@ pub fn acqsearch_routes<S: HostStorage + Clone + Send + Sync + 'static>() -> Rou
         .route("/_port/acquisition/search-now", post(search_now_h::<S>))
         .route("/_port/acquisition/grab", post(grab_h::<S>))
         .route("/_port/acquisition/watch-now", post(watch_now_h::<S>))
+        .route("/_port/acquisition/watch-now-confirm", post(watch_now_confirm_h::<S>))
         .route("/_port/acquisition/watch-now-reject", post(watch_now_reject_h::<S>))
         .route("/_port/acquisition/watch-now-capable", post(watch_now_capable_h::<S>))
 }
@@ -22,6 +23,13 @@ async fn watch_now_h<S: HostStorage + Clone + Send + Sync + 'static>(
     Json(ask): Json<crate::watch_now::Ask>,
 ) -> Json<Result<crate::watch_now::Reply, String>> {
     port_reply(move || crate::watch_now::watch_now(&host, &ask)).await
+}
+
+async fn watch_now_confirm_h<S: HostStorage + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+    Json(confirmation): Json<crate::watch_now::Confirmation>,
+) -> Json<Result<bool, String>> {
+    port_reply(move || crate::watch_now::confirm(&host, &confirmation)).await
 }
 
 async fn watch_now_reject_h<S: HostStorage + Clone + Send + Sync + 'static>(

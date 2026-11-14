@@ -193,8 +193,6 @@ fn wait_while_idle(ctx: &JobContext, paused: &AtomicBool) {
     }
 }
 
-// An episode a source only streams is left out of a season's detection until it
-// has a complete local copy: both passes read the whole file.
 fn has_whole_file(ctx: &JobContext, episode: &MediaItem) -> bool {
     episode
         .abs_path
