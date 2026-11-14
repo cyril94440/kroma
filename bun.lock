@@ -472,6 +472,25 @@
         "react": "^19.3.0",
       },
     },
+    "modules/tv.kroma.live": {
+      "name": "@kromatv/module-live",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kromatv/client": "workspace:*",
+        "@kromatv/module-sdk": "workspace:*",
+        "@kromatv/ui": "workspace:*",
+        "@tanstack/react-query": "^5.104.5",
+        "hls.js": "^1.7.3",
+        "zod": "^4.6.7",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "typescript": "^7.0.2",
+      },
+      "peerDependencies": {
+        "react": "^19.3.0",
+      },
+    },
     "modules/tv.kroma.party": {
       "name": "@kromatv/module-party",
       "version": "0.0.0",
@@ -1744,6 +1763,8 @@
     "@kromatv/module-acquisition": ["@kromatv/module-acquisition@workspace:modules/tv.kroma.acquisition"],
 
     "@kromatv/module-indexer": ["@kromatv/module-indexer@workspace:modules/tv.kroma.indexer"],
+
+    "@kromatv/module-live": ["@kromatv/module-live@workspace:modules/tv.kroma.live"],
 
     "@kromatv/module-party": ["@kromatv/module-party@workspace:modules/tv.kroma.party"],
 

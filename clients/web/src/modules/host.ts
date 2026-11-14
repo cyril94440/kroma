@@ -3,6 +3,7 @@
 
 import type { KromaClient } from '@kromatv/client';
 import { hasPermission } from '@kromatv/client/accounts';
+import { ModuleId } from '@kromatv/client/modules';
 import type { MessageKey, TVars } from '@kromatv/i18n';
 import type { HostBase, KromaHost, ModuleManifest } from '@kromatv/module-sdk';
 import { useLocale, useT } from '@kromatv/ui';
