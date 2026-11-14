@@ -28,3 +28,5 @@ export type { HeldSeekTransport } from './seek-hold';
 export { useHeldSeek } from './seek-hold';
 export type { TrailerState } from './trailer-preparation';
 export { useTrailerPreparation } from './trailer-preparation';
+export type { TitleWatchNow, WatchedTitle, WatchNowOptions, WatchNowState } from './watch-now';
+export { useWatchNow } from './watch-now';

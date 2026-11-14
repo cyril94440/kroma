@@ -118,4 +118,8 @@ pub struct DiscoverDetail {
     // Next air date (`YYYY-MM-DD`): a show's next episode, or a movie's soonest
     // availability. `None` when nothing is upcoming.
     pub next_air_date: Option<String>,
+    // True only for a viewer who may skip the queue, on a server whose download
+    // client can fetch at once, for a title the library does not hold.
+    #[serde(default)]
+    pub watch_now: bool,
 }

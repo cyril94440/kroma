@@ -132,6 +132,12 @@ pub fn test_app_with_tmdb() -> TestApp {
     build_app(Some("test-tmdb-key"), &[], None)
 }
 
+/// Like [`test_app_with_tmdb`] but with `contributions` answering the points a
+/// test stands modules up behind.
+pub fn test_app_with_contributions(contributions: kroma_engine::state::Contributions) -> TestApp {
+    build_app_wired(Some("test-tmdb-key"), &[], |_| (), contributions)
+}
+
 /// Like [`test_app`] but with a built web SPA on the same origin, as the
 /// single-binary deploy has. `files` are written verbatim under the served
 /// directory; `_shell.html` is the client-side-routing fallback.

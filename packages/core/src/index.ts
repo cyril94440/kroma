@@ -34,3 +34,4 @@ export * from './push-labels';
 export * from './slug';
 export * from './subtitles';
 export * from './trailer';
+export * from './watch-now';

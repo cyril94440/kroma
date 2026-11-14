@@ -19,6 +19,14 @@ pub(super) fn sync_files(
         .collect();
 
     delete_gone_files(tx, &scanned)?;
+    upsert_files(tx, items, mtimes)
+}
+
+pub(super) fn upsert_files(
+    tx: &rusqlite::Transaction,
+    items: &[MediaItem],
+    mtimes: &HashMap<String, Option<i64>>,
+) -> Result<()> {
     let prev = existing_file_sigs(tx)?;
 
     let mut keep_stmt = tx.prepare(

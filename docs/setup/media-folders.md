@@ -89,6 +89,7 @@ and organize files for you.
 | Browsing and playing your files | Read |
 | Subtitles and artwork | Read: KROMA keeps them in its own data folder |
 | The **Acquisition** module, which downloads requested titles, moves them into your libraries and renames them | Read and write |
+| **Watch now** with a debrid service such as AllDebrid, which starts a title you do not have within seconds | Read and write: it places small placeholder files, not videos, in your library |
 
 KROMA's own data, such as its database, posters, and downloads in progress, is
 in its data folder, which always needs read and write access. Keep it apart

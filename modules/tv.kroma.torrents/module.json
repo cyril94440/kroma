@@ -48,7 +48,15 @@
     },
     {
       "name": "grab",
-      "methods": ["grab", "list-files", "gate-open", "activate", "drop-data", "grab-instant", "instant-capable"]
+      "methods": [
+        "grab",
+        "list-files",
+        "gate-open",
+        "activate",
+        "drop-data",
+        "grab-instant",
+        "instant-capable"
+      ]
     },
     {
       "name": "db",

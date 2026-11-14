@@ -46,5 +46,10 @@
   "discover.trendingShows": "Séries tendance",
   "discover.upcomingMovies": "Films à venir",
   "discover.upcomingShows": "Séries en cours de diffusion",
-  "discover.viewInLibrary": "Voir dans la bibliothèque"
+  "discover.viewInLibrary": "Voir dans la bibliothèque",
+  "discover.watchNow": "Regarder maintenant",
+  "discover.watchNowEpisode": "Regarder cet épisode maintenant",
+  "discover.watchNowError": "La connexion a été coupée. Réessayez : si le titre est prêt, il s'ouvre aussitôt.",
+  "discover.watchNowRequested": "Demandé. Nous vous préviendrons dès qu'il sera disponible.",
+  "discover.watchNowSearching": "Recherche de la meilleure copie"
 }

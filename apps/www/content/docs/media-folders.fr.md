@@ -95,6 +95,7 @@ qui téléchargent et rangent des fichiers pour vous.
 | Parcourir et lire vos fichiers | Lecture |
 | Sous-titres et illustrations | Lecture : KROMA les garde dans son propre dossier de données |
 | Le module **Acquisition**, qui télécharge les titres demandés, les déplace dans vos bibliothèques et les renomme | Lecture et écriture |
+| **Regarder maintenant** avec un service de débrid comme AllDebrid, qui lance en quelques secondes un titre que vous n'avez pas | Lecture et écriture : il dépose dans votre bibliothèque de petits fichiers de remplacement, pas des vidéos |
 
 Les données propres à KROMA, comme sa base de données, les affiches et les
 téléchargements en cours, se trouvent dans son dossier de données. Ce dossier a

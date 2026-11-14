@@ -167,6 +167,7 @@ pub fn flag_detail(
         request_progress,
         air_status,
         next_air_date,
+        watch_now: false,
     })
 }
 

@@ -111,4 +111,34 @@ describe('buildTitleView: discover source (not owned)', () => {
     const v = build({ source: 'discover', detail: baseDetail as never }, null);
     expect(v.canRequest).toBe(false);
   });
+
+  describe('watch now', () => {
+    const offered = { ...baseDetail, watchNow: true };
+    const auto = { ...requester, permissions: ['requests.create', 'requests.auto'] };
+
+    it('is offered when the server says so and the viewer skips the queue', () => {
+      const v = build({ source: 'discover', detail: offered as never }, auto as never);
+      expect(v.watchNow).toBe(true);
+    });
+
+    it('is not offered when the server does not say so', () => {
+      const v = build({ source: 'discover', detail: baseDetail as never }, auto as never);
+      expect(v.watchNow).toBe(false);
+    });
+
+    it('is not offered to a viewer who needs a moderator or is not signed in', () => {
+      const plain = { ...requester, permissions: ['requests.create'] };
+      expect(build({ source: 'discover', detail: offered as never }, plain as never).watchNow).toBe(
+        false,
+      );
+      expect(build({ source: 'discover', detail: offered as never }, null).watchNow).toBe(false);
+    });
+
+    it('is not offered for a title with no TMDB id', () => {
+      const detail = { ...offered, tmdbId: null };
+      expect(build({ source: 'discover', detail: detail as never }, auto as never).watchNow).toBe(
+        false,
+      );
+    });
+  });
 });

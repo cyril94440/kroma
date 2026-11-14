@@ -1,6 +1,7 @@
 import { tmdbKindOf } from '@kromatv/client/discovery';
 import type { ItemId, SubjectId } from '@kromatv/client/media';
 import { formatRuntime } from '@kromatv/core';
+import type { TitleWatchNowState } from '#web/features/catalog/use-title-watch-now';
 import { useT } from '@kromatv/ui';
 import { Button, type HostElement } from '@kromatv/ui/kit';
 import {
@@ -14,6 +15,7 @@ import {
 import { FollowState } from '#web/features/catalog/follow-state';
 import { ReportDialog } from '#web/features/catalog/report-dialog';
 import { TrailerButton } from '#web/features/catalog/trailer-button';
+import { WatchNowCta, watchNowSettled } from '#web/features/catalog/watch-now-cta';
 import { savedTitleId } from '#web/shared/lib/saved-title-id';
 import { type TitleView, tmdbMetaLine } from '#web/shared/lib/titleView';
 import { RequestStatusChip } from '#web/shared/ui/request-status-chip';
@@ -30,6 +32,7 @@ export function TitleHero({
   toggleList,
   onPlay,
   onRequest,
+  watchNow,
   back,
 }: Readonly<{
   view: TitleView;
@@ -43,6 +46,7 @@ export function TitleHero({
   toggleList: (id: SubjectId) => void;
   onPlay: (id: ItemId) => void;
   onRequest: () => void;
+  watchNow: TitleWatchNowState;
   back: HostElement;
 }>) {
   const t = useT();
@@ -90,7 +94,9 @@ export function TitleHero({
       inList={listState.inList}
       onToggleList={listState.onToggleList}
       primaryAction={
-        owned ? undefined : <RequestCta view={view} busy={busy} onRequest={onRequest} />
+        owned ? undefined : (
+          <TitleActions view={view} busy={busy} onRequest={onRequest} watchNow={watchNow} />
+        )
       }
       trailerAction={
         view.tmdbId == null ? null : (
@@ -116,11 +122,45 @@ export function TitleHero({
   );
 }
 
+function TitleActions({
+  view,
+  busy,
+  onRequest,
+  watchNow,
+}: Readonly<{
+  view: TitleView;
+  busy: boolean;
+  onRequest: () => void;
+  watchNow: TitleWatchNowState;
+}>) {
+  if (!watchNow.offered) return <RequestCta view={view} busy={busy} onRequest={onRequest} />;
+  return (
+    <>
+      <WatchNowCta state={watchNow.state} onWatch={() => watchNow.watch(firstEpisode(view))} />
+      {watchNowSettled(watchNow.state) ? null : (
+        <RequestCta view={view} busy={busy} onRequest={onRequest} variant="outline" />
+      )}
+    </>
+  );
+}
+
+function firstEpisode(view: TitleView) {
+  if (view.kind !== 'show') return undefined;
+  const season = view.seasons.find((s) => s.number > 0) ?? view.seasons[0];
+  return { season: season?.number ?? 1, episode: 1 };
+}
+
 function RequestCta({
   view,
   busy,
   onRequest,
-}: Readonly<{ view: TitleView; busy: boolean; onRequest: () => void }>) {
+  variant,
+}: Readonly<{
+  view: TitleView;
+  busy: boolean;
+  onRequest: () => void;
+  variant?: 'outline';
+}>) {
   const t = useT();
   if (view.requestStatus && view.requestStatus !== 'denied') {
     return (
@@ -134,6 +174,7 @@ function RequestCta({
       label={view.kind === 'show' ? t('discover.requestShow') : t('discover.request')}
       onPress={onRequest}
       loading={busy}
+      variant={variant}
     />
   );
 }

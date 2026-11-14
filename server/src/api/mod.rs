@@ -178,6 +178,8 @@ mod it_updates;
 #[cfg(test)]
 mod it_verify_email;
 #[cfg(test)]
+mod it_watch_now;
+#[cfg(test)]
 pub(crate) mod test_support;
 
 use std::sync::Arc;

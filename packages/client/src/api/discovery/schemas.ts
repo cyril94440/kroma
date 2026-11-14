@@ -59,6 +59,7 @@ export const DiscoverDetail = DiscoverEntry.extend({
   similar: z.array(DiscoverEntry),
   airStatus: z.string().nullable(),
   nextAirDate: z.string().nullable(),
+  watchNow: z.boolean().default(false),
 });
 export type DiscoverDetail = z.infer<typeof DiscoverDetail>;
 
@@ -97,3 +98,32 @@ export const DiscoverResponse = z.object({
   totalPages: z.number(),
 });
 export type DiscoverResponse = z.infer<typeof DiscoverResponse>;
+
+/** Which episode of a show to watch now. A movie has none. */
+export const WatchNowEpisode = z.object({
+  season: z.number().int().positive(),
+  episode: z.number().int().positive(),
+});
+export type WatchNowEpisode = z.infer<typeof WatchNowEpisode>;
+
+/** `POST /api/discover/:kind/:tmdbId/watch-now`: the title is in the library
+ * (`ready`), was asked for and will arrive (`requested`), or cannot be fetched
+ * now (`unavailable`, with the server's own words for why). */
+export const WatchNowResult = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('ready'),
+    itemId: z.string(),
+    fileId: z.string().nullish(),
+  }),
+  z.object({
+    status: z.literal('requested'),
+    requestId: z.string().nullish(),
+  }),
+  z.object({
+    status: z.literal('unavailable'),
+    reason: z.enum(['noEngine', 'noIndexer', 'noRelease']),
+    message: z.string(),
+    requestId: z.string().nullish(),
+  }),
+]);
+export type WatchNowResult = z.infer<typeof WatchNowResult>;

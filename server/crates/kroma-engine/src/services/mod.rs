@@ -36,6 +36,7 @@ pub mod subtitles;
 pub mod trailers;
 pub mod updates;
 pub mod upgrade_tasks;
+pub mod watch_now;
 
 pub use kroma_requests::lifecycle as requests;
 pub use kroma_requests::{monitoring, request_ledger};

@@ -23,6 +23,7 @@ pub mod search;
 mod serve;
 pub mod titles;
 pub mod upgrades;
+pub mod watch_now;
 
 pub use dtos::*;
 pub use serve::acqsearch_routes;

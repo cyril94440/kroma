@@ -7,6 +7,8 @@ import {
   DiscoverSeasonEpisodes,
   type DiscoverType,
   type TmdbKind,
+  type WatchNowEpisode,
+  WatchNowResult,
 } from './schemas';
 
 /** What a discovery listing asks for. `all` is the absence of a type filter and
@@ -59,6 +61,15 @@ export default function discoveryApi(ctx: RequestContext) {
      * (`movie` | `tv`); the response speaks the catalog's (`movie` | `show`). */
     detail: (kind: TmdbKind, tmdbId: number) =>
       ctx.get('/discover/:kind/:tmdbId', DiscoverDetail, { params: { kind, tmdbId } }),
+
+    /** Fetches a title the library does not hold and answers once it plays. One
+     * call can take half a minute, and asking twice for one title is safe: the
+     * second asker waits for the first. */
+    watchNow: (kind: TmdbKind, tmdbId: number, episode?: WatchNowEpisode) =>
+      ctx.post('/discover/:kind/:tmdbId/watch-now', WatchNowResult, {
+        params: { kind, tmdbId },
+        body: episode ?? {},
+      }),
 
     season: (tmdbId: number, season: number) =>
       ctx.get('/discover/tv/:tmdbId/season/:season', DiscoverSeasonEpisodes, {

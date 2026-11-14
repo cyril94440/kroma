@@ -23,6 +23,17 @@ Only then does `status` report `completed`, and acquisition imports the stubs
 like the videos they stand for. A magnet that is ready stays on AllDebrid after
 the import, because the library streams from it.
 
+## Instant
+
+`POST /_port/tv.kroma.torrents/client/instant` takes `{ "candidates": [{ "key", "magnet_or_url" }] }`.
+At most eight are used: the magnets go up in one `magnet/upload` call, each `.torrent` link in a
+call of its own, and the first candidate in rank order that AllDebrid reports `ready` is kept and
+answered as `{ "key", "client_ref" }`. Every other upload, ready or not, is deleted again
+(`magnet/delete` takes one id, so one call each, spaced to stay under the documented 12 requests
+a second); a delete that fails is logged with the magnet id and never fails the call. A magnet
+this module already tracks is never deleted. An empty list answers `null` without calling
+AllDebrid.
+
 ## Streaming and the cache
 
 `POST /_port/source/locate` takes `{ "ref", "warm" }` and answers a local path

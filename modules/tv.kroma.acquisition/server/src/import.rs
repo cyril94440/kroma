@@ -24,6 +24,14 @@ mod subtitles;
 
 pub use recycle::empty_recycle_bin;
 
+/// Takes files this module placed out of the library again, with their subtitles.
+pub fn remove_placed(paths: &[String]) -> usize {
+    paths
+        .iter()
+        .map(|path| recycle::delete_with_subtitles(Path::new(path)))
+        .sum()
+}
+
 use content::{is_gone, is_held, largest, Content, FilesGone};
 use ledger::{until_it_lands, BUSY_BACKOFF};
 use naming::{episode_ctx, movie_ctx, resolve_meta, stem_of};

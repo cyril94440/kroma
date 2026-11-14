@@ -3,7 +3,7 @@
 
 # Requirement index
 
-551 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
+558 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
 
 ## ACCT - [accounts](accounts/)
 
@@ -450,6 +450,13 @@
 - **MOD-92** (AGREED) - A module is checked against the module interface the server implements, <sub>[README.md](modules/README.md)</sub>
 - **MOD-93** (AGREED) - `minServer` is the floor for a server capability the module needs. It is <sub>[README.md](modules/README.md)</sub>
 - **MOD-94** (SHIPPED) - The release process refuses to publish a module whose `minServer` <sub>[README.md](modules/README.md)</sub>
+- **MOD-95** (AGREED) - Watching now is offered only to someone whose request would have been <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-96** (AGREED) - Watching now chooses by quality first. It considers only the releases the <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-97** (AGREED) - A film is watched as itself. A show is watched one episode at a time: its <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-98** (AGREED) - A title nothing instant holds is not started as a slow download passed off <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-99** (AGREED) - What is played is the library's own item, with its history, resume and <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-100** (AGREED) - The file is read back before the title is called ready. A file that cannot <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-101** (AGREED) - A client that fetches at once leaves the account as it found it: every <sub>[acquisition.md](modules/acquisition.md)</sub>
 
 ## PLAY - [playback](playback/)
 

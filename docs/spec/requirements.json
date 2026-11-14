@@ -4280,6 +4280,76 @@
     "line": 94
   },
   {
+    "id": "MOD-95",
+    "domain": "MOD",
+    "space": "modules",
+    "number": 95,
+    "status": "AGREED",
+    "text": "Watching now is offered only to someone whose request would have been",
+    "file": "docs/spec/modules/acquisition.md",
+    "line": 161
+  },
+  {
+    "id": "MOD-96",
+    "domain": "MOD",
+    "space": "modules",
+    "number": 96,
+    "status": "AGREED",
+    "text": "Watching now chooses by quality first. It considers only the releases the",
+    "file": "docs/spec/modules/acquisition.md",
+    "line": 166
+  },
+  {
+    "id": "MOD-97",
+    "domain": "MOD",
+    "space": "modules",
+    "number": 97,
+    "status": "AGREED",
+    "text": "A film is watched as itself. A show is watched one episode at a time: its",
+    "file": "docs/spec/modules/acquisition.md",
+    "line": 170
+  },
+  {
+    "id": "MOD-98",
+    "domain": "MOD",
+    "space": "modules",
+    "number": 98,
+    "status": "AGREED",
+    "text": "A title nothing instant holds is not started as a slow download passed off",
+    "file": "docs/spec/modules/acquisition.md",
+    "line": 174
+  },
+  {
+    "id": "MOD-99",
+    "domain": "MOD",
+    "space": "modules",
+    "number": 99,
+    "status": "AGREED",
+    "text": "What is played is the library's own item, with its history, resume and",
+    "file": "docs/spec/modules/acquisition.md",
+    "line": 178
+  },
+  {
+    "id": "MOD-100",
+    "domain": "MOD",
+    "space": "modules",
+    "number": 100,
+    "status": "AGREED",
+    "text": "The file is read back before the title is called ready. A file that cannot",
+    "file": "docs/spec/modules/acquisition.md",
+    "line": 182
+  },
+  {
+    "id": "MOD-101",
+    "domain": "MOD",
+    "space": "modules",
+    "number": 101,
+    "status": "AGREED",
+    "text": "A client that fetches at once leaves the account as it found it: every",
+    "file": "docs/spec/modules/acquisition.md",
+    "line": 188
+  },
+  {
     "id": "PLAY-1",
     "domain": "PLAY",
     "space": "playback",

@@ -67,7 +67,7 @@ Three manifest verbs, and every module may use all three:
 // tv.kroma.torrents — defines a point, and answers it itself
 "definesPoints": [
   { "name": "client",
-    "methods": ["test", "add", "status", "pause", "resume", "reannounce", "remove"] }
+    "methods": ["test", "add", "status", "pause", "resume", "reannounce", "remove", "instant"] }
 ],
 "contributes": [
   { "point": "tv.kroma.torrents/client", "id": "rqbit" }

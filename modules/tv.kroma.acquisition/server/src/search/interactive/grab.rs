@@ -69,7 +69,7 @@ pub fn replaces(verdict: Option<Verdict>) -> bool {
     !matches!(verdict, None | Some(Verdict::Fill))
 }
 
-fn resolve_grab_target<S: HostStorage>(state: &S, cached: &RememberedRelease) -> Result<String> {
+pub(crate) fn resolve_grab_target<S: HostStorage>(state: &S, cached: &RememberedRelease) -> Result<String> {
     let indexer = crate::peers::indexers::get(state, &cached.view.indexer_id)?;
     match indexer {
         Some(i) if i.kind == crate::peers::indexers::KIND_BUILTIN => {

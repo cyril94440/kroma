@@ -64,3 +64,17 @@ pub(crate) fn recall(
         .into_iter()
         .find(|r| r.view.guid == guid && r.view.indexer_id == indexer_id))
 }
+
+/// Every release a search showed, in the order it showed them, and when it ran.
+pub(crate) fn recall_all(store: &Pool, key: &str) -> Result<Option<(Vec<RememberedRelease>, i64)>> {
+    let conn = store.get()?;
+    let kept: Option<(String, i64)> = conn
+        .query_row(
+            "SELECT releases, searched_at FROM search_results WHERE key = ?1",
+            params![key],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
+    kept.map(|(releases, at)| Ok((serde_json::from_str(&releases)?, at)))
+        .transpose()
+}

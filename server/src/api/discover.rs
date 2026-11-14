@@ -7,11 +7,12 @@
 
 mod flags;
 mod lists;
+mod watch_now;
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::json;
@@ -37,6 +38,7 @@ pub fn routes() -> Router<SharedState> {
         .route("/discover/{list}", get(lists::browse))
         .route("/discover/{kind}/{tmdb_id}", get(detail))
         .route("/discover/tv/{tmdb_id}/season/{season}", get(season))
+        .route("/discover/{kind}/{tmdb_id}/watch-now", post(watch_now::watch_now))
 }
 
 // TMDB works zero-config via the built-in key, so absence means the operator
@@ -123,7 +125,12 @@ pub async fn detail(
         let detail = discover::detail(&key, &lang, kind, tmdb_id)
             .map_err(|()| anyhow::anyhow!("TMDB detail failed"))?;
         let conn = state.db.get()?;
-        detail.map(|d| flag_detail(&conn, d, &user)).transpose()
+        let mut flagged = detail.map(|d| flag_detail(&conn, d, &user)).transpose()?;
+        drop(conn);
+        if let Some(d) = flagged.as_mut() {
+            d.watch_now = !d.in_library && crate::services::watch_now::offered(&state, &user);
+        }
+        Ok(flagged)
     })
     .await?;
     match out {

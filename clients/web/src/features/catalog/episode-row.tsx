@@ -198,6 +198,7 @@ export function MissingEpisodeRow({
   pending,
   selected,
   onToggle,
+  watchNow,
 }: Readonly<{
   season: number;
   episode: number;
@@ -205,6 +206,7 @@ export function MissingEpisodeRow({
   pending: boolean;
   selected: boolean;
   onToggle: () => void;
+  watchNow?: { onWatch: () => void; disabled: boolean };
 }>) {
   const t = useT();
   const label = listed?.title
@@ -230,6 +232,14 @@ export function MissingEpisodeRow({
     >
       <MissingStill episode={episode} still={listed?.stillUrl ?? null} />
       <MissingText label={label} listed={listed} color={selected ? 'text' : 'white/70'} />
+      {watchNow ? (
+        <IconButton
+          icon="player-play"
+          label={t('discover.watchNowEpisode')}
+          disabled={watchNow.disabled}
+          onPress={watchNow.onWatch}
+        />
+      ) : null}
       <CheckboxFace checked={selected} />
     </Focusable>
   );

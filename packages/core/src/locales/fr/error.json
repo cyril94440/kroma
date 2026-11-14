@@ -39,5 +39,9 @@
   "error.unauthorized": "Non autorisé",
   "error.unauthorizedBody": "Votre session a pris fin. Reconnectez-vous pour continuer à regarder.",
   "error.unauthorizedTitle": "Connexion requise",
-  "error.userNotFound": "Utilisateur introuvable"
+  "error.userNotFound": "Utilisateur introuvable",
+  "error.watchNow.failed": "Impossible de lancer ce titre pour le moment. Réessayez, ou demandez-le.",
+  "error.watchNow.noEngine": "Ce serveur ne peut pas récupérer un titre instantanément.",
+  "error.watchNow.noIndexer": "Aucun indexeur n'est configuré pour chercher ce titre.",
+  "error.watchNow.noRelease": "Rien ne correspond à vos réglages de qualité. Le titre reste demandé."
 }

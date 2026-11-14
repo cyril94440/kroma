@@ -1,7 +1,7 @@
 import { hasPermission } from '@kromatv/client/accounts';
 import { type DiscoverDetail, TmdbKind, tmdbKindOf } from '@kromatv/client/discovery';
-import { formatRuntime, sizedImageUrl } from '@kromatv/core';
-import { useAskForTitle } from '@kromatv/core/react';
+import { formatRuntime, offersWatchNow, sizedImageUrl } from '@kromatv/core';
+import { type TitleWatchNow, useAskForTitle } from '@kromatv/core/react';
 import { Box, Button, styles, Text, useStyles } from '@kromatv/ui/kit';
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams } from 'expo-router';
@@ -22,6 +22,7 @@ import { useGutters } from '#mobile/lib/layout';
 import { routeParam } from '#mobile/lib/nav';
 import { useClient, useSession } from '#mobile/lib/session';
 import { spacing, type } from '#mobile/lib/theme';
+import { useWatchNowAction } from '#mobile/lib/watch-now';
 
 const HERO_W = 1280;
 
@@ -44,12 +45,47 @@ function AskAction({ detail }: Readonly<{ detail: DiscoverDetail }>) {
   );
 }
 
+function WatchNowAction({
+  detail,
+  watch,
+}: Readonly<{ detail: DiscoverDetail; watch: TitleWatchNow }>) {
+  const t = useT();
+  const { state } = watch;
+  const episode =
+    detail.kind === 'show'
+      ? { season: detail.seasons.find((s) => s.season > 0)?.season ?? 1, episode: 1 }
+      : undefined;
+  const working = state.phase === 'searching' || state.phase === 'ready';
+  return (
+    <>
+      <Button
+        icon="player-play"
+        loading={working}
+        disabled={state.phase === 'requested'}
+        label={working ? t('discover.watchNowSearching') : t('discover.watchNow')}
+        onPress={() => watch.watch(episode)}
+      />
+      {state.phase === 'requested' ? <Text>{t('discover.watchNowRequested')}</Text> : null}
+      {state.phase === 'unavailable' ? <ErrorBanner message={state.message} /> : null}
+      {state.phase === 'error' ? <ErrorBanner message={t('discover.watchNowError')} /> : null}
+    </>
+  );
+}
+
 export default function DiscoverRoute() {
   const params = useLocalSearchParams<{ type?: string; tmdbId?: string }>();
   const kind = TmdbKind.safeParse(routeParam(params.type));
   const tmdbId = Number(routeParam(params.tmdbId));
   if (!(kind.success && Number.isFinite(tmdbId))) return <Redirect href="/" />;
   return <DiscoverScreen kind={kind.data} tmdbId={tmdbId} />;
+}
+
+function episodeWatch(offered: boolean, watch: TitleWatchNow) {
+  if (!offered) return undefined;
+  return {
+    busy: watch.state.phase === 'searching',
+    onWatch: (season: number, episode: number) => watch.watch({ season, episode }),
+  };
 }
 
 function DiscoverScreen({ kind, tmdbId }: Readonly<{ kind: TmdbKind; tmdbId: number }>) {
@@ -65,6 +101,7 @@ function DiscoverScreen({ kind, tmdbId }: Readonly<{ kind: TmdbKind; tmdbId: num
     scrollY.value = e.contentOffset.y;
   });
   const fiche = useQuery(client.query.discovery.detail(kind, tmdbId));
+  const watch = useWatchNowAction({ kind: kind === 'tv' ? 'show' : 'movie', tmdbId });
 
   if (fiche.isPending) return <Loading label={t('common.loading')} />;
   if (fiche.isError)
@@ -82,6 +119,7 @@ function DiscoverScreen({ kind, tmdbId }: Readonly<{ kind: TmdbKind; tmdbId: num
     return <Redirect href={owned as never} />;
   }
 
+  const offered = offersWatchNow(user, detail.watchNow);
   const span = detail.seasons.length
     ? t('content.seasonCount', { count: detail.seasons.length })
     : formatRuntime((detail.runtimeMin ?? 0) * 60_000);
@@ -107,13 +145,18 @@ function DiscoverScreen({ kind, tmdbId }: Readonly<{ kind: TmdbKind; tmdbId: num
       />
 
       <Box style={[s.body, gutters.style]}>
+        {offered ? <WatchNowAction detail={detail} watch={watch} /> : null}
         {user && hasPermission(user, 'requests.create') ? <AskAction detail={detail} /> : null}
         <TrailerButton kind={tmdbKindOf(detail.kind)} tmdbId={detail.tmdbId} title={detail.title} />
         {detail.overview ? <ExpandableText>{detail.overview}</ExpandableText> : null}
       </Box>
 
       {detail.kind === 'show' ? (
-        <DiscoverEpisodes tmdbId={detail.tmdbId} seasons={detail.seasons} />
+        <DiscoverEpisodes
+          tmdbId={detail.tmdbId}
+          seasons={detail.seasons}
+          watch={episodeWatch(offered, watch)}
+        />
       ) : null}
 
       {detail.cast.length > 0 ? (

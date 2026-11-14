@@ -12,6 +12,29 @@ pub fn acqsearch_routes<S: HostStorage + Clone + Send + Sync + 'static>() -> Rou
         .route("/_port/acquisition/search", post(search_h::<S>))
         .route("/_port/acquisition/search-now", post(search_now_h::<S>))
         .route("/_port/acquisition/grab", post(grab_h::<S>))
+        .route("/_port/acquisition/watch-now", post(watch_now_h::<S>))
+        .route("/_port/acquisition/watch-now-reject", post(watch_now_reject_h::<S>))
+        .route("/_port/acquisition/watch-now-capable", post(watch_now_capable_h::<S>))
+}
+
+async fn watch_now_h<S: HostStorage + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+    Json(ask): Json<crate::watch_now::Ask>,
+) -> Json<Result<crate::watch_now::Reply, String>> {
+    port_reply(move || crate::watch_now::watch_now(&host, &ask)).await
+}
+
+async fn watch_now_reject_h<S: HostStorage + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+    Json(rejection): Json<crate::watch_now::Rejection>,
+) -> Json<Result<bool, String>> {
+    port_reply(move || crate::watch_now::reject(&host, &rejection)).await
+}
+
+async fn watch_now_capable_h<S: HostStorage + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+) -> Json<Result<bool, String>> {
+    port_reply(move || Ok(crate::watch_now::capable(&host))).await
 }
 
 #[derive(Deserialize)]
@@ -141,6 +164,28 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn the_watch_now_routes_are_mounted_and_answer_through_the_envelope() {
+        let (status, body) = post(
+            "/_port/acquisition/watch-now",
+            serde_json::json!({ "kind": "movie", "tmdb_id": 1, "user_id": "u" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["Ok"]["status"], "unavailable", "{body}");
+        assert_eq!(body["Ok"]["reason"], "noEngine", "{body}");
+
+        let (status, body) = post("/_port/acquisition/watch-now-capable", serde_json::json!({})).await;
+        assert_eq!((status, body), (StatusCode::OK, serde_json::json!({ "Ok": false })));
+
+        let (status, body) = post(
+            "/_port/acquisition/watch-now-reject",
+            serde_json::json!({ "download_id": "d", "kind": "sideways" }),
+        )
+        .await;
+        assert_eq!((status, body), (StatusCode::OK, serde_json::json!({ "Ok": false })));
     }
 
     #[tokio::test]

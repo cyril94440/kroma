@@ -11,7 +11,7 @@ use crate::vectors::prune_orphan_vectors;
 use crate::{now_or_blank, Pool};
 
 use super::probe_result::recompute_all_representatives;
-use super::scanned_files::sync_files;
+use super::scanned_files::{sync_files, upsert_files};
 
 /// The episode ids each show holds right now, for a scan that wants to know
 /// which shows its walk changed. Read BEFORE [`sync_all`] writes over them.
@@ -54,9 +54,50 @@ pub fn sync_all(
     Ok(())
 }
 
+/// Adds scanned shows, items and files without touching anything else: the
+/// write behind a scan of a few files, where [`sync_all`] would read every row
+/// the walk did not see as gone.
+pub fn sync_added(
+    pool: &Pool,
+    libraries: &[Library],
+    shows: &[Show],
+    items: &[MediaItem],
+    mtimes: &HashMap<String, Option<i64>>,
+) -> Result<()> {
+    let mut conn = pool.get()?;
+    let tx = conn.transaction()?;
+    upsert_libraries(&tx, libraries)?;
+    sync_shows(&tx, shows)?;
+    sync_items(&tx, items)?;
+    upsert_files(&tx, items, mtimes)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Forgets these files and whatever item or show they alone held up.
+pub fn forget_files(pool: &Pool, abs_paths: &[String]) -> Result<()> {
+    let mut conn = pool.get()?;
+    let tx = conn.transaction()?;
+    {
+        let mut delete = tx.prepare("DELETE FROM files WHERE abs_path = ?1")?;
+        for path in abs_paths {
+            delete.execute(params![path])?;
+        }
+    }
+    prune_orphans(&tx)?;
+    tx.commit()?;
+    Ok(())
+}
+
 // Upserts by id, then deletes only libraries no longer scanned: a wholesale
 // DELETE FROM libraries would cascade to items/files and wipe what this sync preserves.
 fn sync_libraries(tx: &rusqlite::Transaction, libraries: &[Library]) -> Result<()> {
+    upsert_libraries(tx, libraries)?;
+    let keep: Vec<String> = libraries.iter().map(|l| l.id.clone()).collect();
+    prune_libraries(tx, &keep)
+}
+
+fn upsert_libraries(tx: &rusqlite::Transaction, libraries: &[Library]) -> Result<()> {
     let mut lib_stmt = tx.prepare(
         "INSERT INTO libraries (id,name,kind,path,added_at) VALUES (?1,?2,?3,?4,?5) \
          ON CONFLICT(id) DO UPDATE SET name=excluded.name, kind=excluded.kind, path=excluded.path",
@@ -70,7 +111,10 @@ fn sync_libraries(tx: &rusqlite::Transaction, libraries: &[Library]) -> Result<(
             now_or_blank()
         ])?;
     }
-    let keep: Vec<String> = libraries.iter().map(|l| l.id.clone()).collect();
+    Ok(())
+}
+
+fn prune_libraries(tx: &rusqlite::Transaction, keep: &[String]) -> Result<()> {
     let mut existing: Vec<String> = Vec::new();
     {
         let mut q = tx.prepare("SELECT id FROM libraries")?;
@@ -236,6 +280,35 @@ mod tests {
         )];
         sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 100)).unwrap();
         assert_eq!(crate::counts(&p).unwrap(), (1, 1, 0));
+        assert!(crate::get_item(&p, "m2").unwrap().is_none());
+    }
+
+    #[test]
+    fn sync_added_adds_files_and_leaves_every_other_row_alone() {
+        let p = pool();
+        let held = vec![movie("m1", "Dune", "lib", vec![file("f1", "/media/m1.mkv", false)])];
+        sync_all(&p, &[lib("lib")], &[], &held, &mtimes_of(&held, 100)).unwrap();
+        let added = vec![movie("m2", "Arrival", "lib", vec![file("f2", "/media/m2.mkv", false)])];
+
+        sync_added(&p, &[lib("lib")], &[], &added, &mtimes_of(&added, 100)).unwrap();
+
+        assert_eq!(crate::counts(&p).unwrap(), (1, 2, 0));
+        assert!(crate::get_item(&p, "m1").unwrap().is_some());
+        assert_eq!(crate::get_item(&p, "m2").unwrap().unwrap().files.len(), 1);
+    }
+
+    #[test]
+    fn forgetting_a_files_path_removes_the_item_it_alone_held() {
+        let p = pool();
+        let items = vec![
+            movie("m1", "Dune", "lib", vec![file("f1", "/media/m1.mkv", false)]),
+            movie("m2", "Arrival", "lib", vec![file("f2", "/media/m2.mkv", false)]),
+        ];
+        sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 100)).unwrap();
+
+        forget_files(&p, &["/media/m2.mkv".to_string()]).unwrap();
+
+        assert!(crate::get_item(&p, "m1").unwrap().is_some());
         assert!(crate::get_item(&p, "m2").unwrap().is_none());
     }
 

@@ -38,11 +38,19 @@ struct Fake {
 
 impl Fake {
     fn answering(instant: Value) -> Self {
-        Self { engine: Arc::default(), instant: Some(instant), state: "completed" }
+        Self {
+            engine: Arc::default(),
+            instant: Some(instant),
+            state: "completed",
+        }
     }
 
     fn without_instant() -> Self {
-        Self { engine: Arc::default(), instant: None, state: "completed" }
+        Self {
+            engine: Arc::default(),
+            instant: None,
+            state: "completed",
+        }
     }
 }
 
@@ -78,7 +86,10 @@ async fn host_with(fake: &Fake, rows: &[(&str, &str)]) -> (StubHost, Arc<Downloa
         .route(
             "/_port/tv.kroma.torrents/client/status",
             post(move |Json(_): Json<Value>| async move {
-                Json(Some(status_json(state, if state == "completed" { 1.0 } else { 0.0 })))
+                Json(Some(status_json(
+                    state,
+                    if state == "completed" { 1.0 } else { 0.0 },
+                )))
             }),
         );
     let removing = engine.clone();
@@ -87,7 +98,11 @@ async fn host_with(fake: &Fake, rows: &[(&str, &str)]) -> (StubHost, Arc<Downloa
         post(move |Json(body): Json<Value>| {
             let removing = removing.clone();
             async move {
-                removing.removed.lock().unwrap().push(body["args"]["client_ref"].to_string());
+                removing
+                    .removed
+                    .lock()
+                    .unwrap()
+                    .push(body["args"]["client_ref"].to_string());
                 Json(Ok::<_, String>(()))
             }
         }),
@@ -133,13 +148,19 @@ fn releases(count: usize) -> Vec<InstantRelease> {
     (0..count).map(|n| release(&format!("r{n}"))).collect()
 }
 
-async fn grab(host: &StubHost, manager: &Arc<DownloadManager>, list: Vec<InstantRelease>) -> Result<InstantOutcome> {
+async fn grab(
+    host: &StubHost,
+    manager: &Arc<DownloadManager>,
+    list: Vec<InstantRelease>,
+) -> Result<InstantOutcome> {
     let (host, manager) = (host.clone(), manager.clone());
     blocking(move || manager.grab_instant(&host, list)).await
 }
 
 fn stored(manager: &DownloadManager, id: &str) -> db::DownloadRow {
-    db::get_download(&manager.core().get().unwrap(), id).unwrap().unwrap()
+    db::get_download(&manager.core().get().unwrap(), id)
+        .unwrap()
+        .unwrap()
 }
 
 #[tokio::test]
@@ -155,8 +176,14 @@ async fn the_chosen_release_becomes_a_completed_row_with_the_engines_reference_a
     assert_eq!(row.status, "completed");
     assert_eq!(row.client_ref, "42");
     assert_eq!(row.release_title, "Dune.2021.r1");
-    assert_eq!(row.save_path.as_deref(), Some("/data/alldebrid/downloads/42"));
-    assert_eq!(db::download_contents(manager.store(), &row.id).unwrap(), ["Dune.mkv.kremote"]);
+    assert_eq!(
+        row.save_path.as_deref(),
+        Some("/data/alldebrid/downloads/42")
+    );
+    assert_eq!(
+        db::download_contents(manager.store(), &row.id).unwrap(),
+        ["Dune.mkv.kremote"]
+    );
     assert_eq!(*fake.engine.adds.lock().unwrap(), 0);
 }
 
@@ -168,9 +195,17 @@ async fn the_engine_is_asked_in_rank_order_with_each_releases_link() {
     grab(&host, &manager, releases(3)).await.unwrap();
 
     let asked = fake.engine.asked.lock().unwrap()[0].clone();
-    let keys: Vec<&str> = asked["args"]["candidates"].as_array().unwrap().iter().map(|c| c["key"].as_str().unwrap()).collect();
+    let keys: Vec<&str> = asked["args"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["key"].as_str().unwrap())
+        .collect();
     assert_eq!(keys, ["r0", "r1", "r2"]);
-    assert_eq!(asked["args"]["candidates"][0]["magnet_or_url"], "magnet:?xt=urn:btih:r0");
+    assert_eq!(
+        asked["args"]["candidates"][0]["magnet_or_url"],
+        "magnet:?xt=urn:btih:r0"
+    );
     assert_eq!(asked["client"]["kind"], "fake");
 }
 
@@ -182,7 +217,9 @@ async fn nothing_ready_leaves_no_row_behind() {
     let outcome = grab(&host, &manager, releases(2)).await.unwrap();
 
     assert_eq!(outcome.status, InstantStatus::Nothing);
-    assert!(db::active_downloads(&manager.core().get().unwrap()).unwrap().is_empty());
+    assert!(db::active_downloads(&manager.core().get().unwrap())
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -197,7 +234,12 @@ async fn an_engine_without_the_method_is_unsupported_not_an_error() {
 #[tokio::test]
 async fn the_embedded_engine_is_unsupported_without_any_call() {
     let host = host_over("torrents-instant-embedded", &[]);
-    let manager = DownloadManager::new(Arc::new(host.clone()), host.data_dir(), host.db().clone(), host.store().clone());
+    let manager = DownloadManager::new(
+        Arc::new(host.clone()),
+        host.data_dir(),
+        host.db().clone(),
+        host.store().clone(),
+    );
 
     let outcome = grab(&host, &manager, releases(2)).await.unwrap();
 
@@ -208,7 +250,9 @@ async fn the_embedded_engine_is_unsupported_without_any_call() {
 async fn a_closed_kill_switch_does_not_hold_an_engine_that_moves_no_peer_data() {
     let fake = Fake::answering(json!({ "Ok": { "key": "r0", "client_ref": "42" } }));
     let (host, manager) = host_with(&fake, &[]).await;
-    manager.gate_open.store(false, std::sync::atomic::Ordering::Relaxed);
+    manager
+        .gate_open
+        .store(false, std::sync::atomic::Ordering::Relaxed);
 
     let outcome = grab(&host, &manager, releases(1)).await.unwrap();
 
@@ -220,10 +264,15 @@ async fn no_more_than_the_cap_is_offered_to_the_engine() {
     let fake = Fake::answering(json!({ "Ok": null }));
     let (host, manager) = host_with(&fake, &[]).await;
 
-    grab(&host, &manager, releases(MAX_INSTANT_CANDIDATES + 4)).await.unwrap();
+    grab(&host, &manager, releases(MAX_INSTANT_CANDIDATES + 4))
+        .await
+        .unwrap();
 
     let asked = fake.engine.asked.lock().unwrap()[0].clone();
-    assert_eq!(asked["args"]["candidates"].as_array().unwrap().len(), MAX_INSTANT_CANDIDATES);
+    assert_eq!(
+        asked["args"]["candidates"].as_array().unwrap().len(),
+        MAX_INSTANT_CANDIDATES
+    );
 }
 
 #[tokio::test]
@@ -248,7 +297,9 @@ async fn an_engine_that_fails_the_kept_release_fails_its_row_and_frees_the_magne
 
     assert!(error.to_string().contains("engine"), "{error:#}");
     assert_eq!(fake.engine.removed.lock().unwrap().len(), 1);
-    assert!(db::active_downloads(&manager.core().get().unwrap()).unwrap().is_empty());
+    assert!(db::active_downloads(&manager.core().get().unwrap())
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -277,6 +328,9 @@ fn the_outcome_crosses_as_a_lowercase_status_with_the_key_and_the_row() {
     let none = serde_json::to_value(InstantOutcome::of(InstantStatus::Nothing)).unwrap();
     let unsupported = serde_json::to_value(InstantOutcome::of(InstantStatus::Unsupported)).unwrap();
 
-    assert_eq!(none, json!({ "status": "nothing", "key": null, "download": null }));
+    assert_eq!(
+        none,
+        json!({ "status": "nothing", "key": null, "download": null })
+    );
     assert_eq!(unsupported["status"], "unsupported");
 }

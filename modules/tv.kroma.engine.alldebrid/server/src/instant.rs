@@ -48,7 +48,10 @@ impl AllDebrid {
         outcome?;
         Ok(chosen.map(|(rank, client_ref)| {
             self.remember(Some(&client_ref));
-            Instant { key: ranked[rank].key.clone(), client_ref }
+            Instant {
+                key: ranked[rank].key.clone(),
+                client_ref,
+            }
         }))
     }
 
@@ -66,18 +69,26 @@ impl AllDebrid {
             let sent: Vec<&str> = magnets.iter().map(|(_, magnet)| *magnet).collect();
             for ((rank, _), answer) in magnets.iter().zip(self.api.upload_magnets(&sent)?) {
                 match answer {
-                    Ok(uploaded) => tried.push(Tried { rank: *rank, uploaded }),
+                    Ok(uploaded) => tried.push(Tried {
+                        rank: *rank,
+                        uploaded,
+                    }),
                     Err(error) => tracing::warn!(rank, "AllDebrid refused a candidate: {error:#}"),
                 }
             }
         }
         for (rank, url) in links {
-            if tried.iter().any(|attempt| attempt.uploaded.ready && attempt.rank < rank) {
+            if tried
+                .iter()
+                .any(|attempt| attempt.uploaded.ready && attempt.rank < rank)
+            {
                 break;
             }
             match self.upload_fetched(url) {
                 Ok(uploaded) => tried.push(Tried { rank, uploaded }),
-                Err(error) => tracing::warn!(rank, "a candidate's torrent file did not upload: {error:#}"),
+                Err(error) => {
+                    tracing::warn!(rank, "a candidate's torrent file did not upload: {error:#}")
+                }
             }
         }
         Ok(())
@@ -100,7 +111,10 @@ impl AllDebrid {
             }
             deleted = true;
             if let Err(error) = self.api.delete(id) {
-                tracing::warn!(magnet = id, "could not delete an unchosen magnet: {error:#}");
+                tracing::warn!(
+                    magnet = id,
+                    "could not delete an unchosen magnet: {error:#}"
+                );
             }
         }
     }

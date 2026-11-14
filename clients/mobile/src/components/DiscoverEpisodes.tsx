@@ -1,6 +1,6 @@
 import type { DiscoverEpisode, DiscoverSeason } from '@kromatv/client/discovery';
 import { sizedImageUrl } from '@kromatv/core';
-import { Box, Button, styles, Text, useStyles } from '@kromatv/ui/kit';
+import { Box, Button, IconButton, styles, Text, useStyles } from '@kromatv/ui/kit';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import type { View } from 'react-native';
@@ -14,7 +14,16 @@ import { radius, spacing, type } from '#mobile/lib/theme';
 
 const STILL_W = 480;
 
-function EpisodeRow({ episode }: Readonly<{ episode: DiscoverEpisode }>) {
+/** Watching a listed episode now, when the server offers it. */
+export interface EpisodeWatch {
+  busy: boolean;
+  onWatch: (episode: number) => void;
+}
+
+function EpisodeRow({
+  episode,
+  watch,
+}: Readonly<{ episode: DiscoverEpisode; watch?: EpisodeWatch }>) {
   const s = useStyles(sDefinition);
 
   const t = useT();
@@ -37,6 +46,14 @@ function EpisodeRow({ episode }: Readonly<{ episode: DiscoverEpisode }>) {
           </Text>
         ) : null}
       </Box>
+      {watch ? (
+        <IconButton
+          icon="player-play"
+          label={t('discover.watchNowEpisode')}
+          disabled={watch.busy}
+          onPress={() => watch.onWatch(episode.episode)}
+        />
+      ) : null}
     </Box>
   );
 }
@@ -44,7 +61,12 @@ function EpisodeRow({ episode }: Readonly<{ episode: DiscoverEpisode }>) {
 export function DiscoverEpisodes({
   tmdbId,
   seasons,
-}: Readonly<{ tmdbId: number; seasons: readonly DiscoverSeason[] }>) {
+  watch,
+}: Readonly<{
+  tmdbId: number;
+  seasons: readonly DiscoverSeason[];
+  watch?: { busy: boolean; onWatch: (season: number, episode: number) => void };
+}>) {
   const s = useStyles(sDefinition);
 
   const t = useT();
@@ -80,7 +102,18 @@ export function DiscoverEpisodes({
       </Box>
       <Box style={[s.list, gutters.style]}>
         {(episodes.data?.episodes ?? []).map((episode) => (
-          <EpisodeRow key={episode.episode} episode={episode} />
+          <EpisodeRow
+            key={episode.episode}
+            episode={episode}
+            watch={
+              watch
+                ? {
+                    busy: watch.busy,
+                    onWatch: (number) => watch.onWatch(season?.season ?? 1, number),
+                  }
+                : undefined
+            }
+          />
         ))}
       </Box>
       <PopoverMenu

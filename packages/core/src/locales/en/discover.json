@@ -46,5 +46,10 @@
   "discover.trendingShows": "Trending shows",
   "discover.upcomingMovies": "Upcoming movies",
   "discover.upcomingShows": "Shows on the air",
-  "discover.viewInLibrary": "View in library"
+  "discover.viewInLibrary": "View in library",
+  "discover.watchNow": "Watch now",
+  "discover.watchNowEpisode": "Watch this episode now",
+  "discover.watchNowError": "The connection dropped. Try again: if the title is ready, it opens at once.",
+  "discover.watchNowRequested": "Requested. We will let you know when it is available.",
+  "discover.watchNowSearching": "Finding the best copy"
 }

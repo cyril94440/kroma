@@ -52,6 +52,7 @@ function detail(over: Partial<DiscoverDetail> & { tmdbId: number }): DiscoverDet
     requestProgress: null,
     airStatus: null,
     nextAirDate: null,
+    watchNow: false,
     ...over,
   };
 }

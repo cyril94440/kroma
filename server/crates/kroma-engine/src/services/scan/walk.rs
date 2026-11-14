@@ -38,16 +38,16 @@ pub(super) fn scan_root(
     movie_seen: &mut bool,
     episode_seen: &mut bool,
 ) -> usize {
-    let lib_name = root
-        .file_name()
-        .and_then(std::ffi::OsStr::to_str)
-        .unwrap_or("library")
-        .to_string();
-    let added_at = now_iso8601();
-
-    // Resolve the root once (cheap, single syscall) so file abs-paths are stable
-    // without a per-file `canonicalize()` (which is very slow over SMB).
-    let abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let folder = Folder::of(lib_id, root);
+    let abs_root = folder.abs_root.clone();
+    let mut acc = Accumulator {
+        items,
+        shows,
+        mtimes,
+        lib_item_ids,
+        movie_seen,
+        episode_seen,
+    };
 
     // Phase-1 walk: jwalk traverses directories on a large thread pool and stats
     // files *in that pool*, so the readdir/stat network round-trips over SMB run
@@ -81,72 +81,9 @@ pub(super) fn scan_root(
         if !is_media_file(&path) {
             continue;
         }
-        let rel = path
-            .strip_prefix(root)
-            .unwrap_or(&path)
-            .to_string_lossy()
-            .replace('\\', "/");
-        // Build the absolute path by joining the resolved root with the relative
-        // path no extra stat / symlink resolution per file.
-        let abs = abs_root.join(&rel);
+        let meta = entry.client_state;
+        index_file(&folder, &path, meta, &mut acc);
 
-        let (mut size, mtime) = match entry.client_state {
-            Some((s, m)) => (Some(s), Some(m)),
-            None => (None, None),
-        };
-
-        let mut container = path
-            .extension()
-            .and_then(std::ffi::OsStr::to_str)
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        if remote_file::is_remote_file(&path) {
-            let Some(stub) = readable_stub(&path) else {
-                continue;
-            };
-            container = stub.container.clone();
-            size = Some(stub.size);
-        }
-        let named = named_as(&path);
-
-        let file_name = named
-            .file_name()
-            .and_then(std::ffi::OsStr::to_str)
-            .unwrap_or("");
-        let edition = detect_edition(file_name);
-
-        let file = MediaFile {
-            remote: remote_file::is_remote_file(&path),
-            id: short_hash(&abs.to_string_lossy()),
-            rel_path: Some(rel),
-            container,
-            duration_ms: None,
-            video: None,
-            audio: None,
-            audio_tracks: Vec::new(),
-            subtitles: Vec::new(),
-            size,
-            edition,
-            probed: false,
-            unreadable: None,
-            edition_id: None,
-            abs_path: Some(abs.to_string_lossy().to_string()),
-        };
-        index_parsed(
-            naming::parse(root, &named),
-            lib_id,
-            &added_at,
-            file,
-            mtime,
-            items,
-            shows,
-            mtimes,
-            lib_item_ids,
-            movie_seen,
-            episode_seen,
-        );
-
-        debug!("indexed file under {}", lib_name);
     }
 
     if let Some(path) = first_unreadable {
@@ -158,6 +95,103 @@ pub(super) fn scan_root(
         );
     }
     unreadable
+}
+
+pub(super) struct Folder<'a> {
+    lib_id: &'a str,
+    root: &'a Path,
+    abs_root: PathBuf,
+    added_at: String,
+}
+
+impl<'a> Folder<'a> {
+    // Resolve the root once (cheap, single syscall) so file abs-paths are stable
+    // without a per-file `canonicalize()` (which is very slow over SMB).
+    pub(super) fn of(lib_id: &'a str, root: &'a Path) -> Self {
+        Self {
+            lib_id,
+            root,
+            abs_root: root.canonicalize().unwrap_or_else(|_| root.to_path_buf()),
+            added_at: now_iso8601(),
+        }
+    }
+}
+
+pub(super) struct Accumulator<'a> {
+    pub items: &'a mut HashMap<String, MediaItem>,
+    pub shows: &'a mut HashMap<String, Show>,
+    pub mtimes: &'a mut HashMap<String, Option<i64>>,
+    pub lib_item_ids: &'a mut HashSet<String>,
+    pub movie_seen: &'a mut bool,
+    pub episode_seen: &'a mut bool,
+}
+
+/// Folds one media file under `folder` into what a scan is collecting. `meta` is
+/// its size and mtime, when they could be read.
+pub(super) fn index_file(
+    folder: &Folder,
+    path: &Path,
+    meta: FileMeta,
+    acc: &mut Accumulator,
+) {
+    let rel = path
+        .strip_prefix(folder.root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let abs = folder.abs_root.join(&rel);
+    let (mut size, mtime) = match meta {
+        Some((s, m)) => (Some(s), Some(m)),
+        None => (None, None),
+    };
+    let mut container = path
+        .extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if remote_file::is_remote_file(path) {
+        let Some(stub) = readable_stub(path) else {
+            return;
+        };
+        container = stub.container.clone();
+        size = Some(stub.size);
+    }
+    let named = named_as(path);
+    let file_name = named
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or("");
+    let edition = detect_edition(file_name);
+    let file = MediaFile {
+        remote: remote_file::is_remote_file(path),
+        id: short_hash(&abs.to_string_lossy()),
+        rel_path: Some(rel),
+        container,
+        duration_ms: None,
+        video: None,
+        audio: None,
+        audio_tracks: Vec::new(),
+        subtitles: Vec::new(),
+        size,
+        edition,
+        probed: false,
+        unreadable: None,
+        edition_id: None,
+        abs_path: Some(abs.to_string_lossy().to_string()),
+    };
+    index_parsed(
+        naming::parse(folder.root, &named),
+        folder.lib_id,
+        &folder.added_at,
+        file,
+        mtime,
+        acc.items,
+        acc.shows,
+        acc.mtimes,
+        acc.lib_item_ids,
+        acc.movie_seen,
+        acc.episode_seen,
+    );
 }
 
 struct StubFacts {
@@ -239,7 +273,7 @@ fn first_descent(descended: &Mutex<HashSet<PathBuf>>, dir: &Path) -> bool {
 }
 
 // Per-file metadata carried through the parallel jwalk: (size, mtime-secs).
-type FileMeta = Option<(u64, i64)>;
+pub(super) type FileMeta = Option<(u64, i64)>;
 
 // Concurrency for the directory walk. Metadata ops are latency-bound (not CPU),
 // so more threads than cores overlap the round-trips but a NAS serving its
@@ -266,7 +300,7 @@ fn is_pruned_dir(name: &std::ffi::OsStr) -> bool {
 }
 
 // `stat` one file (run inside the parallel walk pool): (size, mtime-as-unix-secs).
-fn file_meta(path: &Path) -> FileMeta {
+pub(super) fn file_meta(path: &Path) -> FileMeta {
     let md = std::fs::metadata(path).ok()?;
     let mtime = md
         .modified()

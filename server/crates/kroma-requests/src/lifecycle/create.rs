@@ -46,12 +46,6 @@ fn create_with<S: HostStorage>(
     body: &CreateRequestBody,
 ) -> Result<MediaRequest> {
     let approve = reviewed_as.is_none_or(|user| user.can(Permission::RequestsAuto));
-    let key = tmdb_key(state)?;
-    let lang = language(state);
-    let detail = discover::detail(&key, &lang, body.kind, body.tmdb_id)
-        .map_err(|()| anyhow!("TMDB lookup failed"))?
-        .ok_or_else(|| anyhow!("title not found on TMDB"))?;
-
     let asked_seasons: Option<Vec<u32>> = match body.kind {
         RequestKind::Movie => None,
         RequestKind::Show => body.seasons.clone().filter(|s| !s.is_empty()).map(|mut s| {
@@ -79,6 +73,12 @@ fn create_with<S: HostStorage>(
             .ok_or_else(|| anyhow!("request vanished during merge"));
     }
     drop(conn);
+
+    let key = tmdb_key(state)?;
+    let lang = language(state);
+    let detail = discover::detail(&key, &lang, body.kind, body.tmdb_id)
+        .map_err(|()| anyhow!("TMDB lookup failed"))?
+        .ok_or_else(|| anyhow!("title not found on TMDB"))?;
 
     let id = kroma_primitives::short_hash(&format!(
         "request|{}|{}|{}",

@@ -46,7 +46,11 @@ pub struct InstantOutcome {
 
 impl InstantOutcome {
     fn of(status: InstantStatus) -> Self {
-        Self { status, key: None, download: None }
+        Self {
+            status,
+            key: None,
+            download: None,
+        }
     }
 }
 
@@ -101,12 +105,17 @@ impl DownloadManager {
             .find(|release| release.key == hit.key)
             .ok_or_else(|| anyhow!("the engine kept a release that was not offered"))?;
         let row = self.record_instant(host, &client, &*engine, chosen.spec, &hit.client_ref)?;
-        Ok(InstantOutcome { status: InstantStatus::Grabbed, key: Some(hit.key), download: Some(row) })
+        Ok(InstantOutcome {
+            status: InstantStatus::Grabbed,
+            key: Some(hit.key),
+            download: Some(row),
+        })
     }
 
     fn preferred_client(&self) -> Result<db::DownloadClientRow> {
         let clients = self.store().get()?;
-        db::preferred_download_client(&clients)?.ok_or_else(|| anyhow!("no enabled download client"))
+        db::preferred_download_client(&clients)?
+            .ok_or_else(|| anyhow!("no enabled download client"))
     }
 
     fn not_already_queued(&self, releases: Vec<InstantRelease>) -> Result<Vec<InstantRelease>> {
@@ -148,7 +157,12 @@ impl DownloadManager {
         match self.settle(host, engine, &row) {
             Ok(()) => {}
             Err(error) => {
-                let _ = db::set_download_status(self.core(), &row.id, "failed", Some(&format!("{error:#}")));
+                let _ = db::set_download_status(
+                    self.core(),
+                    &row.id,
+                    "failed",
+                    Some(&format!("{error:#}")),
+                );
                 let _ = engine.remove(client_ref, true);
                 return Err(error);
             }
@@ -169,7 +183,13 @@ impl DownloadManager {
                 .status(&row.client_ref)?
                 .ok_or_else(|| anyhow!("the engine forgot the release it had just kept"))?;
             if status.state == TorrentState::Error {
-                bail!("{}", status.error.as_deref().unwrap_or("the engine failed the release"));
+                bail!(
+                    "{}",
+                    status
+                        .error
+                        .as_deref()
+                        .unwrap_or("the engine failed the release")
+                );
             }
             if self.record_status(host, row, &status, false) {
                 return Ok(());

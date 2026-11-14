@@ -100,6 +100,58 @@ pub fn gate_open(host: &dyn HostCtx) -> bool {
     .unwrap_or(false)
 }
 
+/// A release offered to an instant grab, under the key the answer names it by.
+#[derive(Debug, Clone, Serialize)]
+pub struct InstantRelease {
+    pub key: String,
+    pub spec: GrabSpec,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InstantStatus {
+    Grabbed,
+    Nothing,
+    Unsupported,
+    #[serde(other)]
+    Unknown,
+}
+
+/// What the queue's instant grab came to: the release it kept and the ledger
+/// row, already completed, when it kept one.
+#[derive(Debug, Clone, Deserialize)]
+pub struct InstantOutcome {
+    pub status: InstantStatus,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub download: Option<DownloadRow>,
+}
+
+/// Asks the queue to keep the best of the ranked releases that its download
+/// client already holds. The queue leaves nothing behind for the others.
+pub fn grab_instant(host: &dyn HostCtx, releases: &[InstantRelease]) -> anyhow::Result<InstantOutcome> {
+    call(
+        &grabber(host)?,
+        &format!("{DOWNLOAD_GRAB}/grab-instant"),
+        &serde_json::json!({ "releases": releases }),
+    )
+}
+
+/// Whether the preferred download client can say which releases it holds.
+/// Absent queue or a failed call read as no.
+pub fn instant_capable(host: &dyn HostCtx) -> bool {
+    let Ok(resolve) = grabber(host) else {
+        return false;
+    };
+    call_raw(
+        &resolve,
+        &format!("{DOWNLOAD_GRAB}/instant-capable"),
+        &serde_json::json!({}),
+    )
+    .unwrap_or(false)
+}
+
 /// Kick a freshly recorded row into the engine. Best effort: the row is already in
 /// the ledger, so the engine picks it up on its next sweep either way.
 pub fn activate(host: &dyn HostCtx, id: &str) {
