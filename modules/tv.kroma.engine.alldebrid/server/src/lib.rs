@@ -61,7 +61,10 @@ impl AllDebrid {
             api: api::Api::new(&def.url, &def.password)?,
             cache: cache::Cache::new(module_dir),
             creds: creds::Creds::new(module_dir),
-            saved: creds::Saved { url: def.url.trim().to_string(), key: def.password.trim().to_string() },
+            saved: creds::Saved {
+                url: def.url.trim().to_string(),
+                key: def.password.trim().to_string(),
+            },
             module_dir: module_dir.to_path_buf(),
         })
     }

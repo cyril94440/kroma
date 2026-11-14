@@ -43,7 +43,12 @@ pub(crate) struct Resp {
 
 impl Resp {
     pub(crate) fn data(data: Value) -> Self {
-        Self::raw(200, json!({ "status": "success", "data": data }).to_string().into_bytes())
+        Self::raw(
+            200,
+            json!({ "status": "success", "data": data })
+                .to_string()
+                .into_bytes(),
+        )
     }
 
     pub(crate) fn failure(code: &str, message: &str) -> Self {
@@ -93,7 +98,10 @@ impl Fake {
     }
 
     pub(crate) fn calls_to(&self, path: &str) -> Vec<Req> {
-        self.calls().into_iter().filter(|call| call.path == path).collect()
+        self.calls()
+            .into_iter()
+            .filter(|call| call.path == path)
+            .collect()
     }
 }
 
@@ -202,7 +210,11 @@ pub(crate) struct Script {
 }
 
 impl Script {
-    pub(crate) fn new(tree: Value, files: Vec<(&'static str, Vec<u8>)>, honour_range: bool) -> Self {
+    pub(crate) fn new(
+        tree: Value,
+        files: Vec<(&'static str, Vec<u8>)>,
+        honour_range: bool,
+    ) -> Self {
         Self {
             tree,
             files: files.into_iter().collect(),
@@ -213,7 +225,13 @@ impl Script {
     }
 
     pub(crate) fn start(self) -> Fake {
-        let Script { tree, files, honour_range, status_code, valid_key } = self;
+        let Script {
+            tree,
+            files,
+            honour_range,
+            status_code,
+            valid_key,
+        } = self;
         Fake::start(move |req| {
             let path = req.path.as_str();
             if let Some(name) = path.strip_prefix("/dl/") {
@@ -223,7 +241,11 @@ impl Script {
                 };
             }
             let wanted = valid_key.lock().unwrap().clone();
-            let sent = req.headers.get("authorization").map(String::as_str).unwrap_or_default();
+            let sent = req
+                .headers
+                .get("authorization")
+                .map(String::as_str)
+                .unwrap_or_default();
             if wanted.is_some_and(|key| sent != format!("Bearer {key}")) {
                 return Resp::failure("AUTH_BAD_APIKEY", "The apikey is invalid");
             }
@@ -232,8 +254,12 @@ impl Script {
                     "id": 7, "filename": "Pack", "size": files.values().map(Vec::len).sum::<usize>(),
                     "status": "s", "statusCode": status_code.load(std::sync::atomic::Ordering::SeqCst),
                     "downloaded": 0, "downloadSpeed": 0, "seeders": 0 }] })),
-                "/v4/magnet/files" => Resp::data(json!({ "magnets": [{ "id": "7", "files": tree }] })),
-                "/v4/user" => Resp::data(json!({ "user": { "username": "neo", "isPremium": true } })),
+                "/v4/magnet/files" => {
+                    Resp::data(json!({ "magnets": [{ "id": "7", "files": tree }] }))
+                }
+                "/v4/user" => {
+                    Resp::data(json!({ "user": { "username": "neo", "isPremium": true } }))
+                }
                 "/v4/magnet/delete" => Resp::data(json!({ "message": "deleted" })),
                 "/v4/link/unlock" => {
                     let link = req.query.get("link").cloned().unwrap_or_default();

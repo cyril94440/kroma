@@ -25,7 +25,10 @@ pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
             post(reannounce::<S>),
         )
         .route("/_port/tv.kroma.torrents/client/remove", post(remove::<S>))
-        .route("/_port/tv.kroma.torrents/client/instant", post(instant::<S>))
+        .route(
+            "/_port/tv.kroma.torrents/client/instant",
+            post(instant::<S>),
+        )
         .route("/_port/source/locate", post(locate::<S>))
 }
 
@@ -185,11 +188,17 @@ async fn instant<S: HostCtx + Clone + Send + Sync + 'static>(
             .args
             .candidates
             .into_iter()
-            .map(|c| crate::Candidate { key: c.key, magnet_or_url: c.magnet_or_url })
+            .map(|c| crate::Candidate {
+                key: c.key,
+                magnet_or_url: c.magnet_or_url,
+            })
             .collect();
         Ok(engine(&host, &call.client)?
             .instant(&candidates)?
-            .map(|found| InstantReply { key: found.key, client_ref: found.client_ref }))
+            .map(|found| InstantReply {
+                key: found.key,
+                client_ref: found.client_ref,
+            }))
     })
     .await
 }

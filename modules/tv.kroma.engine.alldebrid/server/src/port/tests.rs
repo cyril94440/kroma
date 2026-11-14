@@ -17,8 +17,13 @@ async fn call(path: &str, body: serde_json::Value) -> (StatusCode, serde_json::V
         .unwrap();
     let resp = tower::ServiceExt::oneshot(app, req).await.unwrap();
     let status = resp.status();
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn unreachable_client() -> serde_json::Value {
@@ -38,7 +43,10 @@ async fn every_method_is_mounted_where_the_consumer_calls_it() {
         if method == "reannounce" {
             assert_eq!(answer, json!({ "Ok": null }), "{method}");
         } else {
-            assert!(answer["Err"].is_string(), "{method} lost its reason: {answer}");
+            assert!(
+                answer["Err"].is_string(),
+                "{method} lost its reason: {answer}"
+            );
         }
     }
 }
@@ -59,22 +67,49 @@ async fn a_status_that_could_not_be_asked_is_a_bad_gateway_not_a_vanished_magnet
 async fn status_answers_null_for_a_forgotten_magnet_and_the_pinned_keys_otherwise() {
     let fake = Fake::start(|req| match req.query["id"].as_str() {
         "1" => Resp::failure("MAGNET_INVALID_ID", "gone"),
-        _ => Resp::data(json!({ "magnets": [{ "id": 2, "filename": "n", "size": 10, "statusCode": 1 }] })),
+        _ => Resp::data(
+            json!({ "magnets": [{ "id": 2, "filename": "n", "size": 10, "statusCode": 1 }] }),
+        ),
     });
     let client = json!({ "url": fake.base, "password": "k" });
 
-    let (_, gone) = call("/_port/tv.kroma.torrents/client/status", json!({ "client": client, "args": { "client_ref": "1" } })).await;
-    let (_, found) = call("/_port/tv.kroma.torrents/client/status", json!({ "client": client, "args": { "client_ref": "2" } })).await;
+    let (_, gone) = call(
+        "/_port/tv.kroma.torrents/client/status",
+        json!({ "client": client, "args": { "client_ref": "1" } }),
+    )
+    .await;
+    let (_, found) = call(
+        "/_port/tv.kroma.torrents/client/status",
+        json!({ "client": client, "args": { "client_ref": "2" } }),
+    )
+    .await;
 
     assert!(gone.is_null());
-    let mut keys: Vec<&str> = found.as_object().unwrap().keys().map(String::as_str).collect();
+    let mut keys: Vec<&str> = found
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     keys.sort_unstable();
     assert_eq!(
         keys,
         [
-            "client_ref", "down_bps", "error", "files", "info_hash", "lifetime_downloaded_bytes",
-            "lifetime_uploaded_bytes", "name", "peers", "peers_seen", "progress", "save_path",
-            "size_bytes", "state", "up_bps"
+            "client_ref",
+            "down_bps",
+            "error",
+            "files",
+            "info_hash",
+            "lifetime_downloaded_bytes",
+            "lifetime_uploaded_bytes",
+            "name",
+            "peers",
+            "peers_seen",
+            "progress",
+            "save_path",
+            "size_bytes",
+            "state",
+            "up_bps"
         ]
     );
     assert_eq!(found["state"], "downloading");

@@ -1,7 +1,10 @@
 use super::*;
 
 fn saved(key: &str) -> Saved {
-    Saved { url: String::new(), key: key.into() }
+    Saved {
+        url: String::new(),
+        key: key.into(),
+    }
 }
 
 #[test]

@@ -23,8 +23,14 @@ pub struct Located {
     pub size: u64,
 }
 
-pub fn locate(module_dir: &Path, settings: CacheSettings, reference: &str, warm: bool) -> Result<Located> {
-    let (magnet, rel) = parse_reference(reference).ok_or_else(|| anyhow!("not a reference this module made"))?;
+pub fn locate(
+    module_dir: &Path,
+    settings: CacheSettings,
+    reference: &str,
+    warm: bool,
+) -> Result<Located> {
+    let (magnet, rel) =
+        parse_reference(reference).ok_or_else(|| anyhow!("not a reference this module made"))?;
     let saved = Creds::new(module_dir).candidates(magnet);
     let (file, _) = through(&saved, |api| {
         plan_with(api, magnet)?
@@ -36,14 +42,22 @@ pub fn locate(module_dir: &Path, settings: CacheSettings, reference: &str, warm:
     if let Some(path) = cache.cached_path(magnet, &file) {
         cache.touch(&path);
         let path = path.canonicalize().unwrap_or(path);
-        return Ok(Located { path: Some(path.to_string_lossy().into_owned()), url: None, size: file.size });
+        return Ok(Located {
+            path: Some(path.to_string_lossy().into_owned()),
+            url: None,
+            size: file.size,
+        });
     }
     let (url, _) = through(&saved, |api| url_of(api, magnet, &file))?;
     if warm && settings.enabled() {
         let ((), api) = through(&saved, |api| api.user().map(|_| ()))?;
         cache.ensure_cached(&api, magnet, &file)?;
     }
-    Ok(Located { path: None, url: Some(url), size: file.size })
+    Ok(Located {
+        path: None,
+        url: Some(url),
+        size: file.size,
+    })
 }
 
 fn url_of(api: &Api, magnet: &str, file: &Planned) -> Result<String> {

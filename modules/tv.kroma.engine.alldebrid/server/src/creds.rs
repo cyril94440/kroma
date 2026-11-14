@@ -22,7 +22,9 @@ pub struct Creds {
 
 impl Creds {
     pub fn new(module_dir: &Path) -> Self {
-        Self { dir: module_dir.join("credentials") }
+        Self {
+            dir: module_dir.join("credentials"),
+        }
     }
 
     pub fn remember(&self, magnet: Option<&str>, saved: &Saved) -> std::io::Result<()> {
@@ -36,7 +38,9 @@ impl Creds {
     /// The magnet's own record first, then the latest, without repeats.
     pub fn candidates(&self, magnet: &str) -> Vec<Saved> {
         let mut found: Vec<Saved> = Vec::new();
-        let own = crate::ensure_magnet_id(magnet).ok().and_then(|()| self.read(magnet));
+        let own = crate::ensure_magnet_id(magnet)
+            .ok()
+            .and_then(|()| self.read(magnet));
         for saved in own.into_iter().chain(self.read(LATEST)) {
             if !found.contains(&saved) {
                 found.push(saved);
@@ -75,7 +79,12 @@ impl Creds {
 #[cfg(unix)]
 fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
     use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(path)
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)
 }
 
 #[cfg(not(unix))]

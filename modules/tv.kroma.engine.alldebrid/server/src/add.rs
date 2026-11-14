@@ -1,6 +1,5 @@
 //! What an add can be handed, and how each reaches AllDebrid.
 
-
 use anyhow::{bail, Context, Result};
 use kroma_module_sdk::http::address::web_target;
 use kroma_module_sdk::http::Fetch;
@@ -29,7 +28,9 @@ pub(crate) fn classify(link: &str) -> Option<Link<'_>> {
 fn is_info_hash(text: &str) -> bool {
     match text.len() {
         40 => text.bytes().all(|b| b.is_ascii_hexdigit()),
-        32 => text.bytes().all(|b| b.is_ascii_uppercase() || (b'2'..=b'7').contains(&b)),
+        32 => text
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || (b'2'..=b'7').contains(&b)),
         _ => false,
     }
 }
@@ -51,8 +52,10 @@ impl AllDebrid {
         let bytes = fetch_torrent(url)?;
         let staging = self.module_dir.join("torrents");
         std::fs::create_dir_all(&staging).context("create the torrent staging folder")?;
-        let file = staging
-            .join(format!("{}.torrent", kroma_module_sdk::primitives::random_token()));
+        let file = staging.join(format!(
+            "{}.torrent",
+            kroma_module_sdk::primitives::random_token()
+        ));
         std::fs::write(&file, &bytes).context("stage the .torrent file")?;
         let uploaded = self.api.upload_torrent_entry(&file);
         let _ = std::fs::remove_file(&file);
@@ -61,7 +64,9 @@ impl AllDebrid {
 }
 
 fn fetch_torrent(url: &str) -> Result<Vec<u8>> {
-    let host = web_target(url).map(|target| target.host).unwrap_or_default();
+    let host = web_target(url)
+        .map(|target| target.host)
+        .unwrap_or_default();
     let response = Fetch::new()
         .purpose(TORRENT_PURPOSE)
         .max_time(TORRENT_SECS)
@@ -69,7 +74,10 @@ fn fetch_torrent(url: &str) -> Result<Vec<u8>> {
         .get(url)
         .with_context(|| format!("fetch the .torrent from {host}"))?;
     if !(200..300).contains(&response.status) {
-        bail!("{host} answered HTTP {} for the .torrent file", response.status);
+        bail!(
+            "{host} answered HTTP {} for the .torrent file",
+            response.status
+        );
     }
     if response.body.first() != Some(&b'd') {
         bail!("{host} did not return a .torrent file");
@@ -85,9 +93,15 @@ mod tests {
     fn a_magnet_a_hash_and_a_web_link_are_told_apart() {
         let hash = "0123456789abcdef0123456789abcdef01234567";
 
-        assert_eq!(classify("magnet:?xt=urn:btih:AB"), Some(Link::Magnet("magnet:?xt=urn:btih:AB")));
+        assert_eq!(
+            classify("magnet:?xt=urn:btih:AB"),
+            Some(Link::Magnet("magnet:?xt=urn:btih:AB"))
+        );
         assert_eq!(classify(hash), Some(Link::Magnet(hash)));
-        assert_eq!(classify(" HTTPS://t/x.torrent "), Some(Link::Web("HTTPS://t/x.torrent")));
+        assert_eq!(
+            classify(" HTTPS://t/x.torrent "),
+            Some(Link::Web("HTTPS://t/x.torrent"))
+        );
     }
 
     #[test]

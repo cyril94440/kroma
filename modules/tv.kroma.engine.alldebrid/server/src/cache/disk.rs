@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 pub fn dest(folder: &Path, rel: &str) -> PathBuf {
-    rel.split('/').fold(folder.to_path_buf(), |path, part| path.join(part))
+    rel.split('/')
+        .fold(folder.to_path_buf(), |path, part| path.join(part))
 }
 
 pub fn part_of(dest: &Path) -> PathBuf {

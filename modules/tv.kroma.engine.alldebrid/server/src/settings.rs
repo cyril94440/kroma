@@ -19,7 +19,10 @@ pub struct CacheSettings {
 
 impl Default for CacheSettings {
     fn default() -> Self {
-        Self { max_gb: DEFAULT_GB as u64, max_days: DEFAULT_DAYS as u64 }
+        Self {
+            max_gb: DEFAULT_GB as u64,
+            max_days: DEFAULT_DAYS as u64,
+        }
     }
 }
 
@@ -38,7 +41,10 @@ impl CacheSettings {
     /// Switched off, the limits evict everything that is not in use.
     pub fn limits(&self) -> Limits {
         if !self.enabled() {
-            return Limits { max_bytes: Some(0), max_age: Duration::ZERO };
+            return Limits {
+                max_bytes: Some(0),
+                max_age: Duration::ZERO,
+            };
         }
         Limits {
             max_bytes: Some(self.max_gb.saturating_mul(GB)),
@@ -58,7 +64,13 @@ mod tests {
     fn the_defaults_apply_until_the_operator_chooses() {
         let settings = CacheSettings::read(&StubHost::new());
 
-        assert_eq!(settings, CacheSettings { max_gb: 50, max_days: 14 });
+        assert_eq!(
+            settings,
+            CacheSettings {
+                max_gb: 50,
+                max_days: 14
+            }
+        );
         assert_eq!(settings.limits().max_bytes, Some(50 * GB));
         assert_eq!(settings.limits().max_age, Duration::from_secs(14 * DAY));
     }
@@ -96,7 +108,10 @@ mod tests {
 
     #[test]
     fn zero_gigabytes_is_no_cache_and_evicts_everything_idle() {
-        let settings = CacheSettings { max_gb: 0, max_days: 14 };
+        let settings = CacheSettings {
+            max_gb: 0,
+            max_days: 14,
+        };
 
         assert!(!settings.enabled());
         assert_eq!(settings.limits().max_bytes, Some(0));

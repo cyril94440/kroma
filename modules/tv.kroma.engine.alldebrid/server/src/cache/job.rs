@@ -9,7 +9,11 @@ use crate::api::Api;
 use crate::files::Planned;
 
 const PURPOSE: &str = "debrid-transfer";
-pub const CHUNK_BYTES: u64 = if cfg!(test) { 64 * 1024 } else { 32 * 1024 * 1024 };
+pub const CHUNK_BYTES: u64 = if cfg!(test) {
+    64 * 1024
+} else {
+    32 * 1024 * 1024
+};
 const CHUNK_SECS: u32 = 120;
 const MAX_RELOCKS: u8 = 2;
 const MAX_FAILURES: u8 = 3;
@@ -21,7 +25,10 @@ pub struct Step {
 
 impl Step {
     fn moved(moved: u64) -> Self {
-        Self { moved, finished: false }
+        Self {
+            moved,
+            finished: false,
+        }
     }
 }
 
@@ -60,7 +67,10 @@ impl FileJob {
         let have = disk::len(&part).unwrap_or(0);
         if have > self.size {
             let _ = std::fs::remove_file(&part);
-            bail!("a partial file was larger than the {} bytes AllDebrid reports", self.size);
+            bail!(
+                "a partial file was larger than the {} bytes AllDebrid reports",
+                self.size
+            );
         }
         if have == self.size {
             return self.finish(0);
@@ -136,7 +146,10 @@ impl FileJob {
             File::create(&part).context("create the empty file")?;
         }
         std::fs::rename(&part, &self.dest).context("move the finished file into place")?;
-        Ok(Step { moved, finished: true })
+        Ok(Step {
+            moved,
+            finished: true,
+        })
     }
 }
 

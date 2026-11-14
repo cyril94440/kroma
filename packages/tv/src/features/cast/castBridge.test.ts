@@ -90,7 +90,7 @@ describe('castReport', () => {
     const report = bridge.castReport(t);
     expect(report?.audioIndex).toBe(1);
     expect(report?.audioTracks?.[0]).toMatchObject({ index: 1 });
-    expect(report?.audioTracks?.[0]?.label).toContain('EAC3');
+    expect(report?.audioTracks?.[0]?.label).toContain('Dolby Digital+ 5.1');
     expect(report?.audioTracks?.[1]).toEqual({ index: 2, label: '#2' });
   });
 

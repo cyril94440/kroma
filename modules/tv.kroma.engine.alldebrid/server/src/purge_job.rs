@@ -35,7 +35,8 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, "x").unwrap();
         let file = std::fs::File::options().write(true).open(&path).unwrap();
-        file.set_modified(std::time::SystemTime::now() - Duration::from_secs(days * 86_400)).unwrap();
+        file.set_modified(std::time::SystemTime::now() - Duration::from_secs(days * 86_400))
+            .unwrap();
         path
     }
 

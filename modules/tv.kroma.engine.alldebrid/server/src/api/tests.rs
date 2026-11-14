@@ -27,7 +27,10 @@ fn ids_arrive_as_numbers_or_strings() {
 #[test]
 fn only_the_unknown_magnet_code_reads_as_unknown() {
     let refused = |code: &str| {
-        anyhow::Error::new(Refused { code: code.into(), message: String::new() })
+        anyhow::Error::new(Refused {
+            code: code.into(),
+            message: String::new(),
+        })
     };
 
     assert!(is_unknown_magnet(&refused("MAGNET_INVALID_ID")));

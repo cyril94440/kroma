@@ -1,6 +1,10 @@
 //! Which of a ranked list of releases AllDebrid already holds: each is
-//! uploaded, the first one it reports ready is kept, and every other upload is
-//! deleted again so the account is left as it was found.
+//! uploaded, the first one it reports ready is kept, and every other magnet
+//! this call created is deleted again. AllDebrid documents no signal for an
+//! upload that was already in the account, so the account's magnet ids are read
+//! first and an id present then is never deleted.
+
+use std::collections::HashSet;
 
 use anyhow::Result;
 
@@ -37,6 +41,15 @@ impl AllDebrid {
         if ranked.is_empty() {
             return Ok(None);
         }
+        let before = match self.api.magnet_ids() {
+            Ok(ids) => Some(ids),
+            Err(error) => {
+                tracing::warn!(
+                    "could not list the account's magnets; none will be deleted: {error:#}"
+                );
+                None
+            }
+        };
         let mut tried = Vec::new();
         let outcome = self.try_all(ranked, &mut tried);
         let chosen = tried
@@ -44,7 +57,11 @@ impl AllDebrid {
             .filter(|attempt| attempt.uploaded.ready)
             .min_by_key(|attempt| attempt.rank)
             .map(|attempt| (attempt.rank, attempt.uploaded.id.clone()));
-        self.discard_others(&tried, chosen.as_ref().map(|(_, id)| id.as_str()));
+        self.discard_others(
+            &tried,
+            chosen.as_ref().map(|(_, id)| id.as_str()),
+            before.as_ref(),
+        );
         outcome?;
         Ok(chosen.map(|(rank, client_ref)| {
             self.remember(Some(&client_ref));
@@ -94,7 +111,12 @@ impl AllDebrid {
         Ok(())
     }
 
-    fn discard_others(&self, tried: &[Tried], chosen: Option<&str>) {
+    fn discard_others(
+        &self,
+        tried: &[Tried],
+        chosen: Option<&str>,
+        before: Option<&HashSet<String>>,
+    ) {
         let mut seen: Vec<&str> = Vec::new();
         let mut deleted = false;
         for attempt in tried {
@@ -104,6 +126,16 @@ impl AllDebrid {
             }
             seen.push(id);
             if self.creds.knows(id) {
+                continue;
+            }
+            let Some(before) = before else {
+                tracing::warn!(
+                    magnet = id,
+                    "left in the account: its prior contents are unknown"
+                );
+                continue;
+            };
+            if before.contains(id) {
                 continue;
             }
             if deleted {

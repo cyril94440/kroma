@@ -27,7 +27,10 @@ pub(crate) fn pack() -> Script {
         tree,
         vec![
             ("ep1.mkv", vec![7; 5000]),
-            ("ep1.en.srt", b"1\n00:00:01,000 --> 00:00:02,000\nhi\n".to_vec()[..20].to_vec()),
+            (
+                "ep1.en.srt",
+                b"1\n00:00:01,000 --> 00:00:02,000\nhi\n".to_vec()[..20].to_vec(),
+            ),
         ],
         true,
     )
@@ -73,7 +76,10 @@ fn names(root: &Path) -> Vec<String> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
+#[cfg_attr(
+    target_family = "wasm",
+    ignore = "binds a test server, and a component holds no socket"
+)]
 async fn a_ready_magnet_becomes_stubs_and_small_subtitles_and_only_then_completed() {
     let fake = pack().start();
     let (dir, alldebrid) = setup("ad-ready", &fake);
@@ -84,21 +90,46 @@ async fn a_ready_magnet_becomes_stubs_and_small_subtitles_and_only_then_complete
     assert_eq!(done.state, TorrentState::Completed);
     assert_eq!(done.progress, 1.0);
     assert_eq!(done.save_path.as_deref(), folder.to_str());
-    assert_eq!(done.files, ["Show.S01/ep1.mkv.kremote", "Show.S01/ep1.en.srt"]);
-    assert_eq!(names(&folder), ["Show.S01/ep1.en.srt", "Show.S01/ep1.mkv.kremote"]);
+    assert_eq!(
+        done.files,
+        ["Show.S01/ep1.mkv.kremote", "Show.S01/ep1.en.srt"]
+    );
+    assert_eq!(
+        names(&folder),
+        ["Show.S01/ep1.en.srt", "Show.S01/ep1.mkv.kremote"]
+    );
     let stub = remote_file::read(&folder.join("Show.S01/ep1.mkv.kremote")).unwrap();
     assert_eq!(stub.source, "alldebrid");
     assert_eq!(stub.reference, "7:Show.S01/ep1.mkv");
     assert_eq!(stub.name, "ep1.mkv");
     assert_eq!(stub.size, 5000);
-    assert_eq!(std::fs::read(folder.join("Show.S01/ep1.en.srt")).unwrap().len(), 20);
-    let unlocked: Vec<String> = fake.calls_to("/v4/link/unlock").iter().map(|c| c.query["link"].clone()).collect();
-    assert_eq!(unlocked, ["https://alldebrid.com/f/ep1.en.srt"], "only the sidecar was downloaded");
-    assert!(fake.calls_to("/dl/ep1.mkv").is_empty(), "no video byte was fetched");
+    assert_eq!(
+        std::fs::read(folder.join("Show.S01/ep1.en.srt"))
+            .unwrap()
+            .len(),
+        20
+    );
+    let unlocked: Vec<String> = fake
+        .calls_to("/v4/link/unlock")
+        .iter()
+        .map(|c| c.query["link"].clone())
+        .collect();
+    assert_eq!(
+        unlocked,
+        ["https://alldebrid.com/f/ep1.en.srt"],
+        "only the sidecar was downloaded"
+    );
+    assert!(
+        fake.calls_to("/dl/ep1.mkv").is_empty(),
+        "no video byte was fetched"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
+#[cfg_attr(
+    target_family = "wasm",
+    ignore = "binds a test server, and a component holds no socket"
+)]
 async fn completed_is_never_reported_while_a_sidecar_is_still_on_its_way() {
     let fake = pack().start();
     let (_dir, alldebrid) = setup("ad-ready-wait", &fake);
@@ -112,13 +143,19 @@ async fn completed_is_never_reported_while_a_sidecar_is_still_on_its_way() {
     if first.state == TorrentState::Completed {
         assert_eq!(first.files.len(), 2);
     } else {
-        assert_eq!((first.state, first.progress), (TorrentState::Downloading, 0.99));
+        assert_eq!(
+            (first.state, first.progress),
+            (TorrentState::Downloading, 0.99)
+        );
         assert!(first.files.is_empty() && first.save_path.is_none());
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
+#[cfg_attr(
+    target_family = "wasm",
+    ignore = "binds a test server, and a component holds no socket"
+)]
 async fn a_magnet_with_no_video_is_an_error_not_an_empty_completion() {
     let script = Script::new(json!([node("readme.nfo", 4)]), vec![], true);
     let fake = script.start();
@@ -131,7 +168,10 @@ async fn a_magnet_with_no_video_is_an_error_not_an_empty_completion() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
+#[cfg_attr(
+    target_family = "wasm",
+    ignore = "binds a test server, and a component holds no socket"
+)]
 async fn a_failing_subtitle_does_not_hold_the_title_back() {
     let tree = json!([node("a.mkv", 10), node("a.srt", 10)]);
     let fake = Script::new(tree, vec![("a.mkv", vec![1; 10])], true).start();
@@ -144,7 +184,10 @@ async fn a_failing_subtitle_does_not_hold_the_title_back() {
 }
 
 #[test]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
+#[cfg_attr(
+    target_family = "wasm",
+    ignore = "binds a test server, and a component holds no socket"
+)]
 fn removing_a_magnet_that_has_not_finished_cancels_it_on_alldebrid() {
     let script = pack();
     script.status_code.store(1, Ordering::SeqCst);
@@ -157,7 +200,10 @@ fn removing_a_magnet_that_has_not_finished_cancels_it_on_alldebrid() {
 }
 
 #[test]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
+#[cfg_attr(
+    target_family = "wasm",
+    ignore = "binds a test server, and a component holds no socket"
+)]
 fn a_finished_magnet_stays_on_alldebrid_and_only_its_local_stubs_go() {
     let fake = pack().start();
     let dir = kroma_module_sdk::testing::temp_dir("ad-remove-ready");
@@ -179,7 +225,10 @@ fn a_finished_magnet_stays_on_alldebrid_and_only_its_local_stubs_go() {
 }
 
 #[test]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
+#[cfg_attr(
+    target_family = "wasm",
+    ignore = "binds a test server, and a component holds no socket"
+)]
 fn removing_a_magnet_alldebrid_forgot_succeeds() {
     let fake = Fake::start(|req| match req.path.as_str() {
         "/v4.1/magnet/status" => crate::fake_alldebrid::Resp::failure("MAGNET_INVALID_ID", "gone"),

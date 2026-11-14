@@ -9,11 +9,18 @@ fn at(now: SystemTime, idle: Duration) -> SystemTime {
 }
 
 fn entry(name: &str, size: u64, last_used: SystemTime) -> Entry {
-    Entry { path: PathBuf::from(name), size, last_used }
+    Entry {
+        path: PathBuf::from(name),
+        size,
+        last_used,
+    }
 }
 
 fn limits(max_bytes: u64, days: u64) -> Limits {
-    Limits { max_bytes: (max_bytes > 0).then_some(max_bytes), max_age: DAY * days as u32 }
+    Limits {
+        max_bytes: (max_bytes > 0).then_some(max_bytes),
+        max_age: DAY * days as u32,
+    }
 }
 
 fn names(paths: Vec<PathBuf>) -> Vec<String> {
@@ -25,9 +32,15 @@ fn names(paths: Vec<PathBuf>) -> Vec<String> {
 #[test]
 fn a_file_idle_past_the_age_limit_goes() {
     let now = SystemTime::now();
-    let all = [entry("old", 1, at(now, DAY * 15)), entry("fresh", 1, at(now, DAY * 2))];
+    let all = [
+        entry("old", 1, at(now, DAY * 15)),
+        entry("fresh", 1, at(now, DAY * 2)),
+    ];
 
-    assert_eq!(names(victims(&all, now, limits(0, 14), &HashSet::new())), ["old"]);
+    assert_eq!(
+        names(victims(&all, now, limits(0, 14), &HashSet::new())),
+        ["old"]
+    );
 }
 
 #[test]
@@ -39,22 +52,37 @@ fn the_least_recently_used_go_first_until_the_rest_fits() {
         entry("b", 40, at(now, DAY * 4)),
     ];
 
-    assert_eq!(names(victims(&all, now, limits(80, 0), &HashSet::new())), ["a"]);
-    assert_eq!(names(victims(&all, now, limits(50, 0), &HashSet::new())), ["a", "b"]);
+    assert_eq!(
+        names(victims(&all, now, limits(80, 0), &HashSet::new())),
+        ["a"]
+    );
+    assert_eq!(
+        names(victims(&all, now, limits(50, 0), &HashSet::new())),
+        ["a", "b"]
+    );
 }
 
 #[test]
 fn a_file_used_within_the_grace_is_never_chosen_even_over_budget() {
     let now = SystemTime::now();
-    let all = [entry("busy", 100, at(now, Duration::from_secs(60))), entry("idle", 10, at(now, DAY))];
+    let all = [
+        entry("busy", 100, at(now, Duration::from_secs(60))),
+        entry("idle", 10, at(now, DAY)),
+    ];
 
-    assert_eq!(names(victims(&all, now, limits(1, 0), &HashSet::new())), ["idle"]);
+    assert_eq!(
+        names(victims(&all, now, limits(1, 0), &HashSet::new())),
+        ["idle"]
+    );
 }
 
 #[test]
 fn a_file_being_fetched_is_never_chosen() {
     let now = SystemTime::now();
-    let all = [entry("a.part", 100, at(now, DAY * 90)), entry("b", 100, at(now, DAY * 90))];
+    let all = [
+        entry("a.part", 100, at(now, DAY * 90)),
+        entry("b", 100, at(now, DAY * 90)),
+    ];
     let running = HashSet::from([PathBuf::from("a.part")]);
 
     assert_eq!(names(victims(&all, now, limits(1, 14), &running)), ["b"]);
@@ -63,9 +91,15 @@ fn a_file_being_fetched_is_never_chosen() {
 #[test]
 fn protected_bytes_still_count_against_the_budget() {
     let now = SystemTime::now();
-    let all = [entry("busy", 90, at(now, Duration::from_secs(5))), entry("idle", 20, at(now, DAY))];
+    let all = [
+        entry("busy", 90, at(now, Duration::from_secs(5))),
+        entry("idle", 20, at(now, DAY)),
+    ];
 
-    assert_eq!(names(victims(&all, now, limits(100, 0), &HashSet::new())), ["idle"]);
+    assert_eq!(
+        names(victims(&all, now, limits(100, 0), &HashSet::new())),
+        ["idle"]
+    );
 }
 
 #[test]
@@ -102,7 +136,13 @@ fn purging_a_folder_deletes_the_victims_and_the_directories_they_emptied() {
 
     let report = purge(root, SystemTime::now(), limits(0, 14), &running);
 
-    assert_eq!(report, Report { removed: 1, freed: 10 });
+    assert_eq!(
+        report,
+        Report {
+            removed: 1,
+            freed: 10
+        }
+    );
     assert!(!root.join("7/old").exists(), "emptied directory removed");
     assert!(root.join("7/keep/b.mkv").exists());
     assert!(root.join("8/c.mkv.part").exists());
@@ -112,8 +152,14 @@ fn purging_a_folder_deletes_the_victims_and_the_directories_they_emptied() {
 #[test]
 fn a_budget_of_nothing_evicts_everything_that_is_not_in_use() {
     let now = SystemTime::now();
-    let all = [entry("a", 1, at(now, DAY)), entry("busy", 1, at(now, Duration::from_secs(5)))];
-    let none = Limits { max_bytes: Some(0), max_age: Duration::ZERO };
+    let all = [
+        entry("a", 1, at(now, DAY)),
+        entry("busy", 1, at(now, Duration::from_secs(5))),
+    ];
+    let none = Limits {
+        max_bytes: Some(0),
+        max_age: Duration::ZERO,
+    };
 
     assert_eq!(names(victims(&all, now, none, &HashSet::new())), ["a"]);
 }

@@ -41,7 +41,9 @@ pub struct Cache {
 
 impl Cache {
     pub fn new(module_dir: &Path) -> Self {
-        Self { root: module_dir.join(DIR) }
+        Self {
+            root: module_dir.join(DIR),
+        }
     }
 
     pub fn path_of(&self, magnet: &str, rel: &str) -> Result<PathBuf> {

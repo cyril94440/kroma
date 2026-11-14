@@ -28,11 +28,14 @@ the import, because the library streams from it.
 `POST /_port/tv.kroma.torrents/client/instant` takes `{ "candidates": [{ "key", "magnet_or_url" }] }`.
 At most eight are used: the magnets go up in one `magnet/upload` call, each `.torrent` link in a
 call of its own, and the first candidate in rank order that AllDebrid reports `ready` is kept and
-answered as `{ "key", "client_ref" }`. Every other upload, ready or not, is deleted again
-(`magnet/delete` takes one id, so one call each, spaced to stay under the documented 12 requests
-a second); a delete that fails is logged with the magnet id and never fails the call. A magnet
-this module already tracks is never deleted. An empty list answers `null` without calling
-AllDebrid.
+answered as `{ "key", "client_ref" }`. AllDebrid documents no flag for an upload that was already in
+the account, so the account's magnet ids are listed first (one `magnet/status` call with no `id`) and
+only a magnet whose id was not there, so one this call created, may be deleted again. Magnets the
+user added by hand, or that this module tracks, are never deleted, chosen or not. If the account
+cannot be listed nothing is deleted and the ids left behind are logged. Deletes are one call each
+(`magnet/delete` takes one id), spaced to stay under the documented 12 requests a second; a delete
+that fails is logged with the magnet id and never fails the call. An empty list answers `null`
+without calling AllDebrid.
 
 ## Streaming and the cache
 

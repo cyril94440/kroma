@@ -63,7 +63,11 @@ pub fn forget(dest: &Path) {
 }
 
 pub fn forget_under(folder: &Path) {
-    let inside: Vec<PathBuf> = held().keys().filter(|dest| dest.starts_with(folder)).cloned().collect();
+    let inside: Vec<PathBuf> = held()
+        .keys()
+        .filter(|dest| dest.starts_with(folder))
+        .cloned()
+        .collect();
     for dest in inside {
         forget(&dest);
     }
@@ -94,7 +98,11 @@ pub fn join_or_start(dest: &Path, file: &Planned, api: Api) -> Progress {
     held().insert(dest.to_path_buf(), pull.clone());
     let job = FileJob::new(api, dest.to_path_buf(), file);
     tokio::spawn(run(pull.clone(), job));
-    pull.current().unwrap_or(Progress::Running { done: started, total: file.size, bps: 0 })
+    pull.current().unwrap_or(Progress::Running {
+        done: started,
+        total: file.size,
+        bps: 0,
+    })
 }
 
 impl Pull {

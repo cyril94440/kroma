@@ -49,18 +49,29 @@ fn a_parent_directory_component_cannot_climb_out() {
 
 #[test]
 fn separators_and_absolute_names_are_neutralised() {
-    let tree = [file("/etc/passwd", 1), file("..\\..\\boot.ini", 1), file("a/../b", 1)];
+    let tree = [
+        file("/etc/passwd", 1),
+        file("..\\..\\boot.ini", 1),
+        file("a/../b", 1),
+    ];
 
     assert_eq!(rels(&tree), ["_etc_passwd", ".._.._boot.ini", "a_.._b"]);
 }
 
 #[test]
 fn no_planned_path_has_a_climbing_or_rooted_component() {
-    let tree = [folder("../x", vec![file("/abs", 1), file("....", 1), file("", 1)])];
+    let tree = [folder(
+        "../x",
+        vec![file("/abs", 1), file("....", 1), file("", 1)],
+    )];
 
     for rel in rels(&tree) {
         assert!(!rel.starts_with('/'), "{rel}");
-        assert!(rel.split('/').all(|part| !part.is_empty() && part.chars().any(|c| c != '.')), "{rel}");
+        assert!(
+            rel.split('/')
+                .all(|part| !part.is_empty() && part.chars().any(|c| c != '.')),
+            "{rel}"
+        );
     }
 }
 

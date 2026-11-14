@@ -49,7 +49,8 @@ pub fn victims(
     }
     if let Some(max_bytes) = limits.max_bytes {
         let mut total: u64 = kept.iter().map(|entry| entry.size).sum();
-        let mut evictable: Vec<&Entry> = kept.into_iter().filter(|entry| !protected(entry)).collect();
+        let mut evictable: Vec<&Entry> =
+            kept.into_iter().filter(|entry| !protected(entry)).collect();
         evictable.sort_by_key(|entry| entry.last_used);
         for entry in evictable {
             if total <= max_bytes {
@@ -110,7 +111,8 @@ fn remove_empty_dirs(dir: &Path, is_root: bool) -> bool {
     let mut empty = true;
     for item in read.flatten() {
         let path = item.path();
-        let child_empty = item.metadata().is_ok_and(|meta| meta.is_dir()) && remove_empty_dirs(&path, false);
+        let child_empty =
+            item.metadata().is_ok_and(|meta| meta.is_dir()) && remove_empty_dirs(&path, false);
         empty &= child_empty;
     }
     if empty && !is_root {

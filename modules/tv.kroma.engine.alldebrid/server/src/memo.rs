@@ -18,7 +18,10 @@ pub struct Memo<V> {
 
 impl<V: Clone> Memo<V> {
     pub fn new(ttl: Duration) -> Self {
-        Self { ttl, items: Mutex::default() }
+        Self {
+            ttl,
+            items: Mutex::default(),
+        }
     }
 
     pub fn get(&self, key: &str, now: Instant) -> Option<V> {
@@ -37,7 +40,10 @@ impl<V: Clone> Memo<V> {
     }
 
     pub fn forget(&self, key: &str) {
-        self.items.lock().unwrap_or_else(PoisonError::into_inner).remove(key);
+        self.items
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(key);
     }
 }
 

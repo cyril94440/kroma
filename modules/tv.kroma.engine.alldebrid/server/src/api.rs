@@ -1,6 +1,7 @@
 //! The AllDebrid HTTP API: one method per endpoint this module calls, each
 //! answering the envelope's `data` or the failure it carried.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::path::Path;
 
@@ -79,9 +80,9 @@ impl Api {
     }
 
     fn get(&self, path: &str, query: &[(&str, &str)]) -> Result<Value> {
-        let fetch = query
-            .iter()
-            .fold(self.fetch(), |fetch, (name, value)| fetch.query(name, *value));
+        let fetch = query.iter().fold(self.fetch(), |fetch, (name, value)| {
+            fetch.query(name, *value)
+        });
         data_of(fetch.get(&self.url(path)))
     }
 
@@ -100,14 +101,23 @@ impl Api {
     }
 
     pub fn upload_magnets(&self, magnets: &[&str]) -> Result<Vec<Result<Uploaded>>> {
-        let fields: Vec<(&str, &str)> = magnets.iter().map(|magnet| ("magnets[]", *magnet)).collect();
+        let fields: Vec<(&str, &str)> = magnets
+            .iter()
+            .map(|magnet| ("magnets[]", *magnet))
+            .collect();
         let data = self.post("/v4/magnet/upload", &fields)?;
-        Ok(entries(&data, "magnets").iter().map(entry_uploaded).collect())
+        Ok(entries(&data, "magnets")
+            .iter()
+            .map(entry_uploaded)
+            .collect())
     }
 
     pub fn upload_torrent_entry(&self, file: &Path) -> Result<Uploaded> {
         let parts = [("files[]", FormPart::File(file))];
-        let data = data_of(self.fetch().post_multipart(&self.url("/v4/magnet/upload/file"), &parts))?;
+        let data = data_of(
+            self.fetch()
+                .post_multipart(&self.url("/v4/magnet/upload/file"), &parts),
+        )?;
         entries(&data, "files")
             .first()
             .map(entry_uploaded)
@@ -124,7 +134,21 @@ impl Api {
             Some(single @ Value::Object(_)) => Some(single),
             _ => None,
         };
-        first.map(|magnet| parse(Some(magnet), "magnet")).transpose()
+        first
+            .map(|magnet| parse(Some(magnet), "magnet"))
+            .transpose()
+    }
+
+    /// Ids of every magnet in the account, from one `magnet/status` call with no `id`.
+    pub fn magnet_ids(&self) -> Result<HashSet<String>> {
+        let data = self.get("/v4.1/magnet/status", &[])?;
+        let Some(Value::Array(all)) = data.get("magnets") else {
+            bail!("AllDebrid's reply has no magnet list");
+        };
+        Ok(all
+            .iter()
+            .filter_map(|magnet| magnet.get("id").and_then(wire::id_text))
+            .collect())
     }
 
     pub fn files(&self, id: &str) -> Result<Vec<Node>> {
