@@ -20,6 +20,15 @@ impl Req {
         parse_pairs(&String::from_utf8_lossy(&self.body))
     }
 
+    pub(crate) fn form_all(&self, name: &str) -> Vec<String> {
+        String::from_utf8_lossy(&self.body)
+            .split('&')
+            .filter_map(|pair| pair.split_once('='))
+            .filter(|(key, _)| decode(key) == name)
+            .map(|(_, value)| decode(value))
+            .collect()
+    }
+
     pub(crate) fn range(&self) -> Option<(u64, u64)> {
         let spec = self.headers.get("range")?.strip_prefix("bytes=")?;
         let (from, to) = spec.split_once('-')?;

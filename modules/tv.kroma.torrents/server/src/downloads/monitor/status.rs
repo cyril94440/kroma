@@ -25,6 +25,16 @@ impl DownloadManager {
         row: &db::DownloadRow,
         status: &crate::TorrentStatus,
     ) -> bool {
+        self.record_status(host, row, status, true)
+    }
+
+    pub(in crate::downloads) fn record_status(
+        &self,
+        host: &dyn HostCtx,
+        row: &db::DownloadRow,
+        status: &crate::TorrentStatus,
+        announce: bool,
+    ) -> bool {
         let finished = status.progress >= 1.0
             || matches!(
                 status.state,
@@ -94,7 +104,9 @@ impl DownloadManager {
                 "download.completed",
                 json!({ "id": row.id, "title": row.release_title }),
             ));
-            host.notify(&notice::audience(), &notice::completed(row));
+            if announce {
+                host.notify(&notice::audience(), &notice::completed(row));
+            }
             return true;
         }
         false

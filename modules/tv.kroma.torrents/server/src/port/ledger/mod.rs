@@ -11,7 +11,7 @@ use kroma_module_sdk::host::{HostStorage, port_reply};
 
 use super::manager;
 use crate::db::DownloadRow;
-use crate::{DownloadDb, GrabSpec, TorrentFileEntry};
+use crate::{DownloadDb, GrabSpec, InstantOutcome, InstantRelease, TorrentFileEntry};
 
 pub const DOWNLOAD_GRAB: &str = "tv.kroma.torrents/grab";
 
@@ -37,6 +37,14 @@ pub fn routes<S: HostStorage + Clone + Send + Sync + 'static>() -> Router<S> {
             post(drop_data::<S>),
         )
         .route(
+            "/_port/tv.kroma.torrents/grab/grab-instant",
+            post(grab_instant::<S>),
+        )
+        .route(
+            "/_port/tv.kroma.torrents/grab/instant-capable",
+            post(instant_capable::<S>),
+        )
+        .route(
             "/_port/tv.kroma.torrents/db/completed",
             post(completed::<S>),
         )
@@ -59,6 +67,31 @@ async fn grab<S: HostStorage + Clone + Send + Sync + 'static>(
     Json(spec): Json<GrabSpec>,
 ) -> Json<Result<DownloadRow, String>> {
     port_reply(move || manager(&host)?.grab(&host, spec)).await
+}
+
+#[derive(Deserialize)]
+struct InstantReq {
+    releases: Vec<InstantRelease>,
+}
+
+async fn grab_instant<S: HostStorage + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+    Json(req): Json<InstantReq>,
+) -> Json<Result<InstantOutcome, String>> {
+    port_reply(move || manager(&host)?.grab_instant(&host, req.releases)).await
+}
+
+// Not fallible: an absent manager is a client that cannot do it.
+async fn instant_capable<S: HostStorage + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+) -> Json<bool> {
+    Json(
+        kroma_module_sdk::host::run_blocking(move || {
+            manager(&host).map(|m| m.instant_capable()).unwrap_or(false)
+        })
+        .await
+        .unwrap_or(false),
+    )
 }
 
 #[derive(Deserialize)]

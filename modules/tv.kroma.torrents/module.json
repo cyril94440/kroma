@@ -44,11 +44,11 @@
   "definesPoints": [
     {
       "name": "client",
-      "methods": ["test", "add", "status", "pause", "resume", "reannounce", "remove"]
+      "methods": ["test", "add", "status", "pause", "resume", "reannounce", "remove", "instant"]
     },
     {
       "name": "grab",
-      "methods": ["grab", "list-files", "gate-open", "activate", "drop-data"]
+      "methods": ["grab", "list-files", "gate-open", "activate", "drop-data", "grab-instant", "instant-capable"]
     },
     {
       "name": "db",

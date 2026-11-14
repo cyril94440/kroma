@@ -11,7 +11,7 @@ use serde_json::Value;
 
 mod wire;
 
-pub use wire::{Magnet, Node, Unlocked, User};
+pub use wire::{Magnet, Node, Unlocked, Uploaded, User};
 
 pub(crate) const DEFAULT_BASE: &str = "https://api.alldebrid.com";
 const PURPOSE: &str = "download-client";
@@ -99,10 +99,19 @@ impl Api {
         uploaded(&data, "magnets")
     }
 
-    pub fn upload_torrent(&self, file: &Path) -> Result<String> {
+    pub fn upload_magnets(&self, magnets: &[&str]) -> Result<Vec<Result<Uploaded>>> {
+        let fields: Vec<(&str, &str)> = magnets.iter().map(|magnet| ("magnets[]", *magnet)).collect();
+        let data = self.post("/v4/magnet/upload", &fields)?;
+        Ok(entries(&data, "magnets").iter().map(entry_uploaded).collect())
+    }
+
+    pub fn upload_torrent_entry(&self, file: &Path) -> Result<Uploaded> {
         let parts = [("files[]", FormPart::File(file))];
         let data = data_of(self.fetch().post_multipart(&self.url("/v4/magnet/upload/file"), &parts))?;
-        uploaded(&data, "files")
+        entries(&data, "files")
+            .first()
+            .map(entry_uploaded)
+            .unwrap_or_else(|| Err(anyhow!("AllDebrid accepted nothing")))
     }
 
     pub fn magnet(&self, id: &str) -> Result<Option<Magnet>> {
@@ -167,19 +176,29 @@ fn parse<T: DeserializeOwned>(value: Option<&Value>, what: &str) -> Result<T> {
     serde_json::from_value(value.clone()).with_context(|| format!("read AllDebrid's {what}"))
 }
 
-fn uploaded(data: &Value, list: &str) -> Result<String> {
-    let entry = data
-        .get(list)
+fn entries<'a>(data: &'a Value, list: &str) -> &'a [Value] {
+    data.get(list)
         .and_then(Value::as_array)
-        .and_then(|all| all.first())
-        .ok_or_else(|| anyhow!("AllDebrid accepted nothing"))?;
+        .map_or(&[], Vec::as_slice)
+}
+
+fn entry_uploaded(entry: &Value) -> Result<Uploaded> {
     if let Some(refused) = entry.get("error").and_then(failure) {
         return Err(refused.into());
     }
-    entry
+    let id = entry
         .get("id")
         .and_then(wire::id_text)
-        .ok_or_else(|| anyhow!("AllDebrid returned no magnet id"))
+        .ok_or_else(|| anyhow!("AllDebrid returned no magnet id"))?;
+    let ready = entry.get("ready").and_then(Value::as_bool).unwrap_or(false);
+    Ok(Uploaded { id, ready })
+}
+
+fn uploaded(data: &Value, list: &str) -> Result<String> {
+    let entry = entries(data, list)
+        .first()
+        .ok_or_else(|| anyhow!("AllDebrid accepted nothing"))?;
+    entry_uploaded(entry).map(|uploaded| uploaded.id)
 }
 
 fn data_of(sent: Result<Response>) -> Result<Value> {

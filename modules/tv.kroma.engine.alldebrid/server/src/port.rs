@@ -25,6 +25,7 @@ pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
             post(reannounce::<S>),
         )
         .route("/_port/tv.kroma.torrents/client/remove", post(remove::<S>))
+        .route("/_port/tv.kroma.torrents/client/instant", post(instant::<S>))
         .route("/_port/source/locate", post(locate::<S>))
 }
 
@@ -72,6 +73,20 @@ struct Args {
     magnet_or_url: String,
     client_ref: String,
     delete_data: bool,
+    candidates: Vec<InstantCandidate>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct InstantCandidate {
+    key: String,
+    magnet_or_url: String,
+}
+
+#[derive(Debug, Serialize)]
+struct InstantReply {
+    key: String,
+    client_ref: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -159,6 +174,24 @@ fn wire(s: crate::TorrentStatus) -> Status {
         lifetime_downloaded_bytes: s.lifetime_downloaded_bytes,
         lifetime_uploaded_bytes: s.lifetime_uploaded_bytes,
     }
+}
+
+async fn instant<S: HostCtx + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+    Json(call): Json<Call>,
+) -> Json<Result<Option<InstantReply>, String>> {
+    port_reply(move || {
+        let candidates: Vec<crate::Candidate> = call
+            .args
+            .candidates
+            .into_iter()
+            .map(|c| crate::Candidate { key: c.key, magnet_or_url: c.magnet_or_url })
+            .collect();
+        Ok(engine(&host, &call.client)?
+            .instant(&candidates)?
+            .map(|found| InstantReply { key: found.key, client_ref: found.client_ref }))
+    })
+    .await
 }
 
 async fn pause<S: HostCtx + Clone + Send + Sync + 'static>(

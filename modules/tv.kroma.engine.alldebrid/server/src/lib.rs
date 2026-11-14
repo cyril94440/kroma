@@ -18,9 +18,11 @@ pub mod ready;
 pub mod settings;
 pub mod types;
 
+pub use instant::{Candidate, Instant, MAX_CANDIDATES};
 pub use types::{ClientDef, TorrentState, TorrentStatus};
 
 mod add;
+mod instant;
 mod lifecycle;
 pub mod resolve;
 mod status;
@@ -29,6 +31,8 @@ mod status;
 mod fake_alldebrid;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_engine;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_instant;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_locate;
 #[cfg(all(test, not(target_family = "wasm")))]

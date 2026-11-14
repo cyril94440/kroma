@@ -100,14 +100,9 @@ pub fn import_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<Im
                 ));
                 summary.imported += 1;
                 summary.files += paths.len();
-                let marked = until_it_lands(&BUSY_BACKOFF, "mark imported", || {
-                    crate::peers::downloads::mark_imported(state, &row.id, &paths, now_ms())
-                });
-                if let Err(e) = marked {
+                if let Err(e) = record_import(state, &row, &paths) {
                     tracing::warn!(download = %row.id, error = %format!("{e:#}"), "could not mark the download imported");
-                    continue;
                 }
-                finalize_import(state, &row, &paths);
             }
             Err(e) => {
                 log(format!(
@@ -115,17 +110,7 @@ pub fn import_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<Im
                     row.release_title
                 ));
                 summary.failed += 1;
-                let status = if e.is::<FilesGone>() {
-                    "removed"
-                } else {
-                    "completed"
-                };
-                crate::peers::downloads::set_status(
-                    state,
-                    &row.id,
-                    status,
-                    Some(&format!("import: {e:#}")),
-                )?;
+                refuse_import(state, &row, &e)?;
             }
         }
     }
@@ -135,7 +120,56 @@ pub fn import_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<Im
     Ok(summary)
 }
 
+fn record_import<S: HostStorage>(state: &S, row: &DownloadRow, paths: &[String]) -> Result<()> {
+    until_it_lands(&BUSY_BACKOFF, "mark imported", || {
+        crate::peers::downloads::mark_imported(state, &row.id, paths, now_ms())
+    })?;
+    finalize_import(state, row, paths);
+    Ok(())
+}
+
+fn refuse_import<S: HostStorage>(state: &S, row: &DownloadRow, error: &anyhow::Error) -> Result<()> {
+    let status = if error.is::<FilesGone>() {
+        "removed"
+    } else {
+        "completed"
+    };
+    crate::peers::downloads::set_status(state, &row.id, status, Some(&format!("import: {error:#}")))?;
+    Ok(())
+}
+
+/// One file an import put in the library, and the episode it is when it is one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Placed {
+    pub path: String,
+    pub unit: Option<(u32, u32)>,
+}
+
+/// Imports one `completed` download now instead of at the next pass, and says
+/// where each of its files landed. Failures land on the row like the pass's do.
+pub fn import_download<S: HostStorage>(state: &S, download_id: &str) -> Result<Vec<Placed>> {
+    let row = crate::peers::downloads::completed(state)?
+        .into_iter()
+        .find(|row| row.id == download_id)
+        .ok_or_else(|| anyhow!("download {download_id} is not waiting to be imported"))?;
+    let placed = match place_row(state, &row) {
+        Ok(placed) => placed,
+        Err(e) => {
+            refuse_import(state, &row, &e)?;
+            return Err(e);
+        }
+    };
+    let paths: Vec<String> = placed.iter().map(|p| p.path.clone()).collect();
+    record_import(state, &row, &paths)?;
+    state.trigger_job("library.scan", "acquisition-import");
+    Ok(placed)
+}
+
 fn import_one<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<Vec<String>> {
+    Ok(place_row(state, row)?.into_iter().map(|p| p.path).collect())
+}
+
+fn place_row<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<Vec<Placed>> {
     let save_path = row
         .save_path
         .as_deref()
@@ -239,7 +273,16 @@ fn import_one<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<Vec<String
     if replacing {
         drop_replaced(state, row, &placed, &lib.id);
     }
-    Ok(placed.into_iter().map(|(_, at)| at).collect())
+    Ok(placed
+        .into_iter()
+        .map(|(unit, path)| Placed {
+            path,
+            unit: match unit {
+                Replaced::Movie => None,
+                Replaced::Episode(season, episode) => Some((season, episode)),
+            },
+        })
+        .collect())
 }
 
 // What an upgrade just improved, resolved to file paths after the new ones land.

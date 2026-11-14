@@ -15,6 +15,11 @@ async fn every_route_is_mounted_where_a_consumer_calls_it() {
         ),
         ("/_port/tv.kroma.torrents/grab/gate-open", json!({})),
         (
+            "/_port/tv.kroma.torrents/grab/grab-instant",
+            json!({ "releases": [] }),
+        ),
+        ("/_port/tv.kroma.torrents/grab/instant-capable", json!({})),
+        (
             "/_port/tv.kroma.torrents/grab/activate",
             json!({ "id": "d1" }),
         ),
@@ -180,4 +185,28 @@ async fn a_completed_row_whose_engine_named_no_file_carries_an_empty_list() {
     let (_, answer) = post(host, "/_port/tv.kroma.torrents/db/completed", json!({})).await;
 
     assert_eq!(answer["Ok"][0]["content_rel_paths"], json!([]));
+}
+
+#[tokio::test]
+async fn an_instant_grab_with_no_manager_running_answers_err_and_the_capability_is_false() {
+    let (_, grabbed) = call(
+        "/_port/tv.kroma.torrents/grab/grab-instant",
+        json!({ "releases": [] }),
+    )
+    .await;
+    let (_, capable) = call("/_port/tv.kroma.torrents/grab/instant-capable", json!({})).await;
+
+    assert!(grabbed["Err"].as_str().is_some(), "{grabbed}");
+    assert_eq!(capable, json!(false));
+}
+
+#[tokio::test]
+async fn an_instant_grab_names_each_release_by_a_key_and_a_grab_spec() {
+    let (status, _) = call(
+        "/_port/tv.kroma.torrents/grab/grab-instant",
+        json!({ "releases": [{ "key": "g|i", "spec": { "magnet_or_url": "m", "kind": "movie", "release_title": "R" } }] }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
 }

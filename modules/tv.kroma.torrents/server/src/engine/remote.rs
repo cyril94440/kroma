@@ -16,7 +16,10 @@ use kroma_module_sdk::host::{call, call_raw, pinned_resolver, HostCtx, Resolver}
 
 #[cfg(test)]
 use super::TorrentState;
-use super::{AddTorrentReq, ClientDef, DownloadClient, TorrentFileEntry, TorrentStatus};
+use super::{
+    AddTorrentReq, ClientDef, DownloadClient, InstantCandidate, InstantHit, InstantUnsupported,
+    TorrentFileEntry, TorrentStatus,
+};
 
 /// The point an engine answers, under an instance name that is its client `kind`.
 pub const DOWNLOAD_CLIENT: &str = "tv.kroma.torrents/client";
@@ -93,6 +96,14 @@ impl DownloadClient for RemoteEngine {
         anyhow::bail!("this download client cannot list a torrent's files before adding it")
     }
 
+    fn instant(&self, candidates: &[InstantCandidate]) -> anyhow::Result<Option<InstantHit>> {
+        self.ask("instant", json!({ "candidates": candidates }))
+            .map_err(|error| match absent_route(&error) {
+                true => InstantUnsupported.into(),
+                false => error,
+            })
+    }
+
     fn status(&self, client_ref: &str) -> anyhow::Result<Option<TorrentStatus>> {
         // `Option` is the answer, not an error: a torrent the engine has forgotten
         // is a normal state the queue reconciles.
@@ -121,6 +132,11 @@ impl DownloadClient for RemoteEngine {
             json!({ "client_ref": client_ref, "delete_data": delete_data }),
         )
     }
+}
+
+fn absent_route(error: &anyhow::Error) -> bool {
+    let text = error.to_string();
+    text.starts_with("HTTP 404") || text.starts_with("HTTP 405")
 }
 
 /// The wire shape an engine parses, which this module also serves for its own

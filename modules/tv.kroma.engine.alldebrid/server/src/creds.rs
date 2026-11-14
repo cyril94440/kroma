@@ -45,6 +45,10 @@ impl Creds {
         found
     }
 
+    pub fn knows(&self, magnet: &str) -> bool {
+        self.read(magnet).is_some()
+    }
+
     fn path(&self, name: &str) -> PathBuf {
         self.dir.join(format!("{name}.json"))
     }

@@ -30,7 +30,10 @@ pub use dtos::*;
 pub use module::MODULE;
 pub use rqbit::{RqbitConfig, RqbitEngine, StillAdding};
 pub use db::{requests_with_active_downloads, ActiveDownload};
-pub use downloads::{active_proxy_url, DownloadDb, DownloadManager, GrabSpec, LABEL};
+pub use downloads::{
+    active_proxy_url, DownloadDb, DownloadManager, GrabSpec, InstantOutcome, InstantRelease,
+    InstantStatus, LABEL, MAX_INSTANT_CANDIDATES,
+};
 
 pub const MODULE_ID: &str = "tv.kroma.torrents";
 
@@ -83,8 +86,8 @@ pub fn server_module<S: kroma_module_sdk::host::HostStorage + Clone + Send + Syn
 pub mod engine;
 pub use dtos::VpnStatusView;
 pub use engine::{
-    magnet_info_hash, AddTorrentReq, ClientDef, DownloadClient, TorrentFileEntry, TorrentState,
-    TorrentStatus,
+    magnet_info_hash, AddTorrentReq, ClientDef, DownloadClient, InstantCandidate, InstantHit,
+    InstantUnsupported, TorrentFileEntry, TorrentState, TorrentStatus,
 };
 
 #[cfg(test)]

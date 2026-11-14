@@ -129,3 +129,39 @@ fn a_state_crosses_as_its_lowercase_word() {
         assert_eq!(status.state, word);
     }
 }
+
+#[tokio::test]
+async fn an_instant_with_no_candidates_answers_null_without_reaching_alldebrid() {
+    let (status, answer) = call(
+        "/_port/tv.kroma.torrents/client/instant",
+        json!({ "client": unreachable_client(), "args": { "candidates": [] } }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(answer, json!({ "Ok": null }));
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[tokio::test(flavor = "multi_thread")]
+async fn an_instant_answers_the_key_and_the_client_ref_of_the_release_it_kept() {
+    let fake = Fake::start(|req| match req.path.as_str() {
+        "/v4/magnet/upload" => Resp::data(json!({ "magnets": [
+            { "magnet": "m", "id": 41, "ready": false },
+            { "magnet": "m", "id": 42, "ready": true },
+        ] })),
+        _ => Resp::data(json!({})),
+    });
+    let candidates = json!([
+        { "key": "a", "magnet_or_url": "magnet:?xt=urn:btih:aa" },
+        { "key": "b", "magnet_or_url": "magnet:?xt=urn:btih:bb" },
+    ]);
+
+    let (_, answer) = call(
+        "/_port/tv.kroma.torrents/client/instant",
+        json!({ "client": { "url": fake.base, "password": "k" }, "args": { "candidates": candidates } }),
+    )
+    .await;
+
+    assert_eq!(answer, json!({ "Ok": { "key": "b", "client_ref": "42" } }));
+}

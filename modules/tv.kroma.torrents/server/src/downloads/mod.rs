@@ -25,6 +25,7 @@ mod engine;
 mod fetch;
 mod gate;
 mod grab;
+mod instant;
 mod ledger;
 pub mod matching;
 mod reseed;
@@ -35,6 +36,7 @@ mod throughput;
 
 pub use engine::LiveStat;
 pub use gate::active_proxy_url;
+pub use instant::{InstantOutcome, InstantRelease, InstantStatus, MAX_INSTANT_CANDIDATES};
 pub use throughput::{bps_setting, DOWN_KBPS_KEY, MAX_ACTIVE_KEY, UP_KBPS_KEY};
 
 use fetch::fetch_torrent_file;

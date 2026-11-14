@@ -64,6 +64,33 @@ pub struct TorrentFileEntry {
     pub size_bytes: u64,
 }
 
+/// One release offered to [`DownloadClient::instant`], under the key its
+/// caller finds it by again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InstantCandidate {
+    pub key: String,
+    pub magnet_or_url: String,
+}
+
+/// The candidate an engine already holds, and the reference it answers to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InstantHit {
+    pub key: String,
+    pub client_ref: String,
+}
+
+/// An engine that cannot say which releases it holds already.
+#[derive(Debug)]
+pub struct InstantUnsupported;
+
+impl std::fmt::Display for InstantUnsupported {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("this download client cannot tell which releases are ready at once")
+    }
+}
+
+impl std::error::Error for InstantUnsupported {}
+
 pub trait DownloadClient: Send + Sync {
     fn kind(&self) -> &'static str;
     // Reachability probe; returns a human-readable version string.
@@ -80,6 +107,13 @@ pub trait DownloadClient: Send + Sync {
         _torrent_bytes: Option<&[u8]>,
     ) -> anyhow::Result<Vec<TorrentFileEntry>> {
         anyhow::bail!("this download client cannot list a torrent's files before adding it")
+    }
+    // The first of the ranked candidates the engine can hand over without
+    // fetching anything, left added; every other candidate is left out. An empty
+    // list asks only whether the engine can do this. Only an engine that moves no
+    // data through this machine implements it, so it is never a peer.
+    fn instant(&self, _candidates: &[InstantCandidate]) -> anyhow::Result<Option<InstantHit>> {
+        Err(InstantUnsupported.into())
     }
     // `Ok(None)` = the engine no longer knows this torrent.
     fn status(&self, client_ref: &str) -> anyhow::Result<Option<TorrentStatus>>;

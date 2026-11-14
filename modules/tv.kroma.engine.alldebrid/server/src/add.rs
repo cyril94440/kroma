@@ -12,12 +12,12 @@ const TORRENT_SECS: u32 = 30;
 const MAX_TORRENT_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
-enum Link<'a> {
+pub(crate) enum Link<'a> {
     Magnet(&'a str),
     Web(&'a str),
 }
 
-fn classify(link: &str) -> Option<Link<'_>> {
+pub(crate) fn classify(link: &str) -> Option<Link<'_>> {
     let link = link.trim();
     if link.starts_with("magnet:") || is_info_hash(link) {
         return Some(Link::Magnet(link));
@@ -41,20 +41,20 @@ impl AllDebrid {
         };
         let id = match link {
             Link::Magnet(magnet) => self.api.upload_magnet(magnet)?,
-            Link::Web(url) => self.upload_fetched(url)?,
+            Link::Web(url) => self.upload_fetched(url)?.id,
         };
         self.remember(Some(&id));
         Ok(id)
     }
 
-    fn upload_fetched(&self, url: &str) -> Result<String> {
+    pub(crate) fn upload_fetched(&self, url: &str) -> Result<crate::api::Uploaded> {
         let bytes = fetch_torrent(url)?;
         let staging = self.module_dir.join("torrents");
         std::fs::create_dir_all(&staging).context("create the torrent staging folder")?;
         let file = staging
             .join(format!("{}.torrent", kroma_module_sdk::primitives::random_token()));
         std::fs::write(&file, &bytes).context("stage the .torrent file")?;
-        let uploaded = self.api.upload_torrent(&file);
+        let uploaded = self.api.upload_torrent_entry(&file);
         let _ = std::fs::remove_file(&file);
         uploaded
     }

@@ -60,3 +60,9 @@ pub(super) fn id_text(value: &Value) -> Option<String> {
         _ => None,
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Uploaded {
+    pub id: String,
+    pub ready: bool,
+}
