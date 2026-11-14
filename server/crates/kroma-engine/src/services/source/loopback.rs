@@ -113,10 +113,17 @@ impl Loopback {
     pub(super) fn grant(&self, sources: &Weak<Sources>, abs: &str) -> io::Result<(u16, Grant)> {
         let port = self.port(sources)?;
         let id = kroma_primitives::random_token();
-        self.table
-            .lock()
-            .insert(id.clone(), (abs.to_string(), Instant::now() + self.lifetime));
-        Ok((port, Grant { id, table: self.table.clone() }))
+        self.table.lock().insert(
+            id.clone(),
+            (abs.to_string(), Instant::now() + self.lifetime),
+        );
+        Ok((
+            port,
+            Grant {
+                id,
+                table: self.table.clone(),
+            },
+        ))
     }
 
     fn port(&self, sources: &Weak<Sources>) -> io::Result<u16> {
@@ -207,7 +214,10 @@ async fn serve(
     let Some(sources) = shared.sources.upgrade() else {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     };
-    match sources.serve(&stub, false, method == Method::HEAD, &headers, Unmetered).await {
+    match sources
+        .serve(&stub, false, method == Method::HEAD, &headers, Unmetered)
+        .await
+    {
         Ok(response) => response,
         Err(error) => {
             tracing::debug!(%error, "the relay could not serve a title to a local reader");

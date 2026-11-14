@@ -30,11 +30,18 @@ async fn a_redirect_is_not_followed_and_names_a_status_without_the_link() {
     server.redirect_to(&format!("http://127.0.0.1:{}/private", elsewhere.port()));
     let url = upstream(&public_name(&server));
 
-    let error = sources.relay(&url, 0, 9, 100).await.err().expect("a redirect is an error");
+    let error = sources
+        .relay(&url, 0, 9, 100)
+        .await
+        .err()
+        .expect("a redirect is an error");
 
     assert!(error.to_string().contains("302"), "{error}");
     assert!(!error.to_string().contains("hunter2"));
-    assert!(elsewhere.heard().is_empty(), "the redirect target was never contacted");
+    assert!(
+        elsewhere.heard().is_empty(),
+        "the redirect target was never contacted"
+    );
 }
 
 #[tokio::test]
@@ -47,9 +54,16 @@ async fn a_name_that_resolves_to_a_private_address_is_never_connected_to() {
         std::net::SocketAddr::from(([127, 0, 0, 1], server.port())),
     );
 
-    let error = sources.relay(&upstream(host), 0, 9, 100).await.err().expect("refused");
+    let error = sources
+        .relay(&upstream(host), 0, 9, 100)
+        .await
+        .err()
+        .expect("refused");
 
-    assert!(error.to_string().contains("not a public internet address"), "{error}");
+    assert!(
+        error.to_string().contains("not a public internet address"),
+        "{error}"
+    );
     assert!(server.heard().is_empty());
 }
 
@@ -59,7 +73,11 @@ async fn an_upstream_that_reports_another_total_is_a_mismatch() {
     server.announce_total(5_000);
     let url = upstream(&public_name(&server));
 
-    let error = sources.relay(&url, 0, 99, 1_000).await.err().expect("a mismatch");
+    let error = sources
+        .relay(&url, 0, 99, 1_000)
+        .await
+        .err()
+        .expect("a mismatch");
 
     assert!(error.to_string().contains("another size"), "{error}");
 }
@@ -69,7 +87,11 @@ async fn a_file_whose_size_is_not_the_stubs_is_a_mismatch_even_when_it_answers_t
     let (_dir, server, _, sources) = served(1_000);
     let url = upstream(&public_name(&server));
 
-    let error = sources.relay(&url, 0, 99, 2_000).await.err().expect("a mismatch");
+    let error = sources
+        .relay(&url, 0, 99, 2_000)
+        .await
+        .err()
+        .expect("a mismatch");
 
     assert!(error.to_string().contains("another size"), "{error}");
 }
@@ -119,6 +141,14 @@ async fn a_host_that_drops_the_connection_ends_the_body_short_of_what_was_promis
     let got = read_all(body).await;
 
     let got = got.unwrap_or_default();
-    assert!(!got.is_empty() && got.len() < bytes.len(), "{} bytes", got.len());
-    assert_eq!(got, &bytes[..got.len()], "what did arrive is the start of the file");
+    assert!(
+        !got.is_empty() && got.len() < bytes.len(),
+        "{} bytes",
+        got.len()
+    );
+    assert_eq!(
+        got,
+        &bytes[..got.len()],
+        "what did arrive is the start of the file"
+    );
 }

@@ -57,7 +57,9 @@ async fn a_download_whose_folder_is_gone_is_marked_removed_and_says_why() {
     let moves = Moves::default();
     let resolve = kroma_module_sdk::testing::serve(ledger(rows), moves.clone()).await;
     let (base, token) = resolve().expect("the fake ledger is up");
-    let host = StubHost::new().with_point(DOWNLOAD_DB, None, &base, &token);
+    let host = StubHost::with_core(kroma_module_sdk::db::testing::temp_pool("import-gone"))
+        .with_point(DOWNLOAD_DB, None, &base, &token);
+    crate::rules::schema::install(host.store());
 
     let summary = kroma_module_sdk::testing::blocking(move || import_pass(&host, &|_| {}))
         .await

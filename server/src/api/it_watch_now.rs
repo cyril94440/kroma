@@ -146,11 +146,23 @@ async fn a_show_asks_the_module_for_the_episode_the_caller_named() {
 }
 
 #[tokio::test]
-async fn a_show_with_one_number_is_a_bad_request() {
+async fn a_title_held_in_a_library_the_viewer_cannot_see_is_answered_requested_not_imported_again() {
+    let fake = acquisition(true).await;
+    *fake.reply.lock().unwrap() = json!({ "Ok": { "status": "present", "request_id": null } });
+    let t = app_over(&fake);
+
+    let (status, body) = watch(&t, &t.token, "/api/discover/movie/603/watch-now", None).await;
+
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body, json!({ "status": "requested", "requestId": null }));
+}
+
+#[tokio::test]
+async fn a_show_with_one_number_is_a_bad_request_with_a_translated_message() {
     let fake = acquisition(true).await;
     let t = app_over(&fake);
 
-    let (status, _) = watch(
+    let status = watch(
         &t,
         &t.token,
         "/api/discover/tv/1396/watch-now",
@@ -158,7 +170,8 @@ async fn a_show_with_one_number_is_a_bad_request() {
     )
     .await;
 
-    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(status.0, StatusCode::BAD_REQUEST);
+    assert_eq!(status.1["code"], "error.watchNow.episodeRequired");
 }
 
 #[tokio::test]

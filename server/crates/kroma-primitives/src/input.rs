@@ -63,11 +63,16 @@ impl Relayed {
         extension: &str,
         held: Arc<dyn Any + Send + Sync>,
     ) -> Option<Self> {
-        let plain = |text: &str| !text.is_empty() && text.chars().all(|c| c.is_ascii_alphanumeric());
+        let plain =
+            |text: &str| !text.is_empty() && text.chars().all(|c| c.is_ascii_alphanumeric());
         if !plain(secret) || !plain(grant) || !(extension.is_empty() || plain(extension)) {
             return None;
         }
-        let name = if extension.is_empty() { "title".to_string() } else { format!("title.{extension}") };
+        let name = if extension.is_empty() {
+            "title".to_string()
+        } else {
+            format!("title.{extension}")
+        };
         Some(Self {
             url: format!("http://{RELAY_HOST}:{port}/{secret}/{grant}/{name}"),
             _grant: held,
@@ -186,7 +191,9 @@ mod tests {
     use super::*;
 
     fn words(args: &[OsString]) -> Vec<String> {
-        args.iter().map(|a| a.to_string_lossy().into_owned()).collect()
+        args.iter()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect()
     }
 
     fn relayed() -> Relayed {
@@ -197,12 +204,20 @@ mod tests {
     fn a_relayed_input_whitelists_http_and_tcp_and_nothing_else() {
         let args = words(&media(&MediaInput::Remote(relayed())));
 
-        let at = args.iter().position(|a| a == "-protocol_whitelist").unwrap();
+        let at = args
+            .iter()
+            .position(|a| a == "-protocol_whitelist")
+            .unwrap();
         assert_eq!(args[at + 1], "http,tcp");
-        for banned in ["https", "tls", "file", "concat", "crypto", "data", "pipe", "subfile", "hls"] {
+        for banned in [
+            "https", "tls", "file", "concat", "crypto", "data", "pipe", "subfile", "hls",
+        ] {
             assert!(!args[at + 1].split(',').any(|p| p == banned), "{banned}");
         }
-        assert_eq!(&args[args.len() - 2..], ["-i", "http://127.0.0.1:4001/s3cret/grant1/title.mkv"]);
+        assert_eq!(
+            &args[args.len() - 2..],
+            ["-i", "http://127.0.0.1:4001/s3cret/grant1/title.mkv"]
+        );
         assert!(args.windows(2).any(|w| w == ["-rw_timeout", "30000000"]));
     }
 
@@ -218,9 +233,15 @@ mod tests {
     fn neither_debug_nor_redact_shows_the_secret_or_the_grant() {
         let input = MediaInput::Remote(relayed());
 
-        let shown = format!("{input:?} {}", input.redact("http://127.0.0.1:4001/s3cret/grant1/title.mkv: Server returned 403"));
+        let shown = format!(
+            "{input:?} {}",
+            input.redact("http://127.0.0.1:4001/s3cret/grant1/title.mkv: Server returned 403")
+        );
 
-        assert!(!shown.contains("s3cret") && !shown.contains("grant1"), "{shown}");
+        assert!(
+            !shown.contains("s3cret") && !shown.contains("grant1"),
+            "{shown}"
+        );
     }
 
     #[test]
@@ -232,8 +253,13 @@ mod tests {
 
         let out = without_proxies(&mut command).output().unwrap();
 
-        let printed = String::from_utf8_lossy(&out.stdout).to_ascii_lowercase();
-        assert!(!printed.contains("proxy"), "{printed}");
+        let printed = String::from_utf8_lossy(&out.stdout);
+        let left: Vec<&str> = printed
+            .lines()
+            .filter_map(|line| line.split_once('=').map(|(name, _)| name))
+            .filter(|name| PROXY_VARIABLES.contains(name))
+            .collect();
+        assert!(left.is_empty(), "{left:?}");
     }
 
     #[test]

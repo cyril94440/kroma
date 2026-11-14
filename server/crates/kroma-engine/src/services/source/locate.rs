@@ -50,7 +50,10 @@ pub(super) fn answerer(
         .filter(|found| trusted.contains(&found.module_id));
     let first = named.next().ok_or(SourceError::NoModule)?;
     if named.next().is_some() {
-        warn!(source, "more than one official module answers this source; none is asked");
+        warn!(
+            source,
+            "more than one official module answers this source; none is asked"
+        );
         return Err(SourceError::Refused(Refusal::DuplicateSource));
     }
     Ok(first)
@@ -84,18 +87,25 @@ mod tests {
 
     #[test]
     fn the_request_is_a_ref_and_a_warm_flag_and_nothing_else() {
-        let body = serde_json::to_value(Ask { reference: "7:Show/a.mkv", warm: true }).unwrap();
+        let body = serde_json::to_value(Ask {
+            reference: "7:Show/a.mkv",
+            warm: true,
+        })
+        .unwrap();
 
         assert_eq!(body, json!({ "ref": "7:Show/a.mkv", "warm": true }));
     }
 
     #[test]
     fn an_answer_may_carry_a_path_a_url_or_more_than_it_was_asked_for() {
-        let by_path: Result<Answer, String> =
-            serde_json::from_value(json!({ "Ok": { "path": "/d/a.mkv", "url": null, "size": 9, "later": 1 } })).unwrap();
+        let by_path: Result<Answer, String> = serde_json::from_value(
+            json!({ "Ok": { "path": "/d/a.mkv", "url": null, "size": 9, "later": 1 } }),
+        )
+        .unwrap();
         let by_url: Result<Answer, String> =
             serde_json::from_value(json!({ "Ok": { "url": "https://x.example/a" } })).unwrap();
-        let refused: Result<Answer, String> = serde_json::from_value(json!({ "Err": "gone" })).unwrap();
+        let refused: Result<Answer, String> =
+            serde_json::from_value(json!({ "Err": "gone" })).unwrap();
 
         assert_eq!(by_path.unwrap().path.as_deref(), Some("/d/a.mkv"));
         assert_eq!(by_url.unwrap().url.as_deref(), Some("https://x.example/a"));

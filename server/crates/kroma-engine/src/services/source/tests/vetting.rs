@@ -4,7 +4,10 @@ use super::*;
 fn a_url_that_is_not_https_is_refused() {
     let h = harness(url_reply("http://1.1.1.1/a.mkv"));
 
-    assert_eq!(h.refusal(), Refusal::Url(kroma_primitives::input::RemoteUrlError::NotHttps));
+    assert_eq!(
+        h.refusal(),
+        Refusal::Url(kroma_primitives::input::RemoteUrlError::NotHttps)
+    );
 }
 
 #[test]
@@ -86,7 +89,10 @@ fn a_relative_path_is_refused() {
 
 #[test]
 fn a_copy_whose_length_is_not_the_stubs_is_refused() {
-    let h = harness_with(|held| path_reply(&held_file(held, "Movie.mkv", SIZE - 1)), true);
+    let h = harness_with(
+        |held| path_reply(&held_file(held, "Movie.mkv", SIZE - 1)),
+        true,
+    );
 
     assert_eq!(h.refusal(), Refusal::NotTheFileStubbed);
 }
@@ -132,8 +138,9 @@ fn a_vetted_copy_swapped_for_another_file_of_the_same_size_is_not_opened() {
     let copy = vetted_copy(&h);
 
     let path = h.dir.path().join("held/Movie.mkv");
-    std::fs::remove_file(&path).unwrap();
-    std::fs::write(&path, vec![2u8; SIZE as usize]).unwrap();
+    let other = h.dir.path().join("held/other.bin");
+    std::fs::write(&other, vec![2u8; SIZE as usize]).unwrap();
+    std::fs::rename(&other, &path).unwrap();
 
     assert!(copy.open().is_err());
 }

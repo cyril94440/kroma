@@ -2,7 +2,10 @@
 //! acquisition module picks the best release the quality rules accept that the
 //! download client holds already, and imports it. This service then catalogues
 //! the file, reads it back, and only calls it ready when it is what its release
-//! promised; a file that is not is thrown out and the next release is tried.
+//! promised. The module places the file provisionally: it is confirmed to the
+//! module once read back, and a file that is not what it promised is rejected,
+//! which takes back what the module placed and no other file, and the next
+//! release is tried.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -172,12 +175,17 @@ impl<'a> Attempt<'a> {
                         request_id,
                     });
                 }
+                Reply::Present { request_id } => {
+                    return Ok(Outcome::Requested { request_id });
+                }
                 Reply::Imported(imported) => imported,
             };
             request_id = Some(imported.request_id.clone());
             match self.read_back(&imported)? {
                 Read::Ready(item_id, file_id) => {
+                    self.confirm(&resolve, &imported);
                     self.probe_the_rest();
+                    self.check_the_others(&resolve, &imported);
                     return Ok(Outcome::Ready { item_id, file_id });
                 }
                 Read::Unverified => break,
@@ -250,6 +258,8 @@ impl<'a> Attempt<'a> {
         let promise = Promise {
             runtime_min: self.runtime(),
             claimed_height: imported.release.claimed_height,
+            episodes: imported.episodes,
+            multi_part: imported.multi_part,
         };
         match verify::judge(&facts, &promise) {
             Verdict::Fake(reason) => Ok(Read::Fake(reason)),
@@ -258,16 +268,19 @@ impl<'a> Attempt<'a> {
         }
     }
 
+    fn confirm(&self, resolve: &kroma_module_host::Resolver, imported: &Imported) {
+        let confirmation = point::Confirmation {
+            download_id: &imported.download_id,
+        };
+        if let Err(error) = point::confirm(resolve, &confirmation) {
+            tracing::warn!(error = %format!("{error:#}"), "watch now: the module could not confirm a release; it will import it after its grace period");
+        }
+    }
+
     fn turn_down(&self, resolve: &kroma_module_host::Resolver, imported: &Imported, reason: &str) {
         let rejection = point::Rejection {
             download_id: &imported.download_id,
-            release_title: &imported.release.title,
-            kind: self.scope.kind.as_str(),
-            tmdb_id: self.scope.tmdb_id,
             reason,
-            paths: &imported.paths,
-            request_id: &imported.request_id,
-            season: self.scope.season,
         };
         if let Err(error) = point::reject(resolve, &rejection) {
             tracing::warn!(error = %format!("{error:#}"), "watch now: the module could not discard a release");
@@ -276,6 +289,40 @@ impl<'a> Attempt<'a> {
         if let Err(error) = crate::services::scan::forget_files(self.state, &gone) {
             tracing::warn!(error = %format!("{error:#}"), "watch now: could not forget the files of a rejected release");
         }
+    }
+
+    fn check_the_others(&self, resolve: &kroma_module_host::Resolver, imported: &Imported) {
+        let primary = canonical(&imported.primary_path);
+        let others: Vec<PathBuf> = imported
+            .paths
+            .iter()
+            .filter(|path| canonical(path) != primary)
+            .map(PathBuf::from)
+            .collect();
+        if others.is_empty() {
+            return;
+        }
+        let (state, resolve, scope, release) = (
+            self.state.clone(),
+            resolve.clone(),
+            self.scope.clone(),
+            imported.release.clone(),
+        );
+        let claimed_height = release.claimed_height;
+        tokio::task::spawn_blocking(move || {
+            let Some(reason) = sibling_fault(&state, &others, claimed_height) else {
+                return;
+            };
+            let flag = point::Flag {
+                kind: scope.kind.as_str(),
+                tmdb_id: scope.tmdb_id,
+                release_title: &release.title,
+                reason: &reason,
+            };
+            if let Err(error) = point::flag(&resolve, &flag) {
+                tracing::warn!(error = %format!("{error:#}"), "watch now: could not flag a release");
+            }
+        });
     }
 
     fn probe_the_rest(&self) {
@@ -293,6 +340,44 @@ impl<'a> Attempt<'a> {
             .runtime_min
             .get_or_insert_with(|| tmdb_runtime(self.state, self.scope))
     }
+}
+
+fn sibling_fault(
+    state: &SharedState,
+    paths: &[PathBuf],
+    claimed_height: Option<u32>,
+) -> Option<String> {
+    let found = crate::services::scan::ingest_files(state, paths).ok()?;
+    for file in found {
+        let probed = crate::infra::probe::probe_one(
+            &state.db,
+            state.ffprobe_available,
+            &state.sources,
+            &state.events,
+            &file.file_id,
+            &file.abs_path,
+            &file.item_id,
+        );
+        if probed.is_err() {
+            continue;
+        }
+        let item = crate::db::get_item(&state.db, &file.item_id).ok()??;
+        let stored = item.files.iter().find(|f| f.id == file.file_id)?;
+        let facts = Facts {
+            unreadable: stored.unreadable.clone(),
+            duration_ms: stored.duration_ms,
+            width: stored.video.as_ref().and_then(|v| v.width),
+            height: stored.video.as_ref().and_then(|v| v.height),
+        };
+        let promise = Promise {
+            claimed_height,
+            ..Promise::default()
+        };
+        if let Verdict::Fake(reason) = verify::judge(&facts, &promise) {
+            return Some(format!("another file of the pack: {reason}"));
+        }
+    }
+    None
 }
 
 fn reason_of(why: Why) -> Reason {

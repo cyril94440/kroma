@@ -48,7 +48,9 @@ impl Memo {
         let current = entry.stub == *stub
             && match &entry.place {
                 Place::Copy(copy) => copy.is_there(),
-                Place::Upstream(_) => entry.at.elapsed() < UPSTREAM_FRESH && (entry.warmed || !warm),
+                Place::Upstream(_) => {
+                    entry.at.elapsed() < UPSTREAM_FRESH && (entry.warmed || !warm)
+                }
             };
         if current {
             return Some(entry.place.clone());
@@ -62,7 +64,15 @@ impl Memo {
             held(&self.quiet).remove(abs);
             held(&self.warming).remove(abs);
         }
-        held(&self.entries).insert(abs.to_string(), Entry { stub, place, at: Instant::now(), warmed });
+        held(&self.entries).insert(
+            abs.to_string(),
+            Entry {
+                stub,
+                place,
+                at: Instant::now(),
+                warmed,
+            },
+        );
     }
 
     pub(super) fn forget(&self, abs: &str) {
@@ -75,7 +85,10 @@ impl Memo {
 
     pub(super) fn note_failure(&self, abs: &str, error: &SourceError) {
         if error.is_transient() {
-            held(&self.quiet).insert(abs.to_string(), Quiet::Failed(Instant::now(), error.clone()));
+            held(&self.quiet).insert(
+                abs.to_string(),
+                Quiet::Failed(Instant::now(), error.clone()),
+            );
         }
     }
 
@@ -85,7 +98,9 @@ impl Memo {
         let mut quiet = held(&self.quiet);
         let answer = match quiet.get(abs)? {
             Quiet::Uncached(at) => (at.elapsed() < UNCACHED_REMEMBERED).then_some(Ok(())),
-            Quiet::Failed(at, error) => (at.elapsed() < FAILURE_REMEMBERED).then(|| Err(error.clone())),
+            Quiet::Failed(at, error) => {
+                (at.elapsed() < FAILURE_REMEMBERED).then(|| Err(error.clone()))
+            }
         };
         if answer.is_none() {
             quiet.remove(abs);

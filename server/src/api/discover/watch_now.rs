@@ -8,7 +8,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::api::error::{json_error, lerr};
+use crate::api::error::lerr;
 use crate::api::extract::AuthUser;
 use crate::api::point;
 use crate::i18n;
@@ -36,7 +36,7 @@ pub async fn watch_now(
     }
     point::require(&state, &user, watch_now::ACQUISITION)?;
     let scope = scope_of(&kind, tmdb_id, body.map(|Json(b)| b).unwrap_or_default())
-        .map_err(|why| json_error(StatusCode::BAD_REQUEST, why))?;
+        .map_err(|key| lerr(loc, StatusCode::BAD_REQUEST, key))?;
     match watch_now::watch_now(&state, &user, &scope).await {
         Ok(outcome) => Ok(Json(answer(outcome, loc)).into_response()),
         Err(error) => {
@@ -48,7 +48,7 @@ pub async fn watch_now(
 
 fn scope_of(kind: &str, tmdb_id: u64, body: Body) -> Result<Scope, &'static str> {
     if tmdb_id == 0 {
-        return Err("a TMDB id is required");
+        return Err("error.watchNow.tmdbRequired");
     }
     match kind {
         "movie" => Ok(Scope {
@@ -70,9 +70,9 @@ fn scope_of(kind: &str, tmdb_id: u64, body: Body) -> Result<Scope, &'static str>
                 season: Some(season),
                 episode: Some(episode),
             }),
-            _ => Err("a show is watched one episode at a time: send a season and an episode"),
+            _ => Err("error.watchNow.episodeRequired"),
         },
-        _ => Err("unknown media type"),
+        _ => Err("error.watchNow.unknownMedia"),
     }
 }
 

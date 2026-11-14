@@ -13,6 +13,7 @@ fn promise(runtime_min: Option<u32>, claimed_height: Option<u32>) -> Promise {
     Promise {
         runtime_min,
         claimed_height,
+        ..Promise::default()
     }
 }
 
@@ -132,4 +133,26 @@ fn the_reason_names_what_was_found_and_what_was_promised() {
         reason.contains("4 minutes") && reason.contains("155"),
         "{reason}"
     );
+}
+
+#[test]
+fn a_double_episode_file_is_held_to_two_runtimes() {
+    let two = Promise {
+        episodes: 2,
+        ..promise(Some(45), None)
+    };
+
+    assert_eq!(judge(&file(90, 1920, 1080), &two), Verdict::Genuine);
+    assert!(is_fake(&judge(&file(90, 1920, 1080), &promise(Some(45), None))));
+}
+
+#[test]
+fn a_part_of_a_multi_part_movie_is_not_held_to_the_runtime() {
+    let part = Promise {
+        multi_part: true,
+        ..promise(Some(150), None)
+    };
+
+    assert_eq!(judge(&file(75, 1920, 1080), &part), Verdict::Genuine);
+    assert!(is_fake(&judge(&file(75, 1920, 1080), &promise(Some(150), None))));
 }

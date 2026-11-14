@@ -13,12 +13,27 @@ pub struct Facts {
     pub height: Option<u32>,
 }
 
-/// What the file was promised to be: how long TMDB says the title runs, and the
-/// resolution its release name claims. Either is absent when nobody knows it.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// What the file was promised to be: how long TMDB says the title runs, how
+/// many episodes the file's own name says it holds, whether it is one part of a
+/// multi-part movie, and the resolution its release name claims. Either is
+/// absent when nobody knows it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Promise {
     pub runtime_min: Option<u32>,
     pub claimed_height: Option<u32>,
+    pub episodes: u32,
+    pub multi_part: bool,
+}
+
+impl Default for Promise {
+    fn default() -> Self {
+        Self {
+            runtime_min: None,
+            claimed_height: None,
+            episodes: 1,
+            multi_part: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,8 +42,10 @@ pub enum Verdict {
     Fake(String),
 }
 
-/// Judges the probed file. The duration band is wide because cuts differ, and
-/// the resolution may fall one tier below its claim, because a name rounds.
+/// Judges the probed file. The duration band is wide because cuts differ, a
+/// file named for a run of episodes is held to that many runtimes, a part of a
+/// multi-part movie to none, and the resolution may fall one tier below its
+/// claim, because a name rounds.
 pub fn judge(facts: &Facts, promise: &Promise) -> Verdict {
     if let Some(reason) = &facts.unreadable {
         return Verdict::Fake(format!("the file cannot be read ({reason})"));
@@ -36,14 +53,15 @@ pub fn judge(facts: &Facts, promise: &Promise) -> Verdict {
     if facts.height.is_none() && facts.width.is_none() {
         return Verdict::Fake("the file holds no video".into());
     }
-    if let (Some(runtime), Some(duration_ms)) = (promise.runtime_min, facts.duration_ms) {
+    let timed = (!promise.multi_part).then_some(()).and(promise.runtime_min);
+    if let (Some(runtime), Some(duration_ms)) = (timed, facts.duration_ms) {
         let minutes = duration_ms as f64 / 60_000.0;
-        let expected = f64::from(runtime);
+        let expected = f64::from(runtime) * f64::from(promise.episodes.max(1));
         if minutes < expected * LOWEST_FRACTION_OF_RUNTIME
             || minutes > expected * HIGHEST_FRACTION_OF_RUNTIME
         {
             return Verdict::Fake(format!(
-                "the file runs {minutes:.0} minutes and the title runs {runtime}"
+                "the file runs {minutes:.0} minutes and the title runs {expected:.0}"
             ));
         }
     }

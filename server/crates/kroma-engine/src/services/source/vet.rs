@@ -87,7 +87,9 @@ pub(super) struct Vetting {
 impl Vetting {
     pub(super) fn vet(&self, located: &Located, stub: &RemoteFile) -> Result<Place, SourceError> {
         if let Some(path) = &located.path {
-            return self.vet_path(&located.module_id, path, stub).map(Place::Copy);
+            return self
+                .vet_path(&located.module_id, path, stub)
+                .map(Place::Copy);
         }
         match &located.url {
             Some(url) => self.vet_url(&located.module_id, url).map(Place::Upstream),
@@ -95,7 +97,12 @@ impl Vetting {
         }
     }
 
-    fn vet_path(&self, module: &str, path: &str, stub: &RemoteFile) -> Result<LocalCopy, SourceError> {
+    fn vet_path(
+        &self,
+        module: &str,
+        path: &str,
+        stub: &RemoteFile,
+    ) -> Result<LocalCopy, SourceError> {
         let refused = || SourceError::Refused(Refusal::PathOutsideItsFolders);
         if !Path::new(path).is_absolute() {
             return Err(refused());
@@ -123,9 +130,12 @@ impl Vetting {
     }
 
     fn vet_url(&self, module: &str, url: &str) -> Result<RemoteUrl, SourceError> {
-        let parsed = RemoteUrl::parse(url).map_err(|why| SourceError::Refused(Refusal::Url(why)))?;
-        let target = kroma_http::address::web_target(parsed.expose())
-            .ok_or(SourceError::Refused(Refusal::Url(kroma_primitives::input::RemoteUrlError::NotAUrl)))?;
+        let parsed =
+            RemoteUrl::parse(url).map_err(|why| SourceError::Refused(Refusal::Url(why)))?;
+        let target =
+            kroma_http::address::web_target(parsed.expose()).ok_or(SourceError::Refused(
+                Refusal::Url(kroma_primitives::input::RemoteUrlError::NotAUrl),
+            ))?;
         if !(self.declared)(module, &target) {
             return Err(SourceError::Refused(Refusal::HostNotDeclared));
         }

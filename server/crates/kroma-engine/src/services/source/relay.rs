@@ -15,7 +15,11 @@ pub struct UpstreamStatus(pub u16);
 
 impl fmt::Display for UpstreamStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "the source's host answered {} to a range request", self.0)
+        write!(
+            f,
+            "the source's host answered {} to a range request",
+            self.0
+        )
     }
 }
 
@@ -47,7 +51,9 @@ fn content_range(value: &str) -> Option<Granted> {
 }
 
 fn mismatch(what: &str) -> Error {
-    Error::other(format!("the source's host answered a range request with {what}"))
+    Error::other(format!(
+        "the source's host answered a range request with {what}"
+    ))
 }
 
 impl Sources {
@@ -58,7 +64,13 @@ impl Sources {
     /// Dropping the reader ends the transfer. An upstream that answers anything
     /// but exactly the range asked for, of a file of the size the stub
     /// declares, is an error that names a status and never the link.
-    pub async fn relay(&self, url: &RemoteUrl, start: u64, end: u64, size: u64) -> Result<Upstream> {
+    pub async fn relay(
+        &self,
+        url: &RemoteUrl,
+        start: u64,
+        end: u64,
+        size: u64,
+    ) -> Result<Upstream> {
         let streamed = Fetch::new()
             .purpose(super::vet::PURPOSE)
             .header("range", format!("bytes={start}-{end}"))
@@ -69,7 +81,9 @@ impl Sources {
             .await
             .map_err(|error| Error::other(url.redact(&format!("{error:#}"))))?;
         let length = end - start + 1;
-        let declared = streamed.header("content-length").and_then(|text| text.trim().parse::<u64>().ok());
+        let declared = streamed
+            .header("content-length")
+            .and_then(|text| text.trim().parse::<u64>().ok());
         match streamed.status {
             206 => {
                 let granted = streamed

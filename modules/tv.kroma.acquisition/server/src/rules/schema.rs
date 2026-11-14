@@ -131,6 +131,8 @@ pub const STEPS: &[Step] = &[
                 wanted_ids    TEXT NOT NULL,
                 created_at    INTEGER NOT NULL
             );
+            INSERT OR IGNORE INTO rule_settings (key, value)
+                VALUES ('give_up_since', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
             ",
         ),
         rebuilds: false,

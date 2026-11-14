@@ -3,8 +3,8 @@ use std::path::Path;
 use kroma_module_sdk::db;
 use kroma_module_sdk::domain::{RequestKind, RequestStatus};
 use kroma_module_sdk::testing::blocking;
-use serde_json::json;
 
+use super::test_requests::*;
 use super::test_world::*;
 use super::*;
 
@@ -214,7 +214,7 @@ async fn a_rejected_release_is_blocklisted_its_files_leave_and_the_download_is_r
     assert!(engine
         .statuses
         .contains(&(imported.download_id.clone(), "removed".into())));
-    assert_eq!(engine.discarded, [imported.download_id.clone()]);
+    assert_eq!(engine.discarded, std::slice::from_ref(&imported.download_id));
     drop(engine);
     let blocked =
         crate::rules::blocklist::for_title(world.host.store(), RequestKind::Movie, 438_631)
@@ -258,69 +258,4 @@ async fn after_a_rejection_the_next_search_refuses_the_blocklisted_release_and_o
     };
 
     assert_eq!(second.release.title, DUNE_720);
-}
-
-#[test]
-fn a_show_is_asked_for_one_episode_at_a_time() {
-    let ask = Ask {
-        kind: "show".into(),
-        tmdb_id: 42,
-        ..Ask::default()
-    };
-
-    assert!(asked_unit(RequestKind::Show, &ask).is_err());
-    assert_eq!(asked_unit(RequestKind::Movie, &ask).unwrap(), None);
-}
-
-#[test]
-fn the_reply_crosses_as_a_status_tag_with_snake_case_fields() {
-    let imported = serde_json::to_value(Reply::Imported(Imported {
-        request_id: "r".into(),
-        download_id: "d".into(),
-        release: Release {
-            key: "k".into(),
-            title: "T".into(),
-            claimed_height: Some(1080),
-        },
-        paths: vec!["/a".into()],
-        primary_path: "/a".into(),
-    }))
-    .unwrap();
-
-    assert_eq!(
-        imported,
-        json!({
-            "status": "imported", "request_id": "r", "download_id": "d",
-            "release": { "key": "k", "title": "T", "claimed_height": 1080 },
-            "paths": ["/a"], "primary_path": "/a"
-        })
-    );
-    assert_eq!(
-        serde_json::to_value(Reply::Requested {
-            request_id: "r".into()
-        })
-        .unwrap(),
-        json!({ "status": "requested", "request_id": "r" })
-    );
-    assert_eq!(
-        serde_json::to_value(Reply::Present { request_id: None }).unwrap(),
-        json!({ "status": "present", "request_id": null })
-    );
-    assert_eq!(
-        serde_json::to_value(Reply::Unavailable {
-            reason: Why::NoIndexer,
-            request_id: None
-        })
-        .unwrap(),
-        json!({ "status": "unavailable", "reason": "noIndexer", "request_id": null })
-    );
-}
-
-#[test]
-fn an_ask_reads_from_the_core_s_json_and_tolerates_missing_fields() {
-    let ask: Ask =
-        serde_json::from_value(json!({ "kind": "movie", "tmdb_id": 1, "user_id": "u" })).unwrap();
-
-    assert!(ask.exclude.is_empty());
-    assert_eq!(ask.budget_ms, None);
 }

@@ -216,7 +216,7 @@ pub fn probe_one(
     };
     let container = resolved.container().unwrap_or_default();
     let result = match probe_outcome(&resolved.input, &container, ffprobe) {
-        Probed::Done(result) => result,
+        Probed::Done(result) => *result,
         Probed::Killed => {
             warn!(file = %file_id, "ffprobe was killed before it answered; leaving the file unprobed");
             return Ok(());

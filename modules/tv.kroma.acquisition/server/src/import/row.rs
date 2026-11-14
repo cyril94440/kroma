@@ -19,6 +19,8 @@ pub struct Placed {
     pub path: String,
     pub unit: Option<(u32, u32)>,
     pub created: bool,
+    pub episodes: u32,
+    pub multi_part: bool,
 }
 
 /// What importing a row did to the library: its videos, and every file this
@@ -68,7 +70,7 @@ pub(super) fn place_row<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<
     };
     // A replaced episode is only known once its number is, and what it replaces
     // depends on where the new file landed: collect both as they are placed.
-    let mut placed: Vec<(Replaced, String, bool)> = Vec::new();
+    let mut placed: Vec<(Replaced, String, bool, Claim)> = Vec::new();
     let mut written: Vec<String> = Vec::new();
     match row.kind.as_str() {
         "movie" => {
@@ -76,7 +78,7 @@ pub(super) fn place_row<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<
             let dest = lib_root.join(tpl.movie_rel_path(&ctx, ext_of(largest_video)));
             let at = place_with_subtitles(state, largest_video, content.files(), &dest, mode)?;
             record(&mut written, &at);
-            placed.push((Replaced::Movie, path_text(&at.video.path), at.video.created));
+            placed.push((Replaced::Movie, path_text(&at.video.path), at.video.created, claim_of(largest_video)));
         }
         "episode" => {
             let named = remote::named(largest_video);
@@ -96,6 +98,7 @@ pub(super) fn place_row<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<
                 Replaced::Episode(season, episode),
                 path_text(&at.video.path),
                 at.video.created,
+                claim_of(largest_video),
             ));
         }
         "season" => {
@@ -126,6 +129,7 @@ pub(super) fn place_row<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<
                     Replaced::Episode(season, episode),
                     path_text(&at.video.path),
                     at.video.created,
+                    claim_of(src),
                 ));
             }
             if placed.is_empty() {
@@ -140,15 +144,17 @@ pub(super) fn place_row<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<
     if replacing {
         let named: Vec<(Replaced, String)> = placed
             .iter()
-            .map(|(unit, path, _)| (unit.clone(), path.clone()))
+            .map(|(unit, path, _, _)| (unit.clone(), path.clone()))
             .collect();
         drop_replaced(state, row, &named, &lib.id);
     }
     let videos = placed
         .into_iter()
-        .map(|(unit, path, created)| Placed {
+        .map(|(unit, path, created, claim)| Placed {
             path,
             created,
+            episodes: claim.episodes,
+            multi_part: claim.multi_part,
             unit: match unit {
                 Replaced::Movie => None,
                 Replaced::Episode(season, episode) => Some((season, episode)),
@@ -156,6 +162,41 @@ pub(super) fn place_row<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<
         })
         .collect();
     Ok(Landing { videos, written })
+}
+
+struct Claim {
+    episodes: u32,
+    multi_part: bool,
+}
+
+fn claim_of(src: &Path) -> Claim {
+    let named = remote::named(src);
+    let parsed = kroma_scene::parse_release_name(stem_of(&named));
+    let episodes = match (parsed.episode, parsed.episode_end) {
+        (Some(first), Some(last)) if last > first => last - first + 1,
+        _ => 1,
+    };
+    Claim {
+        episodes,
+        multi_part: is_multi_part(stem_of(&named)),
+    }
+}
+
+fn is_multi_part(stem: &str) -> bool {
+    const MARKERS: [&str; 5] = ["cd", "disc", "disk", "part", "pt"];
+    let lower = stem.to_ascii_lowercase();
+    let tokens: Vec<&str> = lower
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .collect();
+    let numbered = |rest: &str| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit());
+    tokens.iter().enumerate().any(|(at, token)| {
+        MARKERS.iter().any(|marker| match token.strip_prefix(marker) {
+            Some("") => tokens.get(at + 1).is_some_and(|next| numbered(next)),
+            Some(rest) => numbered(rest),
+            None => false,
+        })
+    })
 }
 
 fn path_text(path: &Path) -> String {
@@ -195,3 +236,26 @@ fn target_library_def<S: HostStorage>(state: &S, kind: RequestKind) -> Result<Li
     Ok(def.clone())
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_name_carrying_a_disc_or_part_marker_is_one_part_of_several() {
+        assert!(is_multi_part("Movie.1999.CD1.x264"));
+        assert!(is_multi_part("Movie (1999) - part2"));
+        assert!(is_multi_part("Movie.1999.Disc 2"));
+        assert!(!is_multi_part("Movie.1999.1080p.BluRay.x264-GRP"));
+        assert!(!is_multi_part("Partners.1979.720p"));
+    }
+
+    #[test]
+    fn a_double_episode_file_claims_two_episodes() {
+        let double = std::path::PathBuf::from("The.Show.S01E01E02.1080p.mkv");
+        let single = std::path::PathBuf::from("The.Show.S01E03.1080p.mkv");
+
+        assert_eq!(claim_of(&double).episodes, 2);
+        assert_eq!(claim_of(&single).episodes, 1);
+    }
+}

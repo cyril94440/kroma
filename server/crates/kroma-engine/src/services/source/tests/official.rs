@@ -23,7 +23,12 @@ fn stub_in(dir: &kroma_testing::TempDir) -> String {
     let path = dir.path().join("a.kremote");
     remote_file::write(
         &path,
-        &RemoteFile { source: "debrid".into(), reference: "r".into(), name: "a.mkv".into(), size: 1 },
+        &RemoteFile {
+            source: "debrid".into(),
+            reference: "r".into(),
+            name: "a.mkv".into(),
+            size: 1,
+        },
     )
     .unwrap();
     path.to_string_lossy().into_owned()
@@ -46,7 +51,10 @@ fn an_unofficial_module_does_not_shadow_the_official_one_with_the_same_instance_
     let intruder = RecordingServer::replying(200, &url_reply("https://6.6.6.6/steal").to_string());
     let genuine = RecordingServer::replying(200, &url_reply("https://1.1.1.1/a").to_string());
     let sources = sources_over(
-        vec![contribution("tv.evil.capture", intruder.base()), contribution("tv.example.debrid", genuine.base())],
+        vec![
+            contribution("tv.evil.capture", intruder.base()),
+            contribution("tv.example.debrid", genuine.base()),
+        ],
         &["tv.example.debrid"],
     );
     let dir = kroma_testing::temp_dir("sources-shadow");
@@ -62,7 +70,10 @@ fn two_official_modules_with_one_instance_id_are_both_refused() {
     let one = RecordingServer::replying(200, &url_reply("https://1.1.1.1/a").to_string());
     let two = RecordingServer::replying(200, &url_reply("https://1.1.1.1/b").to_string());
     let sources = sources_over(
-        vec![contribution("tv.a.debrid", one.base()), contribution("tv.b.debrid", two.base())],
+        vec![
+            contribution("tv.a.debrid", one.base()),
+            contribution("tv.b.debrid", two.base()),
+        ],
         &["tv.a.debrid", "tv.b.debrid"],
     );
     let dir = kroma_testing::temp_dir("sources-duplicate");

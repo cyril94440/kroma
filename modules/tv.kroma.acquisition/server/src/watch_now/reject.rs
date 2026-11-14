@@ -4,7 +4,7 @@ use kroma_module_sdk::host::HostStorage;
 use kroma_module_sdk::primitives::now_ms;
 
 use super::provisional::{self, Provisional};
-use super::Rejection;
+use super::{Flag, Rejection};
 use crate::rules::blocklist::{self, Blocked};
 
 /// The core read the file back and it was not what its release promised: the
@@ -19,6 +19,28 @@ pub fn reject<S: HostStorage>(state: &S, rejection: &Rejection) -> Result<bool> 
     };
     blocklist_release(state, &held, &rejection.reason)?;
     undo(state, &held, &rejection.reason)?;
+    Ok(true)
+}
+
+/// A later look at a release's other files found them wrong: the release is
+/// blocklisted for the title and nothing is removed from the library.
+pub fn flag<S: HostStorage>(state: &S, flag: &Flag) -> Result<bool> {
+    let Some(kind) = RequestKind::parse(&flag.kind) else {
+        return Ok(false);
+    };
+    blocklist::add(
+        state.store(),
+        &Blocked {
+            id: format!("flag:{}:{}", flag.tmdb_id, flag.release_title),
+            kind,
+            tmdb_id: flag.tmdb_id,
+            release_title: flag.release_title.clone(),
+            info_hash: None,
+            indexer_id: None,
+            reason: format!("watch now: {}", flag.reason),
+            added_at: now_ms(),
+        },
+    )?;
     Ok(true)
 }
 

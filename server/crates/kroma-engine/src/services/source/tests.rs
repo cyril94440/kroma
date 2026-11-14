@@ -23,7 +23,11 @@ fn harness_with(reply: impl FnOnce(&Path) -> Value, declares: bool) -> Harness {
     harness_for(reply, vec!["tv.example.debrid".to_string()], declares)
 }
 
-fn harness_for(reply: impl FnOnce(&Path) -> Value, official: Vec<String>, declares: bool) -> Harness {
+fn harness_for(
+    reply: impl FnOnce(&Path) -> Value,
+    official: Vec<String>,
+    declares: bool,
+) -> Harness {
     let dir = kroma_testing::temp_dir("sources");
     let held = dir.path().join("held");
     std::fs::create_dir_all(&held).unwrap();
@@ -46,7 +50,11 @@ fn harness_for(reply: impl FnOnce(&Path) -> Value, official: Vec<String>, declar
         Arc::new(move |_, _| declares),
         Arc::new(move |_| vec![held.clone()]),
     );
-    Harness { dir, server, sources }
+    Harness {
+        dir,
+        server,
+        sources,
+    }
 }
 
 fn harness(reply: Value) -> Harness {
@@ -143,7 +151,10 @@ fn a_source_that_answers_an_error_is_gone_and_a_retry_may_work() {
 
     let error = h.sources.resolve(&h.stub(), false).unwrap_err();
 
-    assert_eq!(error, SourceError::Gone("the magnet no longer has Movie.mkv".into()));
+    assert_eq!(
+        error,
+        SourceError::Gone("the magnet no longer has Movie.mkv".into())
+    );
     assert!(error.is_transient());
 }
 
@@ -151,10 +162,18 @@ fn a_source_that_answers_an_error_is_gone_and_a_retry_may_work() {
 fn a_stub_naming_a_source_nobody_answers_for_has_no_module() {
     let h = harness(json!({ "Ok": {} }));
     let path = h.dir.path().join("Other.kremote");
-    let stub = RemoteFile { source: "someone-else".into(), reference: "r".into(), name: "a.mkv".into(), size: 1 };
+    let stub = RemoteFile {
+        source: "someone-else".into(),
+        reference: "r".into(),
+        name: "a.mkv".into(),
+        size: 1,
+    };
     remote_file::write(&path, &stub).unwrap();
 
-    let error = h.sources.resolve(&path.to_string_lossy(), false).unwrap_err();
+    let error = h
+        .sources
+        .resolve(&path.to_string_lossy(), false)
+        .unwrap_err();
 
     assert_eq!(error, SourceError::NoModule);
     assert!(h.server.requests().is_empty());
@@ -177,7 +196,16 @@ fn a_module_that_is_not_answering_is_unreachable() {
     );
     let dir = kroma_testing::temp_dir("sources-down");
     let path = dir.path().join("a.kremote");
-    remote_file::write(&path, &RemoteFile { source: "debrid".into(), reference: "r".into(), name: "a.mkv".into(), size: 1 }).unwrap();
+    remote_file::write(
+        &path,
+        &RemoteFile {
+            source: "debrid".into(),
+            reference: "r".into(),
+            name: "a.mkv".into(),
+            size: 1,
+        },
+    )
+    .unwrap();
 
     let error = sources.resolve(&path.to_string_lossy(), false).unwrap_err();
 
@@ -190,7 +218,10 @@ fn a_stub_that_cannot_be_read_is_not_a_title() {
     let path = h.dir.path().join("Broken.kremote");
     std::fs::write(&path, "not json").unwrap();
 
-    let error = h.sources.resolve(&path.to_string_lossy(), false).unwrap_err();
+    let error = h
+        .sources
+        .resolve(&path.to_string_lossy(), false)
+        .unwrap_err();
 
     assert!(matches!(error, SourceError::BadStub(_)));
     assert!(!error.is_transient());
@@ -201,16 +232,26 @@ fn what_is_logged_about_a_refusal_never_holds_the_url() {
     let secret = "https://127.0.0.1/bearer/abc123?sig=hunter2";
     let h = harness(url_reply(secret));
 
-    let said = format!("{:?} / {}", h.sources.resolve(&h.stub(), false), h.sources.resolve(&h.stub(), false).unwrap_err());
+    let said = format!(
+        "{:?} / {}",
+        h.sources.resolve(&h.stub(), false),
+        h.sources.resolve(&h.stub(), false).unwrap_err()
+    );
 
-    assert!(!said.contains("hunter2") && !said.contains("abc123"), "{said}");
+    assert!(
+        !said.contains("hunter2") && !said.contains("abc123"),
+        "{said}"
+    );
 }
 
 #[test]
 fn local_is_the_file_itself_when_it_is_not_a_stub() {
     let h = harness(json!({ "Ok": {} }));
 
-    assert_eq!(h.sources.local("/media/a.mkv").unwrap(), Some("/media/a.mkv".into()));
+    assert_eq!(
+        h.sources.local("/media/a.mkv").unwrap(),
+        Some("/media/a.mkv".into())
+    );
 }
 
 #[test]
@@ -221,7 +262,17 @@ fn local_is_a_stubs_complete_copy_and_none_while_it_is_only_a_url() {
     let copy = cached.sources.local(&cached.stub()).unwrap();
     let none = streamed.sources.local(&streamed.stub()).unwrap();
 
-    assert_eq!(copy, Some(cached.dir.path().join("held/Movie.mkv").canonicalize().unwrap()));
+    assert_eq!(
+        copy,
+        Some(
+            cached
+                .dir
+                .path()
+                .join("held/Movie.mkv")
+                .canonicalize()
+                .unwrap()
+        )
+    );
     assert_eq!(none, None);
 }
 
@@ -234,7 +285,11 @@ fn local_asks_without_warming_and_remembers_a_stub_with_no_copy() {
     h.sources.local(&stub).unwrap();
 
     let asked = h.server.requests();
-    assert_eq!(asked.len(), 1, "the second pass over the library asks nobody");
+    assert_eq!(
+        asked.len(),
+        1,
+        "the second pass over the library asks nobody"
+    );
     let body: Value = serde_json::from_str(&asked[0].body).unwrap();
     assert_eq!(body["warm"], false);
 }
@@ -247,7 +302,10 @@ fn local_does_not_trust_a_remembered_copy_that_has_gone() {
 
     std::fs::remove_file(h.dir.path().join("held/Movie.mkv")).unwrap();
 
-    assert!(h.sources.local(&stub).is_err(), "the source is asked again and refuses a missing file");
+    assert!(
+        h.sources.local(&stub).is_err(),
+        "the source is asked again and refuses a missing file"
+    );
 }
 
 mod granted;
@@ -258,7 +316,10 @@ mod vetting;
 
 fn public_name(server: &kroma_testing::RangedServer) -> String {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    let host = format!("cdn-{}.example.com", NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+    let host = format!(
+        "cdn-{}.example.com",
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    );
     kroma_http::test_hosts::map_host(
         &host,
         "93.184.216.34".parse().unwrap(),

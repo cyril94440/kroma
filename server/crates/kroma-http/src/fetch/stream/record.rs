@@ -86,4 +86,3 @@ pub(super) fn failed(
         carried: egress::gateway().is_some(),
     }
 }
-

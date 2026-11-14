@@ -26,7 +26,10 @@ pub fn map_host(host: &str, address: IpAddr, transport: SocketAddr) {
 
 pub(crate) fn address_of(host: &str) -> Option<IpAddr> {
     let hosts = HOSTS.lock().unwrap_or_else(PoisonError::into_inner);
-    hosts.as_ref()?.get(&host.to_ascii_lowercase()).map(|mapped| mapped.address)
+    hosts
+        .as_ref()?
+        .get(&host.to_ascii_lowercase())
+        .map(|mapped| mapped.address)
 }
 
 /// `url` pointed at the socket its host is mapped to, as plain HTTP.
@@ -45,14 +48,24 @@ mod tests {
 
     #[test]
     fn a_mapped_name_keeps_its_path_and_query_on_the_new_socket() {
-        map_host("map-test.example", "93.184.216.34".parse().unwrap(), "127.0.0.1:9".parse().unwrap());
+        map_host(
+            "map-test.example",
+            "93.184.216.34".parse().unwrap(),
+            "127.0.0.1:9".parse().unwrap(),
+        );
 
         assert_eq!(
             transport_url("https://map-test.example/a/b.mkv?t=1").as_deref(),
             Some("http://127.0.0.1:9/a/b.mkv?t=1")
         );
-        assert_eq!(transport_url("https://map-test.example").as_deref(), Some("http://127.0.0.1:9"));
-        assert_eq!(address_of("MAP-TEST.example"), Some("93.184.216.34".parse().unwrap()));
+        assert_eq!(
+            transport_url("https://map-test.example").as_deref(),
+            Some("http://127.0.0.1:9")
+        );
+        assert_eq!(
+            address_of("MAP-TEST.example"),
+            Some("93.184.216.34".parse().unwrap())
+        );
         assert!(transport_url("https://other.example/a").is_none());
     }
 }

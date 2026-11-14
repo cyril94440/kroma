@@ -73,10 +73,11 @@ mod tests {
     }
 
     #[test]
-    fn a_hostile_name_cannot_steer_the_virtual_path_out_of_its_folder() {
+    fn a_hostile_name_is_not_a_stub_and_cannot_steer_the_virtual_path_out_of_its_folder() {
         let dir = kroma_module_sdk::testing::temp_dir("import-remote-hostile");
-        let path = stub_at(dir.path(), "a/x.kremote", "../../etc/x.mkv", 1);
+        let path = stub_at(dir.path(), "a/x.mkv.kremote", "../../etc/x.mkv", 1);
 
-        assert_eq!(named(&path), dir.path().join("a/x.mkv"));
+        assert!(stub(&path).is_none());
+        assert_eq!(named(&path), path);
     }
 }

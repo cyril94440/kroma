@@ -40,6 +40,8 @@ pub struct Imported {
     pub release: Release,
     pub paths: Vec<String>,
     pub primary_path: String,
+    pub episodes: u32,
+    pub multi_part: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -65,6 +67,17 @@ pub enum Reply {
 #[serde(default)]
 pub struct Rejection {
     pub download_id: String,
+    pub reason: String,
+}
+
+/// A release whose other files, read later, were not what it promised: it is
+/// blocklisted for the title, and nothing in the library is touched.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct Flag {
+    pub kind: String,
+    pub tmdb_id: u64,
+    pub release_title: String,
     pub reason: String,
 }
 

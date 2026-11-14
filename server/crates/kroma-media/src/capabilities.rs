@@ -73,7 +73,8 @@ pub fn audio_targets() -> AudioTargets {
 mod tests {
     use super::*;
 
-    const PROTOCOLS: &str = "Supported file protocols:\nInput:\n  file\n  http\n  tcp\nOutput:\n  file\n  http\n";
+    const PROTOCOLS: &str =
+        "Supported file protocols:\nInput:\n  file\n  http\n  tcp\nOutput:\n  file\n  http\n";
     const ENCODERS: &str = "Encoders:\n V....D libx264              libx264 H.264\n A....D ac3                  ATSC A/52A (AC-3)\n A....D aac                  AAC\n";
 
     #[test]
@@ -81,15 +82,30 @@ mod tests {
         let caps = Capabilities::from_listings(PROTOCOLS, ENCODERS);
 
         assert!(caps.http_input);
-        assert_eq!(caps.audio, AudioTargets { ac3: true, eac3: false });
+        assert_eq!(
+            caps.audio,
+            AudioTargets {
+                ac3: true,
+                eac3: false
+            }
+        );
     }
 
     #[test]
     fn a_build_with_no_network_reports_none() {
-        let caps = Capabilities::from_listings("Supported file protocols:\nInput:\n  file\n  pipe\nOutput:\n  file\n", "");
+        let caps = Capabilities::from_listings(
+            "Supported file protocols:\nInput:\n  file\n  pipe\nOutput:\n  file\n",
+            "",
+        );
 
         assert!(!caps.http_input);
-        assert_eq!(caps.audio, AudioTargets { ac3: false, eac3: false });
+        assert_eq!(
+            caps.audio,
+            AudioTargets {
+                ac3: false,
+                eac3: false
+            }
+        );
     }
 
     #[test]

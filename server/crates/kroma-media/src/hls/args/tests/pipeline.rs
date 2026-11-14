@@ -56,7 +56,10 @@ fn qsv_declares_the_derived_device_and_uploads_after_the_map() {
         pipeline(HwAccel::Qsv, true),
     );
 
-    assert!(cmd.contains("-init_hw_device qsv=hw@va -filter_hw_device hw"), "{cmd}");
+    assert!(
+        cmd.contains("-init_hw_device qsv=hw@va -filter_hw_device hw"),
+        "{cmd}"
+    );
     assert!(!cmd.contains("-hwaccel"), "{cmd}");
     assert!(cmd.contains("format=nv12,hwupload"), "{cmd}");
     assert!(cmd.contains("-c:v h264_qsv"), "{cmd}");

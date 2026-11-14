@@ -50,8 +50,11 @@
   "error.unauthorizedBody": "Your session has ended. Sign in again to keep watching.",
   "error.unauthorizedTitle": "Sign-in required",
   "error.userNotFound": "User not found",
+  "error.watchNow.episodeRequired": "A show is watched one episode at a time: send a season and an episode",
   "error.watchNow.failed": "Could not start this title right now. Try again, or request it.",
   "error.watchNow.noEngine": "This server cannot fetch titles instantly.",
   "error.watchNow.noIndexer": "No indexer is set up to look for this title.",
-  "error.watchNow.noRelease": "Nothing that fits your quality settings was found. The title stays requested."
+  "error.watchNow.noRelease": "Nothing that fits your quality settings was found. The title stays requested.",
+  "error.watchNow.tmdbRequired": "A TMDB id is required",
+  "error.watchNow.unknownMedia": "Unknown media type"
 }

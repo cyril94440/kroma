@@ -93,7 +93,13 @@ impl Sources {
         declared: HostDeclared,
         roots: SourceRoots,
     ) -> Arc<Self> {
-        Self::with_relay(contributions, official, declared, roots, loopback::Loopback::new())
+        Self::with_relay(
+            contributions,
+            official,
+            declared,
+            roots,
+            loopback::Loopback::new(),
+        )
     }
 
     fn with_relay(
@@ -118,11 +124,18 @@ impl Sources {
     /// in which `warm` reaches the module at most once; a complete local copy
     /// answers as soon as it exists. Blocking: run it on a blocking thread.
     pub fn find(&self, abs: &str, warm: bool) -> Result<Found, SourceError> {
-        let stub = remote_file::read(Path::new(abs)).map_err(|error| SourceError::BadStub(error.to_string()))?;
+        let stub = remote_file::read(Path::new(abs))
+            .map_err(|error| SourceError::BadStub(error.to_string()))?;
         if let Some(place) = self.memo.recall(abs, &stub, warm) {
             return Ok(Found { stub, place });
         }
-        let located = locate::locate(&self.contributions, &self.official, &stub.source, &stub.reference, warm)?;
+        let located = locate::locate(
+            &self.contributions,
+            &self.official,
+            &stub.source,
+            &stub.reference,
+            warm,
+        )?;
         let place = self.vetting.vet(&located, &stub)?;
         self.memo.remember(abs, stub.clone(), place.clone(), warm);
         Ok(Found { stub, place })
@@ -136,7 +149,10 @@ impl Sources {
     pub fn resolve(&self, abs: &str, warm: bool) -> Result<Resolved, SourceError> {
         let path = Path::new(abs);
         if !remote_file::is_remote_file(path) {
-            return Ok(Resolved { input: MediaInput::Local(path.to_path_buf()), stub: None });
+            return Ok(Resolved {
+                input: MediaInput::Local(path.to_path_buf()),
+                stub: None,
+            });
         }
         let found = self.find(abs, warm)?;
         self.input_of(abs, found, kroma_media::capabilities::network_input())
@@ -173,10 +189,16 @@ impl Sources {
 
     fn input_of(&self, abs: &str, found: Found, network: bool) -> Result<Resolved, SourceError> {
         match found.place {
-            Place::Copy(copy) => Ok(Resolved { input: MediaInput::Local(copy.path), stub: Some(found.stub) }),
+            Place::Copy(copy) => Ok(Resolved {
+                input: MediaInput::Local(copy.path),
+                stub: Some(found.stub),
+            }),
             Place::Upstream(_) if network => {
                 let relayed = self.relayed(abs, &found.stub)?;
-                Ok(Resolved { input: MediaInput::Remote(relayed), stub: Some(found.stub) })
+                Ok(Resolved {
+                    input: MediaInput::Remote(relayed),
+                    stub: Some(found.stub),
+                })
             }
             Place::Upstream(_) => Err(SourceError::Preparing),
         }
@@ -188,8 +210,14 @@ impl Sources {
             SourceError::Unreachable
         })?;
         let extension = stub.container().unwrap_or_default();
-        Relayed::new(port, self.relay.secret(), &grant.id(), &extension, Arc::new(grant))
-            .ok_or(SourceError::Unreachable)
+        Relayed::new(
+            port,
+            self.relay.secret(),
+            &grant.id(),
+            &extension,
+            Arc::new(grant),
+        )
+        .ok_or(SourceError::Unreachable)
     }
 
     /// The file to read in full for the library file at `abs`, for work that
@@ -209,7 +237,10 @@ impl Sources {
             return known.map(|()| None);
         }
         match self.find(abs, false) {
-            Ok(Found { place: Place::Copy(copy), .. }) => Ok(Some(copy.path)),
+            Ok(Found {
+                place: Place::Copy(copy),
+                ..
+            }) => Ok(Some(copy.path)),
             Ok(_) => {
                 self.memo.note_uncached(abs);
                 Ok(None)
@@ -234,7 +265,9 @@ impl Sources {
 
     fn cached(&self, abs: &str) -> Option<Place> {
         let stub = remote_file::read(Path::new(abs)).ok()?;
-        self.memo.recall(abs, &stub, false).filter(|place| matches!(place, Place::Copy(_)))
+        self.memo
+            .recall(abs, &stub, false)
+            .filter(|place| matches!(place, Place::Copy(_)))
     }
 
     /// Forgets what is remembered about `abs`, so its source is asked next time.

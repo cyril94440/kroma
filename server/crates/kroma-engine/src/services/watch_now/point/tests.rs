@@ -6,7 +6,7 @@ fn an_imported_reply_reads_the_modules_json() {
     let reply: Reply = serde_json::from_value(json!({
         "status": "imported", "request_id": "r", "download_id": "d",
         "release": { "key": "k", "title": "T", "claimed_height": 1080 },
-        "paths": ["/a", "/b"], "primary_path": "/a"
+        "paths": ["/a", "/b"], "primary_path": "/a", "episodes": 2, "multi_part": true
     }))
     .unwrap();
 
@@ -15,6 +15,31 @@ fn an_imported_reply_reads_the_modules_json() {
     };
     assert_eq!(imported.release.claimed_height, Some(1080));
     assert_eq!(imported.paths.len(), 2);
+    assert_eq!((imported.episodes, imported.multi_part), (2, true));
+}
+
+#[test]
+fn an_imported_reply_without_the_newer_fields_still_reads() {
+    let reply: Reply = serde_json::from_value(json!({
+        "status": "imported", "request_id": "r", "download_id": "d",
+        "release": { "key": "k", "title": "T" }, "paths": [], "primary_path": "/a"
+    }))
+    .unwrap();
+
+    let Reply::Imported(imported) = reply else {
+        panic!("{reply:?}")
+    };
+    assert_eq!((imported.episodes, imported.multi_part), (1, false));
+    assert_eq!(imported.release.claimed_height, None);
+}
+
+#[test]
+fn a_present_reply_reads_with_or_without_a_request() {
+    let held: Reply = serde_json::from_value(json!({ "status": "present", "request_id": null })).unwrap();
+    let named: Reply = serde_json::from_value(json!({ "status": "present", "request_id": "r" })).unwrap();
+
+    assert!(matches!(held, Reply::Present { request_id: None }));
+    assert!(matches!(named, Reply::Present { request_id: Some(_) }));
 }
 
 #[test]
@@ -63,16 +88,17 @@ fn the_ask_and_the_rejection_carry_the_fields_the_module_reads() {
         budget_ms: 20_000,
     })
     .unwrap();
-    let paths = vec!["/a".to_string()];
     let rejected = serde_json::to_value(Rejection {
         download_id: "d",
-        release_title: "T",
+        reason: "r",
+    })
+    .unwrap();
+    let confirmed = serde_json::to_value(Confirmation { download_id: "d" }).unwrap();
+    let flagged = serde_json::to_value(Flag {
         kind: "movie",
         tmdb_id: 1,
+        release_title: "T",
         reason: "r",
-        paths: &paths,
-        request_id: "r1",
-        season: None,
     })
     .unwrap();
 
@@ -80,9 +106,10 @@ fn the_ask_and_the_rejection_carry_the_fields_the_module_reads() {
         asked,
         json!({ "kind": "show", "tmdb_id": 1, "season": 1, "episode": 2, "user_id": "u", "exclude": ["g|i"], "budget_ms": 20000 })
     );
+    assert_eq!(rejected, json!({ "download_id": "d", "reason": "r" }));
+    assert_eq!(confirmed, json!({ "download_id": "d" }));
     assert_eq!(
-        rejected,
-        json!({ "download_id": "d", "release_title": "T", "kind": "movie", "tmdb_id": 1, "reason": "r",
-                "paths": ["/a"], "request_id": "r1", "season": null })
+        flagged,
+        json!({ "kind": "movie", "tmdb_id": 1, "release_title": "T", "reason": "r" })
     );
 }

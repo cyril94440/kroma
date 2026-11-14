@@ -145,3 +145,24 @@ fn the_grant_stops_at_the_tables_this_module_has_no_business_in() {
             .is_err()
     );
 }
+
+#[test]
+#[cfg_attr(target_family = "wasm", ignore = "the host enforces the grant, not a component's own pool")]
+fn the_grant_covers_what_watch_now_and_the_give_up_rule_read() {
+    let (core, scoped) = scoped();
+    seed(&core);
+    let conn = scoped.get().unwrap();
+
+    let permissions: String = conn
+        .query_row("SELECT permissions FROM users WHERE id = 'u1'", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(permissions, "[\"playback\"]");
+    assert!(conn
+        .query_row("SELECT status, imported_paths FROM downloads WHERE id = 'none'", [], |r| r.get::<_, String>(0))
+        .is_err());
+    conn.prepare(
+        "SELECT d.request_id FROM downloads d JOIN requests r ON r.id = d.request_id \
+         GROUP BY d.request_id HAVING SUM(d.grabbed_at >= r.updated_at) >= 1",
+    )
+    .unwrap();
+}

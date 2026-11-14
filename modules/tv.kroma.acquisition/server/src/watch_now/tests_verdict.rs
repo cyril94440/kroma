@@ -1,9 +1,9 @@
 use kroma_module_sdk::db;
 use kroma_module_sdk::domain::{RequestKind, RequestStatus};
-use kroma_module_sdk::host::HostStorage as _;
 use kroma_module_sdk::testing::blocking;
 use serde_json::json;
 
+use super::test_requests::*;
 use super::test_world::*;
 use super::*;
 
@@ -56,7 +56,7 @@ async fn confirming_is_what_marks_the_request_available_and_records_the_import()
     assert!(confirmed(&world, &placed).await);
 
     assert_eq!(status_of(&world, "r1"), RequestStatus::Available);
-    assert_eq!(world.engine.lock().unwrap().marked, [placed.download_id.clone()]);
+    assert_eq!(world.engine.lock().unwrap().marked, std::slice::from_ref(&placed.download_id));
     assert!(provisional::get(world.host.store(), &placed.download_id).unwrap().is_none());
     assert!(!confirmed(&world, &placed).await, "a second confirmation finds nothing");
 }

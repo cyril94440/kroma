@@ -201,3 +201,5 @@ pub(crate) fn read_downloads<S: HostStorage>(state: &S) -> Result<Vec<Download>>
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_give_up;

@@ -4,7 +4,11 @@ fn asked_warm(h: &Harness) -> Vec<bool> {
     h.server
         .requests()
         .iter()
-        .map(|request| serde_json::from_str::<Value>(&request.body).unwrap()["warm"].as_bool().unwrap())
+        .map(|request| {
+            serde_json::from_str::<Value>(&request.body).unwrap()["warm"]
+                .as_bool()
+                .unwrap()
+        })
         .collect()
 }
 
@@ -39,7 +43,12 @@ fn a_stub_with_other_content_is_not_answered_from_the_memory_of_the_old_one() {
     let stub = h.stub();
     h.sources.find(&stub, false).unwrap();
 
-    let other = RemoteFile { source: "debrid".into(), reference: "8:Other.mkv".into(), name: "Movie.MKV".into(), size: SIZE };
+    let other = RemoteFile {
+        source: "debrid".into(),
+        reference: "8:Other.mkv".into(),
+        name: "Movie.MKV".into(),
+        size: SIZE,
+    };
     remote_file::write(Path::new(&stub), &other).unwrap();
     h.sources.find(&stub, false).unwrap();
 
@@ -47,7 +56,12 @@ fn a_stub_with_other_content_is_not_answered_from_the_memory_of_the_old_one() {
         .server
         .requests()
         .iter()
-        .map(|request| serde_json::from_str::<Value>(&request.body).unwrap()["ref"].as_str().unwrap().to_string())
+        .map(|request| {
+            serde_json::from_str::<Value>(&request.body).unwrap()["ref"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
         .collect();
     assert_eq!(refs, ["7:Movie.mkv", "8:Other.mkv"]);
 }
@@ -68,15 +82,28 @@ fn a_link_the_upstream_called_gone_is_forgotten_at_once() {
 fn a_local_copy_that_appears_wins_over_the_link_remembered_before_it() {
     let h = harness(url_reply("https://1.1.1.1/dl/a.mkv"));
     let stub = h.stub();
-    assert!(matches!(h.sources.find(&stub, false).unwrap().place, Place::Upstream(_)));
+    assert!(matches!(
+        h.sources.find(&stub, false).unwrap().place,
+        Place::Upstream(_)
+    ));
 
     let copy = held_file(&h.dir.path().join("held"), "Movie.mkv", SIZE);
-    h.server.answer_from_now_on(200, &path_reply(&copy).to_string());
+    h.server
+        .answer_from_now_on(200, &path_reply(&copy).to_string());
     h.sources.forget(&stub);
 
-    assert!(matches!(h.sources.find(&stub, false).unwrap().place, Place::Copy(_)));
-    h.server.answer_from_now_on(200, &json!({ "Err": "must not be asked again" }).to_string());
-    assert!(matches!(h.sources.find(&stub, false).unwrap().place, Place::Copy(_)), "the copy answers with no module call");
+    assert!(matches!(
+        h.sources.find(&stub, false).unwrap().place,
+        Place::Copy(_)
+    ));
+    h.server.answer_from_now_on(
+        200,
+        &json!({ "Err": "must not be asked again" }).to_string(),
+    );
+    assert!(
+        matches!(h.sources.find(&stub, false).unwrap().place, Place::Copy(_)),
+        "the copy answers with no module call"
+    );
     assert_eq!(h.server.requests().len(), 2);
 }
 
@@ -111,7 +138,8 @@ fn a_copy_that_lands_after_a_failure_is_found_once_the_failure_is_forgotten() {
     assert!(h.sources.local(&stub).is_err());
 
     let copy = held_file(&h.dir.path().join("held"), "Movie.mkv", SIZE);
-    h.server.answer_from_now_on(200, &path_reply(&copy).to_string());
+    h.server
+        .answer_from_now_on(200, &path_reply(&copy).to_string());
     h.sources.forget(&stub);
     h.sources.find(&stub, false).unwrap();
 
@@ -124,7 +152,12 @@ fn a_probe_that_cannot_read_the_network_warms_at_most_three_titles_at_once() {
     let stubs: Vec<String> = (0..5)
         .map(|n| {
             let path = h.dir.path().join(format!("m{n}.kremote"));
-            let stub = RemoteFile { source: "debrid".into(), reference: format!("{n}:a.mkv"), name: "a.mkv".into(), size: SIZE };
+            let stub = RemoteFile {
+                source: "debrid".into(),
+                reference: format!("{n}:a.mkv"),
+                name: "a.mkv".into(),
+                size: SIZE,
+            };
             remote_file::write(&path, &stub).unwrap();
             path.to_string_lossy().into_owned()
         })

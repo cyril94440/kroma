@@ -12,6 +12,7 @@ describe('readSourceFailure', () => {
     [502, 'error.sourceUnreachable'],
     [502, 'error.sourceGone'],
     [503, 'error.sourceDisabled'],
+    [503, 'error.sourcePreparing'],
   ])('names the source failure a %i answer carries: %s', async (status, code) => {
     expect(await readSourceFailure(answer(status, { error: 'x', code }))).toEqual({
       messageKey: code,

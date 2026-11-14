@@ -49,7 +49,10 @@ fn a_title_with_no_audio_track_still_cuts_a_playlist_in_every_audio_mode() {
             track: None,
         });
 
-        let status = std::process::Command::new("ffmpeg").args(&args).status().unwrap();
+        let status = std::process::Command::new("ffmpeg")
+            .args(&args)
+            .status()
+            .unwrap();
 
         assert!(status.success(), "{mode:?}");
         assert!(out.join("index.m3u8").exists(), "{mode:?}");

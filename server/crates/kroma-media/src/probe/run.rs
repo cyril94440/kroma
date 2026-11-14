@@ -75,8 +75,15 @@ pub fn probe_duration_ms(input: &MediaInput) -> Option<u64> {
 /// the file, so the caller must leave it to a later pass rather than record a
 /// verdict that would stand for good.
 pub fn probe_file(path: &Path, ffprobe_present: bool) -> Option<ProbeResult> {
-    let container = path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("");
-    probe_input(&MediaInput::Local(path.to_path_buf()), container, ffprobe_present)
+    let container = path
+        .extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or("");
+    probe_input(
+        &MediaInput::Local(path.to_path_buf()),
+        container,
+        ffprobe_present,
+    )
 }
 
 /// [`probe_file`] over any input. `container` is the real container's extension,
@@ -88,7 +95,7 @@ pub fn probe_input(
     ffprobe_present: bool,
 ) -> Option<ProbeResult> {
     match probe_outcome(input, container, ffprobe_present) {
-        Probed::Done(result) => Some(result),
+        Probed::Done(result) => Some(*result),
         Probed::Killed | Probed::Network => None,
     }
 }
@@ -98,24 +105,24 @@ pub fn probe_input(
 /// fetched is not an unreadable file.
 #[derive(Debug)]
 pub enum Probed {
-    Done(ProbeResult),
+    Done(Box<ProbeResult>),
     Killed,
     Network,
 }
 
 pub fn probe_outcome(input: &MediaInput, container: &str, ffprobe_present: bool) -> Probed {
     if !ffprobe_present {
-        return Probed::Done(fallback_from_container(container));
+        return Probed::Done(Box::new(fallback_from_container(container)));
     }
     match run_ffprobe(input) {
         Outcome::Read(result, video_stream) => {
-            Probed::Done(with_hdr10plus(input, *result, video_stream))
+            Probed::Done(Box::new(with_hdr10plus(input, *result, video_stream)))
         }
-        Outcome::Unreadable(reason) => Probed::Done(ProbeResult {
+        Outcome::Unreadable(reason) => Probed::Done(Box::new(ProbeResult {
             unreadable: Some(reason),
             ..ProbeResult::default()
-        }),
-        Outcome::NotProbed => Probed::Done(fallback_from_container(container)),
+        })),
+        Outcome::NotProbed => Probed::Done(Box::new(fallback_from_container(container))),
         Outcome::Killed => Probed::Killed,
         Outcome::Network => Probed::Network,
     }
@@ -190,7 +197,15 @@ fn run_ffprobe(input: &MediaInput) -> Outcome {
     let mut command = Command::new("ffprobe");
     input::without_proxies(&mut command);
     command
-        .args(["-v", "error", "-show_format", "-show_streams", "-show_chapters", "-of", "json"])
+        .args([
+            "-v",
+            "error",
+            "-show_format",
+            "-show_streams",
+            "-show_chapters",
+            "-of",
+            "json",
+        ])
         .args(input::media(input));
     let Some(output) = run_bounded(command, budget_for(input)) else {
         return if input.local().is_some() {
@@ -302,7 +317,9 @@ mod tests {
             Outcome::Unreadable(reason) => reason,
             Outcome::Read(..) => panic!("a refusal must not read as a description"),
             Outcome::NotProbed => panic!("a refusal must not read as a missing probe"),
-            Outcome::Killed | Outcome::Network => panic!("a refusal must not read as a killed probe"),
+            Outcome::Killed | Outcome::Network => {
+                panic!("a refusal must not read as a killed probe")
+            }
         }
     }
 
@@ -355,7 +372,12 @@ mod tests {
 
     #[test]
     fn output_kroma_cannot_parse_is_not_the_files_fault() {
-        let outcome = outcome_of(&MediaInput::Local("/media/x.mkv".into()), Some(0), b"not json", b"");
+        let outcome = outcome_of(
+            &MediaInput::Local("/media/x.mkv".into()),
+            Some(0),
+            b"not json",
+            b"",
+        );
 
         assert!(matches!(outcome, Outcome::NotProbed));
     }
@@ -364,7 +386,12 @@ mod tests {
     fn a_described_file_comes_back_with_its_streams_and_no_fault() {
         let stdout = br#"{"streams":[{"codec_type":"video","codec_name":"hevc","width":3840,"height":2160}]}"#;
 
-        let outcome = outcome_of(&MediaInput::Local("/media/x.mkv".into()), Some(0), stdout, b"");
+        let outcome = outcome_of(
+            &MediaInput::Local("/media/x.mkv".into()),
+            Some(0),
+            stdout,
+            b"",
+        );
 
         let Outcome::Read(result, _) = outcome else {
             panic!("a parsable description must read as one");

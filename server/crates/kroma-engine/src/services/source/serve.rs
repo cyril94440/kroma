@@ -40,7 +40,10 @@ impl Sources {
         headers: &HeaderMap,
         meter: M,
     ) -> Result<Response, ServeError> {
-        let me = self.me.upgrade().ok_or(ServeError::Source(SourceError::Unreachable))?;
+        let me = self
+            .me
+            .upgrade()
+            .ok_or(ServeError::Source(SourceError::Unreachable))?;
         let mut again = true;
         loop {
             let (held, path) = (me.clone(), abs.to_string());
@@ -53,27 +56,43 @@ impl Sources {
                 Place::Copy(copy) => {
                     let kind = extension
                         .clone()
-                        .or_else(|| copy.path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase))
+                        .or_else(|| {
+                            copy.path
+                                .extension()
+                                .and_then(|e| e.to_str())
+                                .map(str::to_ascii_lowercase)
+                        })
                         .unwrap_or_default();
                     match tokio::task::spawn_blocking(move || copy.open()).await {
                         Ok(Ok(file)) => {
                             let file = tokio::fs::File::from_std(file);
-                            return Ok(stream_open(file, content_type_of(&kind), headers, meter).await);
+                            return Ok(
+                                stream_open(file, content_type_of(&kind), headers, meter).await
+                            );
                         }
                         _ if again => {
                             self.memo.forget(abs);
                             again = false;
                         }
-                        _ => return Err(ServeError::Source(SourceError::Gone("the copy is gone".into()))),
+                        _ => {
+                            return Err(ServeError::Source(SourceError::Gone(
+                                "the copy is gone".into(),
+                            )))
+                        }
                     }
                 }
                 Place::Upstream(url) => {
                     let size = found.stub.size;
                     let kind = extension.unwrap_or_default();
                     let reader = me.clone();
-                    let opened = stream_ranged(size, content_type_of(&kind), headers, head, meter.clone(), |start, end| async move {
-                        reader.relay(&url, start, end, size).await
-                    })
+                    let opened = stream_ranged(
+                        size,
+                        content_type_of(&kind),
+                        headers,
+                        head,
+                        meter.clone(),
+                        |start, end| async move { reader.relay(&url, start, end, size).await },
+                    )
                     .await;
                     match opened {
                         Ok(response) => return Ok(response),
