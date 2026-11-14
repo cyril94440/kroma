@@ -7,7 +7,7 @@ use axum::body::Body;
 use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
-use kroma_media::hls::ToneMap;
+use kroma_media::hls::{AudioMode, StreamMode, ToneMap, VideoMode};
 use kroma_media::input;
 use serde::Deserialize;
 
@@ -26,13 +26,16 @@ use super::byte_sink;
 use audio_args::download_audio_args;
 use video_args::video_args;
 
-/// `?copy=` and `?video=` name codecs the client decodes natively. Absent means
+/// `?hdr=` names the HDR systems the display shows (`hdr10`, `hdr10plus`, `hlg`, `dv`);
+/// absent is undeclared, empty is SDR only, and a source it cannot show is re-encoded
+/// tone-mapped. `?copy=` and `?video=` name codecs the client decodes natively. Absent means
 /// the default (`copy` → `aac,ac3,eac3`; `video` → stream-copy the source);
 /// present but empty (`?copy=`) means none, so transcode every track.
 #[derive(Debug, Deserialize)]
 pub struct DownloadQuery {
     pub copy: Option<String>,
     pub video: Option<String>,
+    pub hdr: Option<String>,
 }
 
 /// `GET /api/items/:id/download` (optional `?copy=aac,ac3`, `?video=hevc,h264`)
@@ -79,6 +82,11 @@ pub async fn download_item(
         .args(input::file(&abs))
         .args(["-map", "0:v:0"]);
     let tone_map = item.video.as_ref().and_then(ToneMap::for_video);
+    let video_copy = video_copy
+        && StreamMode::new(VideoMode::Copy, AudioMode::Copy)
+            .for_client_hdr(item.video.as_ref(), q.hdr.as_deref(), tone_map.is_some())
+            .video
+            == VideoMode::Copy;
     cmd.args(video_args(item.video.as_ref(), video_copy, tone_map));
     cmd.args(download_audio_args(
         &item.audio_tracks,
