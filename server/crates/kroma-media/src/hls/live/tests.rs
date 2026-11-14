@@ -12,6 +12,7 @@ fn plan(key: &str, mode: StreamMode, accel: HwAccel) -> Plan {
             accel,
             effort: Effort::Realtime,
             tonemap: None,
+            frame: None,
         },
         Some((3840, 2160)),
         Some(4242),

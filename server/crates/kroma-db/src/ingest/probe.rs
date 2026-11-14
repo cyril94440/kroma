@@ -5,11 +5,20 @@ use rusqlite::params;
 
 use crate::Pool;
 
-/// (file_id, abs_path, owning item_id) for every file awaiting an ffprobe pass.
-pub fn unprobed_files(pool: &Pool) -> Result<Vec<(String, String, String)>> {
+/// The version of the facts a probe writes. A release that makes the probe learn
+/// something new raises it, and every file whose facts are older and could gain
+/// from it is read again in the background while it keeps serving the old ones.
+pub const PROBE_SCHEMA: i64 = 1;
+
+type FileToProbe = (String, String, String);
+
+fn files_where(pool: &Pool, condition: &str, limit: i64) -> Result<Vec<FileToProbe>> {
     let conn = pool.get()?;
-    let mut stmt = conn.prepare("SELECT id, abs_path, item_id FROM files WHERE probed = 0")?;
-    let rows = stmt.query_map([], |r| {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT id, abs_path, item_id FROM files WHERE {condition} \
+         ORDER BY v_hdr DESC, id LIMIT ?1"
+    ))?;
+    let rows = stmt.query_map(params![limit], |r| {
         Ok((
             r.get::<_, String>(0)?,
             r.get::<_, String>(1)?,
@@ -17,6 +26,44 @@ pub fn unprobed_files(pool: &Pool) -> Result<Vec<(String, String, String)>> {
         ))
     })?;
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// (file_id, abs_path, owning item_id) for every file awaiting an ffprobe pass.
+pub fn unprobed_files(pool: &Pool) -> Result<Vec<FileToProbe>> {
+    files_where(pool, "probed = 0", -1)
+}
+
+/// Up to `limit` files that are probed and readable but were read by an older
+/// probe, HDR ones first. They are as probed as any other until the new facts
+/// land: every reader keeps using the ones they have.
+pub fn stale_probe_files(pool: &Pool, limit: usize) -> Result<Vec<FileToProbe>> {
+    files_where(
+        pool,
+        &format!("probed = 1 AND unreadable IS NULL AND probe_schema < {PROBE_SCHEMA}"),
+        i64::try_from(limit).unwrap_or(i64::MAX),
+    )
+}
+
+/// How many files [`stale_probe_files`] has left.
+pub fn stale_probe_count(pool: &Pool) -> Result<usize> {
+    let conn = pool.get()?;
+    let n: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM files WHERE probed = 1 AND unreadable IS NULL AND probe_schema < ?1",
+        params![PROBE_SCHEMA],
+        |r| r.get(0),
+    )?;
+    Ok(n as usize)
+}
+
+/// Settle a file whose re-read failed with the facts it already has, so a
+/// transient fault does not replace good ones with an error and the file is not
+/// offered again until the probe changes once more.
+pub fn keep_probe_facts(pool: &Pool, file_id: &str) -> Result<()> {
+    pool.get()?.execute(
+        "UPDATE files SET probe_schema = ?2 WHERE id = ?1",
+        params![file_id, PROBE_SCHEMA],
+    )?;
+    Ok(())
 }
 
 /// Item ids that are fully probed (≥1 file, none unprobed).
@@ -106,107 +153,4 @@ pub fn item_has_probed_file(pool: &Pool, item_id: &str) -> Result<bool> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ingest::test_support::*;
-    use std::collections::HashMap;
-
-    #[test]
-    fn probe_helpers_over_seeded_files() {
-        let p = pool();
-        {
-            let conn = p.get().unwrap();
-            conn.execute(
-                "INSERT INTO libraries (id,name,kind,path,added_at) VALUES ('lib','L','movies','/x','t')",
-                [],
-            )
-            .unwrap();
-            for id in ["m1", "m2"] {
-                conn.execute(
-                    "INSERT INTO items (id,kind,title,container,library,added_at) VALUES (?1,'movie','T','mkv','lib','t')",
-                    params![id],
-                )
-                .unwrap();
-            }
-            // m1: one probed + one unprobed (not fully probed).
-            conn.execute(
-                "INSERT INTO files (id,item_id,abs_path,container,probed,mtime,size) VALUES ('f1','m1','/a',' ',1,100,2000)",
-                [],
-            )
-            .unwrap();
-            conn.execute(
-                "INSERT INTO files (id,item_id,abs_path,container,probed) VALUES ('f2','m1','/b','',0)",
-                [],
-            )
-            .unwrap();
-            // m2: a single probed file (fully probed).
-            conn.execute(
-                "INSERT INTO files (id,item_id,abs_path,container,probed) VALUES ('f3','m2','/c','',1)",
-                [],
-            )
-            .unwrap();
-        }
-
-        assert!(!item_probed(&p, "m1").unwrap());
-        assert!(item_probed(&p, "m2").unwrap());
-        assert!(!item_probed(&p, "missing").unwrap());
-
-        let fully = probed_item_ids(&p).unwrap();
-        assert!(fully.contains("m2") && !fully.contains("m1"));
-
-        let mut ids = file_ids_for_item(&p, "m1").unwrap();
-        ids.sort();
-        assert_eq!(ids, vec!["f1".to_string(), "f2".to_string()]);
-
-        let f1 = probe_target(&p, "f1").unwrap().expect("the probed file");
-        assert_eq!((f1.abs_path.as_str(), f1.item_id.as_str()), ("/a", "m1"));
-        assert!(f1.described);
-        assert!(probe_target(&p, "gone").unwrap().is_none());
-        let sigs: HashMap<String, String> = all_file_sigs(&p).unwrap().into_iter().collect();
-        assert_eq!(sigs.get("f1").map(String::as_str), Some("100:2000"));
-        assert_eq!(sigs.get("f3").map(String::as_str), Some("0:0")); // null mtime/size
-
-        unprobe_item_files(&p, "m1").unwrap();
-        assert!(!item_has_probed_file(&p, "m1").unwrap());
-    }
-
-    #[test]
-    fn a_file_a_pass_left_with_a_fault_is_offered_to_the_next_one() {
-        let p = pool();
-        crate::sync_all(
-            &p,
-            &[lib("lib")],
-            &[],
-            &[movie(
-                "m1",
-                "Dune",
-                "lib",
-                vec![file("f1", "/media/m1.mkv", false)],
-            )],
-            &HashMap::new(),
-        )
-        .unwrap();
-        crate::set_file_probe(
-            &p,
-            "f1",
-            &crate::FileProbe {
-                unreadable: Some("Invalid data found when processing input"),
-                ..crate::FileProbe::default()
-            },
-        )
-        .unwrap();
-
-        let target = probe_target(&p, "f1").unwrap().expect("the faulted file");
-
-        assert!(!target.described);
-    }
-
-    #[test]
-    fn the_probe_state_readers_error_when_the_file_table_is_gone() {
-        let p = pool();
-        p.get().unwrap().execute_batch("DROP TABLE files").unwrap();
-
-        assert!(item_probed(&p, "m1").is_err());
-        assert!(item_has_probed_file(&p, "m1").is_err());
-    }
-}
+mod tests;

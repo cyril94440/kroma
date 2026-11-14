@@ -29,7 +29,8 @@ A file direct-plays when **all** of the following hold:
   level, bit depth and HDR variant, in hardware, as declared for that device generation. On a
   stream request a client may declare the HDR systems its display shows as `hdr=` (`hdr10`,
   `hdr10plus`, `hlg`, `dv`; empty means SDR only; absent means undeclared, and the request
-  stands). The server then re-encodes, tone-mapped, a source the display cannot show.
+  stands). The server then re-encodes, tone-mapped and no larger than 1080p, a source the
+  display cannot show.
 - **PLAY-4** (AGREED) - Every **audio stream the person might select** is decodable by the
   client at its native channel layout, or is passthrough-capable to a connected receiver. A
   copy is always preferred when the client declares the codec; otherwise a surround track is
@@ -69,7 +70,8 @@ change on another stream would do.
 - **PLAY-14** (SHIPPED) - Rung 5, **video transcode**, the last resort. The video stream is
   re-encoded to a codec, profile and bitrate the client can decode, downscaling resolution and
   tone-mapping HDR to SDR only as far as required. This rung always loses quality and costs
-  the server real work.
+  the server real work: a tone-map on the CPU counts for two of the host's re-encode slots, and
+  a 4K source on a host of four cores or fewer is served at 720p, the size it can keep up with.
 
 **PLAY-15** (AGREED) - KROMA takes the highest rung that satisfies the client and does not
 skip rungs for convenience. If remux suffices it remuxes; it does not transcode because a
@@ -116,7 +118,9 @@ than a buried log line.
 profile forces it.
 
 **PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so. The server tone-maps
-every HDR re-encode it can, so the notice is the client's to show.
+every HDR re-encode it can, so the notice is the client's to show. Dolby Vision profile 7
+reaches a client over HLS as its HDR10 base layer, and profile 5 as Dolby Vision only where
+the client declared `dv`.
 
 **PLAY-27** (AGREED) - KROMA never burns in subtitles the person did not ask to see.
 

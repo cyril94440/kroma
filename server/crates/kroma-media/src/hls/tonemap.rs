@@ -12,7 +12,7 @@
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use kroma_module_wire::{HdrFormat, VideoStream};
+use kroma_module_wire::VideoStream;
 
 use crate::input;
 
@@ -20,10 +20,12 @@ use super::ffmpeg::ffmpeg_output;
 use super::hwaccel::HwAccel;
 use super::naming::contains;
 
-pub mod cost;
+pub(super) mod cost;
 mod route;
+mod source;
 
 pub use route::Routes;
+pub use source::ToneSource;
 
 const VALIDATE_TIMEOUT: Duration = Duration::from_secs(20);
 const TEST_SOURCE: &str = "color=c=gray:s=320x240:r=25";
@@ -40,51 +42,6 @@ pub const SDR_TAGS: [&str; 6] = [
 ];
 
 const LIBPLACEBO: &str = "libplacebo=tonemapping=bt.2390:colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv:format=yuv420p";
-
-/// The signal a source picture is encoded in, which decides how it is
-/// linearised before it is squeezed into SDR.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ToneSource {
-    Pq,
-    Hlg,
-    DolbyVision,
-}
-
-impl ToneSource {
-    /// The signal `video` needs mapped, or `None` where it is SDR already or
-    /// nothing reliable says what it is. Dolby Vision follows its base layer:
-    /// profile 5 (no compatible base) is IPT-PQ-c2, which no plain PQ curve
-    /// reads, and an SDR-compatible profile 8.2 is left alone.
-    pub fn of(video: &VideoStream) -> Option<Self> {
-        let transfer = video.color.as_ref().and_then(|c| c.transfer.as_deref());
-        let by_transfer = || match transfer {
-            Some("smpte2084") => Some(Self::Pq),
-            Some("arib-std-b67") => Some(Self::Hlg),
-            _ => None,
-        };
-        match video.hdr_format {
-            Some(HdrFormat::DolbyVision) => match (
-                video.dolby_vision_compatibility,
-                video.dolby_vision_profile,
-            ) {
-                (Some(0), _) | (None, Some(5)) => Some(Self::DolbyVision),
-                (Some(2), _) => None,
-                (Some(4), _) => Some(Self::Hlg),
-                _ => by_transfer().or(Some(Self::Pq)),
-            },
-            Some(HdrFormat::Hdr10 | HdrFormat::Hdr10Plus) => Some(Self::Pq),
-            Some(HdrFormat::Hlg) => Some(Self::Hlg),
-            None => by_transfer(),
-        }
-    }
-
-    const fn transfer(self) -> &'static str {
-        match self {
-            Self::Hlg => "arib-std-b67",
-            Self::Pq | Self::DolbyVision => "smpte2084",
-        }
-    }
-}
 
 /// Which of the filters a tone-map can be built from this ffmpeg actually runs.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -220,6 +177,11 @@ static SUPPORT: OnceLock<Support> = OnceLock::new();
 /// What the host proved at boot, or nothing before [`prime`] has finished: a
 /// request that arrives first is answered conservatively, never by a probe.
 pub fn support() -> Support {
+    #[cfg(test)]
+    SUPPORT.get_or_init(|| Support {
+        filters: detect_filters(),
+        routes: Routes::NONE,
+    });
     SUPPORT.get().copied().unwrap_or(Support::NONE)
 }
 

@@ -28,7 +28,6 @@ use super::live::Plan;
 use super::naming::{contains, content_type, is_safe_name, seg_index, session_dir};
 use super::tonemap::ToneMap;
 use super::window::Window;
-use super::VideoMode;
 use crate::ffmpeg_gate;
 
 const FILE_WAIT: Duration = Duration::from_secs(20);
@@ -204,23 +203,13 @@ impl Sessions {
         }
         // Both shell out on their first call: must not run under the lock.
         let start = keyframe_before(input, start_secs).await;
-        // Off the reactor: the first call makes every candidate device encode a
-        // test frame, and this one runs inside the request that starts a session.
         let target = mode.video.box_size();
-        let tone = asked
+        let tonemap = asked
             .video
-            .filter(|_| !matches!(mode.video, VideoMode::Copy))
-            .cloned();
-        let choose = move || {
-            let tonemap = tone.as_ref().and_then(ToneMap::for_video);
-            Pipeline::choose(source, target, tonemap)
-        };
-        let pipeline = tokio::task::spawn_blocking(choose.clone())
-            .await
-            .unwrap_or_else(|_| choose());
-        // The one case worth taking the box away from background work: no device,
-        // and a picture that has to be rebuilt frame by frame while someone waits.
-        let on_the_cpu = pipeline.on_the_cpu() && !matches!(mode.video, VideoMode::Copy);
+            .filter(|_| !mode.video.copies())
+            .and_then(ToneMap::for_video);
+        let pipeline = Pipeline::choose(source, target, tonemap);
+        let on_the_cpu = pipeline.on_the_cpu() && !mode.video.copies();
 
         let mut map = self.inner.lock().await;
         if let Some(s) = map.get(key) {
@@ -228,7 +217,7 @@ impl Sessions {
             return Ok(s.clone());
         }
         self.make_room(&mut map).await;
-        if !matches!(mode.video, VideoMode::Copy) && !self.admits_transcode(&mut map).await {
+        if !mode.video.copies() && !self.admits_transcode(&mut map, pipeline.slots()).await {
             warn!(session = %key, cap = self.transcode_cap, "refused a re-encode: every slot is taken");
             return Err(Refusal::Busy);
         }
@@ -254,7 +243,7 @@ impl Sessions {
                 return Err(Refusal::Unavailable);
             }
         };
-        info!(session = %key, audio, mode = ?mode, anchor = start_secs, start, accel = pipeline.accel.label(), effort = pipeline.effort.label(), "started HLS remux");
+        info!(session = %key, audio, mode = ?mode, anchor = start_secs, start, accel = pipeline.accel.label(), effort = pipeline.effort.label(), tonemap = ?pipeline.tonemap.map(ToneMap::route), "started HLS remux");
         let session = Arc::new(Session {
             plan: Plan::new(key, audio, mode, pipeline, source, child.id(), start_secs),
             dir,

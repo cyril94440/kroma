@@ -37,7 +37,9 @@ pub(super) fn build(spec: &Spec) -> Vec<OsString> {
     let mut args: Vec<OsString> = Vec::new();
     let mut push = |items: &[&str]| args.extend(items.iter().map(OsString::from));
     let seeking = spec.start_secs > 0.5;
-    let copying_video = matches!(spec.mode.video, VideoMode::Copy);
+    let copying_video = spec.mode.video.copies();
+    let dolby = spec.mode.video == VideoMode::CopyDolby;
+    let audio = guarded_audio(spec, copying_video, dolby);
     push(&["-v", "error", "-nostdin"]);
     // `-threads` lands on the DECODER here (before `-i`): a remux never decodes
     // video, so a pool is pure overhead - but a transcode does, and one thread
@@ -45,8 +47,6 @@ pub(super) fn build(spec: &Spec) -> Vec<OsString> {
     if copying_video {
         push(&["-threads", "1"]);
     } else {
-        // Puts the decode on the device too where there is one, so a 4K source
-        // never touches the CPU on its way to a 1080p screen.
         let decode = spec.pipeline.input_args();
         push(&decode.iter().map(String::as_str).collect::<Vec<_>>());
     }
@@ -67,7 +67,7 @@ pub(super) fn build(spec: &Spec) -> Vec<OsString> {
     push(&["-map", "0:v:0", "-map", &format!("0:a:{}?", spec.audio)]);
     if copying_video {
         push(&["-c:v", "copy"]);
-        push(&stream_copy::video_args(spec.video));
+        push(&stream_copy::video_args(spec.video, dolby));
     } else {
         if let Some(filter) = spec.pipeline.video_filter(spec.mode.video.box_size()) {
             push(&["-vf", &filter]);
@@ -76,10 +76,11 @@ pub(super) fn build(spec: &Spec) -> Vec<OsString> {
         push(spec.pipeline.output_tags());
         push(&["-force_key_frames", &keyframe_cadence()]);
     }
-    push(&audio_args(spec.mode.audio, spec.track));
-    let audio_copied = !spec.mode.audio.transcode();
+    push(&audio_args(audio, spec.track));
+    let audio_copied = !audio.transcode();
     let strictness = stream_copy::strictness(
         spec.video.filter(|_| copying_video),
+        dolby,
         spec.track.map(|t| t.codec.as_str()).filter(|_| audio_copied),
     );
     if let Some(level) = strictness {
@@ -111,6 +112,18 @@ pub(super) fn build(spec: &Spec) -> Vec<OsString> {
         ],
     );
     args
+}
+
+fn guarded_audio(spec: &Spec, copying_video: bool, dolby: bool) -> AudioMode {
+    let codec = spec.track.map(|t| t.codec.as_str());
+    match (spec.mode.audio, codec) {
+        (AudioMode::Copy, Some(codec))
+            if copying_video && !stream_copy::can_copy_audio_beside(spec.video, dolby, codec) =>
+        {
+            AudioMode::Aac
+        }
+        (audio, _) => audio,
+    }
 }
 
 pub(super) fn audio_args(mode: AudioMode, track: Option<&AudioStream>) -> Vec<&'static str> {

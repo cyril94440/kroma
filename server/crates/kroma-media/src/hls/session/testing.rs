@@ -40,11 +40,21 @@ fn mode_of(key: &str) -> StreamMode {
         .unwrap_or(StreamMode::new(VideoMode::Copy, AudioMode::Copy))
 }
 
+pub(in crate::hls) fn software() -> Pipeline {
+    Pipeline {
+        accel: HwAccel::Software,
+        effort: Effort::Quality,
+        tonemap: None,
+        frame: None,
+    }
+}
+
 pub(in crate::hls) fn fake_session(
     key: &str,
     dir: PathBuf,
     age: Duration,
     opener: Option<&str>,
+    pipeline: Pipeline,
 ) -> Arc<Session> {
     let child = Command::new("sleep")
         .arg("30")
@@ -61,11 +71,7 @@ pub(in crate::hls) fn fake_session(
         key,
         0,
         mode_of(key),
-        Pipeline {
-            accel: HwAccel::Software,
-            effort: Effort::Quality,
-            tonemap: None,
-        },
+        pipeline,
         None,
         child.id(),
         0.0,
@@ -109,12 +115,22 @@ pub(in crate::hls) async fn registry_with_budget(
 }
 
 pub(in crate::hls) async fn seed(s: &Sessions, key: &str, age: Duration, opener: Option<&str>) {
+    seed_on(s, key, age, opener, software()).await;
+}
+
+pub(in crate::hls) async fn seed_on(
+    s: &Sessions,
+    key: &str,
+    age: Duration,
+    opener: Option<&str>,
+    pipeline: Pipeline,
+) {
     let dir = s.root.join(session_dir(key));
     tokio::fs::create_dir_all(&dir).await.expect("session dir");
     s.inner
         .lock()
         .await
-        .insert(key.to_string(), fake_session(key, dir, age, opener));
+        .insert(key.to_string(), fake_session(key, dir, age, opener, pipeline));
 }
 
 /// Give a session's directory a measurable size, so the byte budget has

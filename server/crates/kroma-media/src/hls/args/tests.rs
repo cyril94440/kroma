@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use super::super::hwaccel::HwAccel;
 use super::super::software::Effort;
-use super::super::tonemap::{Filters, ToneMap, ToneSource};
+use super::super::tonemap::{Filters, Route, ToneMap, ToneSource};
 use super::super::Rung;
 use super::*;
 
@@ -47,6 +47,14 @@ fn pipeline(accel: HwAccel, tonemap: bool) -> Pipeline {
         accel,
         effort: Effort::Quality,
         tonemap: tonemap.then(|| ToneMap::resolve(ToneSource::Pq, ZIMG).unwrap()),
+        frame: Some((3840, 2160)),
+    }
+}
+
+fn routed(accel: HwAccel, route: Route) -> Pipeline {
+    Pipeline {
+        tonemap: pipeline(accel, true).tonemap.map(|map| map.routed(route)),
+        ..pipeline(accel, false)
     }
 }
 
@@ -113,14 +121,6 @@ fn an_unprobed_source_copies_exactly_as_before() {
 }
 
 #[test]
-fn profile_5_copy_is_dvh1_and_writes_the_dolby_box() {
-    let cmd = line(copy(AudioMode::Copy), Some(&hevc(Some(5))), None, software());
-
-    assert!(cmd.contains("-c:v copy -tag:v dvh1"), "{cmd}");
-    assert!(cmd.contains("-strict unofficial"), "{cmd}");
-}
-
-#[test]
 fn profile_8_copy_keeps_hvc1_and_writes_the_dolby_box() {
     let cmd = line(copy(AudioMode::Copy), Some(&hevc(Some(8))), None, software());
 
@@ -137,6 +137,69 @@ fn profile_7_copy_is_cut_down_to_its_hdr10_base_layer() {
         "{cmd}"
     );
     assert!(!cmd.contains("-strict"), "{cmd}");
+}
+
+#[test]
+fn profile_5_copy_for_a_client_that_did_not_declare_dolby_vision_is_plain_hevc_with_no_box() {
+    let cmd = line(copy(AudioMode::Copy), Some(&hevc(Some(5))), None, software());
+
+    assert!(cmd.contains("-c:v copy -tag:v hvc1"), "{cmd}");
+    assert!(!cmd.contains("dvh1") && !cmd.contains("-strict"), "{cmd}");
+}
+
+#[test]
+fn profile_7_beside_truehd_never_copies_the_audio_that_would_write_a_dolby_box() {
+    let cmd = line(
+        copy(AudioMode::Copy),
+        Some(&hevc(Some(7))),
+        Some(&track("truehd", 8)),
+        software(),
+    );
+
+    assert!(!cmd.contains("-strict"), "{cmd}");
+    assert!(!cmd.contains("-c:a copy"), "{cmd}");
+    assert!(cmd.contains("-c:a aac"), "{cmd}");
+    assert!(cmd.contains("filter_units=remove_types=62|63"), "{cmd}");
+}
+
+#[test]
+fn profile_7_beside_dts_copies_it_with_no_strictness_and_so_no_box() {
+    let cmd = line(
+        copy(AudioMode::Copy),
+        Some(&hevc(Some(7))),
+        Some(&track("dts", 6)),
+        software(),
+    );
+
+    assert!(cmd.contains("-c:a copy"), "{cmd}");
+    assert!(!cmd.contains("-strict"), "{cmd}");
+}
+
+#[test]
+fn profile_5_beside_truehd_keeps_its_box_when_the_client_declared_dolby_vision() {
+    let cmd = line(
+        StreamMode::new(VideoMode::CopyDolby, AudioMode::Copy),
+        Some(&hevc(Some(5))),
+        Some(&track("truehd", 8)),
+        software(),
+    );
+
+    assert!(cmd.contains("-tag:v dvh1"), "{cmd}");
+    assert!(cmd.contains("-c:a copy"), "{cmd}");
+    assert!(cmd.contains("-strict -2"), "{cmd}");
+}
+
+#[test]
+fn a_dolby_copy_is_dvh1_with_its_box() {
+    let cmd = line(
+        StreamMode::new(VideoMode::CopyDolby, AudioMode::Copy),
+        Some(&hevc(Some(5))),
+        None,
+        software(),
+    );
+
+    assert!(cmd.contains("-c:v copy -tag:v dvh1"), "{cmd}");
+    assert!(cmd.contains("-strict unofficial"), "{cmd}");
 }
 
 #[test]

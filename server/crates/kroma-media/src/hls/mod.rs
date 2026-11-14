@@ -32,7 +32,9 @@ pub use admission::Refusal;
 pub use hwaccel::Detection;
 pub use live::Transcode;
 pub use mode::{AudioMode, Rung, StreamMode, VideoMode, SURROUND_MIN_CHANNELS};
-pub use tonemap::{filters as tonemap_filters, Filters, ToneMap, ToneSource, SDR_TAGS};
+pub use tonemap::{filters as tonemap_filters, Filters, Route, ToneMap, ToneSource, SDR_TAGS};
+pub(crate) use fit::declares;
+pub(crate) use hwaccel::tone_map_filter;
 
 use std::path::PathBuf;
 #[cfg(test)]
@@ -69,12 +71,20 @@ pub struct Asked<'a> {
     pub track: Option<&'a AudioStream>,
 }
 
-/// Probes what this host can re-encode with, once, before the first request
-/// would pay for it: the encoder devices and the tone-mapping filters.
+/// Probes what this host can re-encode with, once, at boot and off the async
+/// runtime: the encoder devices, the tone-mapping filters and which tone-map
+/// routes a device runs, and what the ffmpeg build lists. They run side by side;
+/// a request that arrives before they finish is answered conservatively (the
+/// CPU, no tone-map) and never waits on them.
 pub fn prime_hwaccel() {
-    hwaccel::prime();
-    tonemap::filters();
-    crate::capabilities::prime();
+    std::thread::scope(|scope| {
+        scope.spawn(crate::capabilities::prime);
+        let filters = scope.spawn(tonemap::detect_filters);
+        hwaccel::prime();
+        let filters = filters.join().unwrap_or(Filters::NONE);
+        tonemap::prime(hwaccel::detect(), filters);
+    });
+    tracing::info!(support = ?tonemap::support(), "tone-mapping settled");
 }
 
 pub struct HlsEngine {

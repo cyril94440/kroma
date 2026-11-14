@@ -27,6 +27,9 @@ const ASSUMED_FPS: f64 = 30.0;
 // on a fallback path, reading it as stronger than it is costs playback, and the
 // box this has to hold for is a four-thread 1.5 GHz Celeron.
 const CORE_BUDGET: f64 = 15.0;
+// What a tone-mapped megapixel costs beyond the plain one, in plain megapixels:
+// the float chain measured 1.3 times a libx264 veryfast encode of the same frame.
+const TONEMAP_EXTRA_MPIX: f64 = 1.3;
 
 impl Effort {
     /// The tier for one transcode, from the picture going in, the box it is
@@ -36,7 +39,11 @@ impl Effort {
     ///
     /// A source nobody probed reads as `Realtime`: it may well be the 4K the
     /// re-encode exists for, and guessing low here is the guess that stalls.
-    pub fn choose(source: Option<(u32, u32)>, target: Option<(u32, u32)>) -> Self {
+    pub fn choose(
+        source: Option<(u32, u32)>,
+        target: Option<(u32, u32)>,
+        tonemapped: bool,
+    ) -> Self {
         match std::env::var("KROMA_ENCODE_EFFORT").ok().as_deref() {
             Some("quality") => return Self::Quality,
             Some("realtime") => return Self::Realtime,
@@ -45,7 +52,7 @@ impl Effort {
         let Some(source) = source else {
             return Self::Realtime;
         };
-        Self::for_load(load(source, target.unwrap_or(source), cores()))
+        Self::for_load(load(source, target.unwrap_or(source), cores(), tonemapped))
     }
 
     /// The decoder flags this tier asks for, which precede `-i`.
@@ -101,11 +108,10 @@ impl Effort {
     }
 }
 
-// Megapixels a second, per logical core, that this job asks of the box: the
-// source is what has to be decoded and the target is what has to be encoded.
-fn load(source: (u32, u32), target: (u32, u32), cores: usize) -> f64 {
+fn load(source: (u32, u32), target: (u32, u32), cores: usize, tonemapped: bool) -> f64 {
     let mpix = |(w, h): (u32, u32)| f64::from(w) * f64::from(h) / 1_000_000.0;
-    (mpix(source) + mpix(target)) * ASSUMED_FPS / cores.max(1) as f64
+    let mapped = if tonemapped { 1.0 + TONEMAP_EXTRA_MPIX } else { 1.0 };
+    (mpix(source) + mpix(target) * mapped) * ASSUMED_FPS / cores.max(1) as f64
 }
 
 fn cores() -> usize {
@@ -124,28 +130,35 @@ mod tests {
     #[test]
     fn a_four_core_nas_downscaling_4k_cannot_afford_the_quality_tier() {
         // A DS918+: four threads of 1.5 GHz Celeron against 10 megapixels a frame.
-        assert_eq!(Effort::for_load(load(UHD, HD, 4)), Effort::Realtime);
+        assert_eq!(Effort::for_load(load(UHD, HD, 4, false)), Effort::Realtime);
     }
 
     #[test]
     fn a_box_with_headroom_keeps_the_quality_tier() {
-        assert_eq!(Effort::for_load(load(HD, HD, 12)), Effort::Quality);
+        assert_eq!(Effort::for_load(load(HD, HD, 12, false)), Effort::Quality);
     }
 
     #[test]
     fn the_same_job_gets_cheaper_as_cores_are_added() {
-        assert!(load(UHD, HD, 16) < load(UHD, HD, 4));
+        assert!(load(UHD, HD, 16, false) < load(UHD, HD, 4, false));
     }
 
     #[test]
     fn an_unprobed_source_reads_as_the_4k_the_re_encode_exists_for() {
-        assert_eq!(Effort::choose(None, Some(HD)), Effort::Realtime);
+        assert_eq!(Effort::choose(None, Some(HD), false), Effort::Realtime);
     }
 
     #[test]
     fn a_downscale_costs_more_than_the_same_picture_left_alone() {
         // The source is decoded either way, so the target is the only term that moves.
-        assert!(load(UHD, HD, 4) < load(UHD, UHD, 4));
+        assert!(load(UHD, HD, 4, false) < load(UHD, UHD, 4, false));
+    }
+
+    #[test]
+    fn a_tone_mapped_picture_asks_more_of_the_box_than_the_same_one_left_alone() {
+        assert!(load(HD, HD, 12, true) > load(HD, HD, 12, false));
+        assert_eq!(Effort::for_load(load(HD, HD, 12, false)), Effort::Quality);
+        assert_eq!(Effort::for_load(load(HD, HD, 12, true)), Effort::Realtime);
     }
 
     #[test]

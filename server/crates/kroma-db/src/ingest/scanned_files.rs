@@ -7,6 +7,8 @@ use rusqlite::params;
 
 use kroma_domain::{HdrFormat, MediaFile, MediaItem};
 
+use super::probe::PROBE_SCHEMA;
+
 pub(super) fn sync_files(
     tx: &rusqlite::Transaction,
     items: &[MediaItem],
@@ -52,12 +54,12 @@ pub(super) fn upsert_files(
              v_dv_el=NULL",
     )?;
     // Pre-probed files (demo/seed content) skip the phase-2 probe pass.
-    let mut preprobed_stmt = tx.prepare(
+    let mut preprobed_stmt = tx.prepare(&format!(
         "INSERT INTO files (id,item_id,abs_path,rel_path,container,size,mtime,edition,probed,\
              duration_ms,v_codec,v_width,v_height,v_hdr,v_bit_depth,a_codec,a_channels,a_language,subtitles,audio_tracks,\
              v_hdr_format,v_dv_profile,v_color_primaries,v_color_transfer,v_color_matrix,\
-             v_dv_level,v_dv_compat,v_dv_el) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27) \
+             v_dv_level,v_dv_compat,v_dv_el,probe_schema) \
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,{PROBE_SCHEMA}) \
          ON CONFLICT(abs_path) DO UPDATE SET \
              id=excluded.id, item_id=excluded.item_id, rel_path=excluded.rel_path, \
              container=excluded.container, size=excluded.size, mtime=excluded.mtime, \
@@ -69,8 +71,9 @@ pub(super) fn upsert_files(
              v_hdr_format=excluded.v_hdr_format, v_dv_profile=excluded.v_dv_profile, \
              v_color_primaries=excluded.v_color_primaries, v_color_transfer=excluded.v_color_transfer, \
              v_color_matrix=excluded.v_color_matrix, v_dv_level=excluded.v_dv_level, \
-             v_dv_compat=excluded.v_dv_compat, v_dv_el=excluded.v_dv_el",
-    )?;
+             v_dv_compat=excluded.v_dv_compat, v_dv_el=excluded.v_dv_el, \
+             probe_schema={PROBE_SCHEMA}"
+    ))?;
 
     for i in items {
         for f in &i.files {

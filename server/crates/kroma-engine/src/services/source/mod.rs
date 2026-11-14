@@ -184,7 +184,10 @@ impl Sources {
     /// asks a source to cache a title: a stub with no copy this ffmpeg can read
     /// is [`SourceError::Preparing`] and is left for a later pass. Blocking.
     pub fn resolve_without_warming(&self, abs: &str) -> Result<Resolved, SourceError> {
-        let network = kroma_media::capabilities::settled().http_input;
+        self.resolve_quietly(abs, kroma_media::capabilities::settled().http_input)
+    }
+
+    fn resolve_quietly(&self, abs: &str, network: bool) -> Result<Resolved, SourceError> {
         if network || !remote_file::is_remote_file(Path::new(abs)) {
             return self.resolve_with(abs, false, network);
         }

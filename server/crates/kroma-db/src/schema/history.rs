@@ -211,7 +211,7 @@ fn every_step_has_a_unique_name_that_starts_with_its_version() {
 }
 
 #[test]
-fn the_hdr_and_audio_step_queues_the_files_it_can_say_more_about_for_a_re_probe() {
+fn the_hdr_and_audio_step_marks_the_files_it_can_say_more_about_without_unprobing_them() {
     const STEP: &str = "0015_hdr_audio_facts";
     let at = CORE
         .steps
@@ -232,6 +232,7 @@ fn the_hdr_and_audio_step_queues_the_files_it_can_say_more_about_for_a_re_probe(
            ('dolby','m','/dolby','mkv',1,0,'aac','[{\"index\":0,\"codec\":\"aac\"},{\"index\":1,\"codec\":\"truehd\"}]'),
            ('dts','m','/dts','mkv',1,0,'dts','[]'),
            ('plain','m','/plain','mkv',1,0,'aac','[{\"index\":0,\"codec\":\"aac\"}]'),
+           ('unprobed','m','/unprobed','mkv',0,NULL,NULL,'[]'),
            ('broken','m','/broken','mkv',1,1,NULL,'[]');
          UPDATE files SET unreadable = 'moov atom not found' WHERE id = 'broken';",
     )
@@ -239,16 +240,28 @@ fn the_hdr_and_audio_step_queues_the_files_it_can_say_more_about_for_a_re_probe(
 
     kroma_sqlite::migrate(&mut conn, &CORE, None).unwrap();
 
-    let queued: BTreeSet<String> = conn
-        .prepare("SELECT id FROM files WHERE probed = 0")
-        .unwrap()
-        .query_map([], |r| r.get(0))
-        .unwrap()
-        .collect::<rusqlite::Result<_>>()
-        .unwrap();
+    let ids = |sql: &str| -> BTreeSet<String> {
+        conn.prepare(sql)
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
+    };
+    let named = |names: &[&str]| -> BTreeSet<String> { names.iter().map(|n| n.to_string()).collect() };
     assert_eq!(
-        queued,
-        ["dolby", "dts", "hdr"].map(String::from).into_iter().collect()
+        ids("SELECT id FROM files WHERE probed = 1 AND unreadable IS NULL AND probe_schema = 0"),
+        named(&["dolby", "dts", "hdr"]),
+        "the files that can learn something are waiting for a re-read"
+    );
+    assert_eq!(
+        ids("SELECT id FROM files WHERE probed = 0"),
+        named(&["unprobed"]),
+        "no file was un-probed by the step"
+    );
+    assert_eq!(
+        ids("SELECT id FROM files WHERE probed = 1"),
+        named(&["broken", "dolby", "dts", "hdr", "plain"])
     );
     let columns: Vec<String> = conn
         .prepare("SELECT name FROM pragma_table_info('files') WHERE name LIKE 'v_dv_%'")

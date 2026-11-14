@@ -135,7 +135,8 @@ means the table is a guess, and the server behaves as before.
   HDR tone-mapped to an SDR display are each a notice, never a silent change. It is a fallback
   [`playback/`](../playback/) makes visible. Dolby Vision profile 7 is always delivered over HLS as
   its HDR10 base layer alone, so that notice holds for it even on a device that decodes Dolby
-  Vision; only the original file, played directly, keeps its enhancement layer.
+  Vision; only the original file, played directly, keeps its enhancement layer. Its TrueHD is
+  re-encoded rather than copied beside it (MEDIA-48).
 
 ## Audio
 
@@ -166,13 +167,32 @@ profile naming Dolby Atmos or DTS:X marks the stream `spatial`. DTS-HD Master Au
   profile's language preference.
 
 - **MEDIA-48** (SHIPPED) - A video copied into fragmented MP4 keeps what makes it HDR: HEVC is
-  tagged `hvc1`, Dolby Vision profile 5 is tagged `dvh1` with its configuration box, profile 8
-  keeps `hvc1` with its `dvvC` box so a Dolby Vision decoder engages and everything else draws
-  the base layer, and a single-track profile 7 is cut down to its HDR10 base layer.
+  tagged `hvc1`, profile 8 keeps `hvc1` with its `dvvC` box so a Dolby Vision decoder engages
+  and everything else draws the base layer, and a single-track profile 7 is cut down to its
+  HDR10 base layer and signalled as nothing else. Profile 5 has no base layer a plain decoder
+  can draw, so `dvh1` and the configuration box go only to a client that declared `dv`; any
+  other client, and any host that cannot tone-map it for one that declared `hdr` without `dv`,
+  gets plain `hvc1` with no box, which opens everywhere and draws the base layer's own
+  colours, as it did before the box existed. The Apple HLS rules ask `dvh1` of profile 5 and
+  nothing else can open it. TrueHD needs a muxer level that also writes the box from the
+  stream's own record, which ffmpeg 6.1 cannot drop, so it is never copied beside a profile 7
+  or a profile 5 not signalled as Dolby Vision: it is re-encoded like any soundtrack the
+  client cannot decode. `hvc1` rather than `hev1` is deliberate (Apple requires it, and
+  in-band parameter sets are the less compatible form for fragmented MP4 HLS); the residual
+  risk is a television whose decoder is not probed for it, and a browser only declares `hevc`
+  after probing `hvc1`.
 - **MEDIA-49** (SHIPPED) - A video re-encoded to 8-bit H.264 from an HDR source is tone-mapped
   and tagged BT.709, on hosts whose ffmpeg has zimg (or libplacebo with a working Vulkan
-  device); elsewhere the re-encode is as before. Dolby Vision profile 5 needs libplacebo.
-  `KROMA_TONEMAP=off` rules tone-mapping out.
+  device); elsewhere the re-encode is as before. A tone-mapped picture is never larger than
+  1080p: it is scaled down first, on the device that decodes it where there is one, and the
+  re-encode is a 1080p rung even for a client that sent no frame cap. At boot each device
+  route is proved on a small HDR10 clip through the same flags a session uses: the device's own
+  filter (`tonemap_vaapi`, `vpp_qsv`), else hardware decode and scale with a download of the
+  1080p picture and a mapping on the CPU, else the CPU for every step; one that fails is not
+  offered. A mapping on the CPU costs two re-encode slots and holds background work back, and
+  on a host with four cores or fewer a 4K source drops to a 720p rung. Dolby Vision profile 5
+  needs libplacebo and a software decoder, which is what hands over its reshaping.
+  `KROMA_TONEMAP=off` rules tone-mapping out and `KROMA_TONEMAP=cpu` rules out the device routes.
 
 **MEDIA-47** (AGREED) - An audio stream carries the region of its language when the file says
 so: from its language tag in any language (`fr-CA`, `pt-BR`), else from words of its title
@@ -244,6 +264,15 @@ extension stands in for the video codec until something can look properly.
   re-probe.
 - **MEDIA-40** (AGREED) - Trust is per-file and durable: a corrected probe is written back,
   not held in memory for one session.
+- **MEDIA-56** (SHIPPED) - A release that makes the probe learn something new (HDR format,
+  Dolby Vision detail, an audio profile) never unprobes a library. Each file carries the
+  version of the facts its probe wrote, and the files that could gain from the new version are
+  read again in the background, after every file never probed, one at a time, a batch of 200 a
+  pass (a boot, a scan) so a large library catches up over days of ordinary use. Until a file's
+  new facts land, in the one write that replaces the old ones, it is as probed as it was: it
+  keeps representing its item, counts as on disk and shows what it showed. A stub with no
+  local copy is left alone where this ffmpeg cannot read the network, and a re-read that
+  fails keeps the facts the file had.
 
 ## Files KROMA can read but not fully describe
 

@@ -311,7 +311,7 @@ fn a_client_that_declares_no_hdr_formats_keeps_every_copy_it_asked_for() {
 #[test]
 fn an_sdr_only_client_gets_every_hdr_source_re_encoded() {
     for video in [HDR10(), HLG(), PROFILE_5(), PROFILE_8_1()] {
-        assert_eq!(hdr(&video, Some(""), true), VideoMode::H264);
+        assert_eq!(hdr(&video, Some(""), true), VideoMode::H264At(Rung::P1080));
     }
 }
 
@@ -325,15 +325,19 @@ fn an_sdr_source_and_an_sdr_compatible_dolby_vision_one_are_never_re_encoded_for
 
 #[test]
 fn profile_5_is_sent_only_to_a_client_that_declares_dolby_vision() {
-    assert_eq!(hdr(&PROFILE_5(), Some("hdr10,hlg"), true), VideoMode::H264);
-    assert_eq!(hdr(&PROFILE_5(), Some("hdr10,dv"), true), VideoMode::Copy);
+    assert_eq!(hdr(&PROFILE_5(), Some("hdr10,hlg"), true), VideoMode::H264At(Rung::P1080));
+    assert_eq!(
+        hdr(&PROFILE_5(), Some("hdr10,dv"), true),
+        VideoMode::CopyDolby
+    );
 }
 
 #[test]
 fn a_dolby_vision_stream_with_a_hdr10_base_plays_as_hdr10_without_dv() {
     assert_eq!(hdr(&PROFILE_8_1(), Some("hdr10"), true), VideoMode::Copy);
-    assert_eq!(hdr(&PROFILE_8_1(), Some("hlg"), true), VideoMode::H264);
+    assert_eq!(hdr(&PROFILE_8_1(), Some("hlg"), true), VideoMode::H264At(Rung::P1080));
     assert_eq!(hdr(&PROFILE_8_1(), Some("dv"), true), VideoMode::Copy);
+    assert_eq!(hdr(&PROFILE_8_1(), Some("dv,hdr10"), false), VideoMode::Copy);
 }
 
 #[test]
@@ -341,7 +345,7 @@ fn a_dolby_vision_stream_with_an_hlg_base_plays_as_hlg_without_dv() {
     let profile_8_4 = hdr_video(Some(HdrFormat::DolbyVision), Some(8), Some(4));
 
     assert_eq!(hdr(&profile_8_4, Some("hlg"), true), VideoMode::Copy);
-    assert_eq!(hdr(&profile_8_4, Some("hdr10"), true), VideoMode::H264);
+    assert_eq!(hdr(&profile_8_4, Some("hdr10"), true), VideoMode::H264At(Rung::P1080));
 }
 
 #[test]
@@ -349,13 +353,13 @@ fn hdr10_plus_plays_on_a_client_that_only_declares_hdr10() {
     let plus = hdr_video(Some(HdrFormat::Hdr10Plus), None, None);
 
     assert_eq!(hdr(&plus, Some("hdr10"), true), VideoMode::Copy);
-    assert_eq!(hdr(&plus, Some("hlg"), true), VideoMode::H264);
+    assert_eq!(hdr(&plus, Some("hlg"), true), VideoMode::H264At(Rung::P1080));
 }
 
 #[test]
 fn each_format_needs_its_own_declaration() {
-    assert_eq!(hdr(&HDR10(), Some("hlg,dv"), true), VideoMode::H264);
-    assert_eq!(hdr(&HLG(), Some("hdr10,dv"), true), VideoMode::H264);
+    assert_eq!(hdr(&HDR10(), Some("hlg,dv"), true), VideoMode::H264At(Rung::P1080));
+    assert_eq!(hdr(&HLG(), Some("hdr10,dv"), true), VideoMode::H264At(Rung::P1080));
     assert_eq!(hdr(&HDR10(), Some(" HDR10 , hlg"), true), VideoMode::Copy);
 }
 
@@ -364,6 +368,47 @@ fn no_re_encode_is_ordered_where_it_could_not_come_out_in_sdr() {
     for video in [HDR10(), PROFILE_5()] {
         assert_eq!(hdr(&video, Some(""), false), VideoMode::Copy);
     }
+}
+
+#[test]
+fn a_re_encoded_hdr_picture_is_one_the_tone_map_runs_at_1080p_on() {
+    let to_sdr = |video: &VideoStream, shows| copy().for_client_hdr(Some(video), shows, true);
+
+    assert_eq!(
+        to_sdr(&HDR10(), Some("")).token(),
+        "h264-1080-copy"
+    );
+}
+
+#[test]
+fn a_client_declaring_no_frame_cap_still_gets_a_1080p_tone_map_not_a_full_size_one() {
+    let mode = copy()
+        .for_client_hdr(Some(&HDR10()), Some(""), true)
+        .for_client_frame(Some((3840, 2160)), None);
+
+    assert_eq!(mode.video, VideoMode::H264At(Rung::P1080));
+}
+
+#[test]
+fn a_full_size_re_encode_of_a_picture_that_will_be_tone_mapped_becomes_a_1080p_one() {
+    let full_size = StreamMode::new(VideoMode::H264, AudioMode::Aac);
+
+    assert_eq!(
+        full_size.within_tone_map_box(true).video,
+        VideoMode::H264At(Rung::P1080)
+    );
+    assert_eq!(full_size.within_tone_map_box(false), full_size);
+    assert_eq!(
+        StreamMode::new(VideoMode::H264At(Rung::P720), AudioMode::Aac).within_tone_map_box(true).video,
+        VideoMode::H264At(Rung::P720)
+    );
+}
+
+#[test]
+fn a_client_that_declares_dolby_vision_alone_gets_the_dolby_signalled_copy_only_for_profile_5() {
+    assert_eq!(hdr(&PROFILE_5(), Some("dv"), false), VideoMode::CopyDolby);
+    assert_eq!(hdr(&PROFILE_5(), Some("hdr10"), false), VideoMode::Copy);
+    assert_eq!(hdr(&PROFILE_8_1(), Some("dv"), true), VideoMode::Copy);
 }
 
 #[test]
@@ -466,9 +511,9 @@ fn a_re_encoded_picture_keeps_the_surround_bed_the_same_request_earned() {
 
     assert_eq!(
         sdr_only,
-        StreamMode::new(VideoMode::H264, AudioMode::Eac3)
+        StreamMode::new(VideoMode::H264At(Rung::P1080), AudioMode::Eac3)
     );
-    assert_eq!(sdr_only.token(), "h264-eac3");
+    assert_eq!(sdr_only.token(), "h264-1080-eac3");
 }
 
 #[test]
@@ -481,3 +526,5 @@ fn a_surround_target_the_build_cannot_encode_degrades_one_step_to_stereo_aac() {
     assert_eq!(target(false, false, "aac,ac3,eac3"), AudioMode::Aac);
     assert_eq!(target(false, true, "aac,ac3"), AudioMode::Aac);
 }
+
+mod pictures;

@@ -25,9 +25,6 @@ enum Treatment {
     Stereo,
 }
 
-// A track that cannot be copied keeps its 5.1 bed only where the client said it
-// decodes the codec: no declaration is the default set, which a phone may not
-// have, so it stays the stereo AAC it always was.
 fn treatment(track: Option<&AudioStream>, fallback: Option<&str>, set: Option<&str>) -> Treatment {
     let codec = track.map(|t| t.codec.as_str()).or(fallback);
     if download_copies_audio(codec, set) {

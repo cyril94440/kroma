@@ -62,7 +62,8 @@ struct ProbeJob {
 
 /// ffprobe every file with `probed=0`, write the result, and emit live events so
 /// clients fill in codec/HDR badges. Returns immediately; work runs on a small
-/// pool of detached threads. A no-op when there are no unprobed files.
+/// pool of detached threads. Once they are done, a bounded batch of files an
+/// older probe described is read again, one at a time (see [`super::refresh`]).
 pub fn spawn_probe_pass(
     pool: Pool,
     ffprobe_present: bool,
@@ -77,12 +78,14 @@ pub fn spawn_probe_pass(
             return;
         }
     };
-    if unprobed.is_empty() {
+    let total = unprobed.len();
+    if total == 0 {
         info!("phase-2 probe: nothing to probe (mtime cache hit)");
+        thread::spawn(move || {
+            super::refresh::refresh_once(&pool, ffprobe_present, &sources, &bus);
+        });
         return;
     }
-
-    let total = unprobed.len();
     info!(files = total, "starting phase-2 background probing");
     activity::probe_started(&activity, total);
 
@@ -98,7 +101,9 @@ pub fn spawn_probe_pass(
     let done = Arc::new(AtomicUsize::new(0));
 
     thread::spawn(move || {
-        run_probe_pass(pool, ffprobe_present, bus, activity, sources, queue, done, total)
+        let (refresh_pool, refresh_sources, refresh_bus) = (pool.clone(), sources.clone(), bus.clone());
+        run_probe_pass(pool, ffprobe_present, bus, activity, sources, queue, done, total);
+        super::refresh::refresh_once(&refresh_pool, ffprobe_present, &refresh_sources, &refresh_bus);
     });
 }
 

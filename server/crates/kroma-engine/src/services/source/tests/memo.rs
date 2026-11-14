@@ -171,3 +171,29 @@ fn a_probe_that_cannot_read_the_network_warms_at_most_three_titles_at_once() {
     let warmed = asked_warm(&h).into_iter().filter(|warm| *warm).count();
     assert_eq!(warmed, 3);
 }
+
+#[test]
+fn a_re_read_that_cannot_read_the_network_never_asks_a_source_to_cache_a_title() {
+    let h = harness(url_reply("https://1.1.1.1/dl/a.mkv"));
+    let stub = h.stub();
+
+    let error = h.sources.resolve_quietly(&stub, false).unwrap_err();
+
+    assert_eq!(error, SourceError::Preparing);
+    assert!(asked_warm(&h).iter().all(|warm| !warm));
+}
+
+#[test]
+fn a_re_read_of_a_file_on_disk_needs_no_network_at_all() {
+    let h = harness(url_reply("https://1.1.1.1/dl/a.mkv"));
+    let path = h.dir.path().join("plain.mkv");
+    std::fs::write(&path, b"x").unwrap();
+
+    let resolved = h
+        .sources
+        .resolve_quietly(&path.to_string_lossy(), false)
+        .unwrap();
+
+    assert_eq!(resolved.input.local(), Some(path.as_path()));
+    assert!(h.server.requests().is_empty());
+}

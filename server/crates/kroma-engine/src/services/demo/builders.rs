@@ -1,5 +1,5 @@
 use crate::model::{
-    AudioStream, ColorInfo, HdrFormat, Kind, MediaFile, MediaItem, SpatialAudio, SubtitleTrack,
+    AudioStream, ColorInfo, HdrFormat, Kind, MediaFile, MediaItem, SubtitleTrack,
     VideoStream,
 };
 use crate::services::scan::short_hash;
@@ -183,10 +183,7 @@ pub(super) fn audio(codec: &str, channels: u32, language: Option<&str>) -> Audio
 pub(super) fn with_profile(mut track: AudioStream, profile: &str, layout: &str) -> AudioStream {
     track.profile = Some(profile.into());
     track.layout = Some(layout.into());
-    track.spatial = [("atmos", SpatialAudio::Atmos), ("dts:x", SpatialAudio::Dtsx)]
-        .into_iter()
-        .find(|(name, _)| profile.to_ascii_lowercase().contains(name))
-        .map(|(_, spatial)| spatial);
+    track.spatial = kroma_media::probe::spatial_of(profile);
     track
 }
 
@@ -228,6 +225,7 @@ pub(super) fn sub(language: Option<&str>, codec: &str) -> SubtitleTrack {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::SpatialAudio;
 
     #[test]
     fn tracks_helper_assigns_sequential_indices() {

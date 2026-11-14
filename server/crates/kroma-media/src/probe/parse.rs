@@ -135,7 +135,7 @@ fn build_audio(stream: &FfStream, index: u32) -> AudioStream {
 /// The object layer ffprobe names in a stream's profile: `Dolby TrueHD + Dolby
 /// Atmos` and `Dolby Digital Plus + Dolby Atmos` for Atmos, `DTS-HD MA + DTS:X`
 /// (and its IMAX variant) for DTS:X.
-pub(super) fn spatial_of(profile: &str) -> Option<SpatialAudio> {
+pub fn spatial_of(profile: &str) -> Option<SpatialAudio> {
     let profile = profile.to_ascii_lowercase();
     if profile.contains("atmos") {
         Some(SpatialAudio::Atmos)

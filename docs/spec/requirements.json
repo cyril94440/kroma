@@ -3017,7 +3017,7 @@
     "status": "AGREED",
     "text": "The first-class audio codecs are **AAC**, **AC-3** and **E-AC-3**",
     "file": "docs/spec/media/README.md",
-    "line": 144
+    "line": 145
   },
   {
     "id": "MEDIA-24",
@@ -3027,7 +3027,7 @@
     "status": "SHIPPED",
     "text": "An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos",
     "file": "docs/spec/media/README.md",
-    "line": 150
+    "line": 151
   },
   {
     "id": "MEDIA-25",
@@ -3037,7 +3037,7 @@
     "status": "SHIPPED",
     "text": "**Passthrough** is the default for multichannel and lossless audio:",
     "file": "docs/spec/media/README.md",
-    "line": 155
+    "line": 156
   },
   {
     "id": "MEDIA-26",
@@ -3047,7 +3047,7 @@
     "status": "AGREED",
     "text": "**Downmixing** to stereo happens only when the target cannot render",
     "file": "docs/spec/media/README.md",
-    "line": 158
+    "line": 159
   },
   {
     "id": "MEDIA-27",
@@ -3057,7 +3057,7 @@
     "status": "SHIPPED",
     "text": "Multiple audio streams, languages and commentary alike, are all",
     "file": "docs/spec/media/README.md",
-    "line": 164
+    "line": 165
   },
   {
     "id": "MEDIA-28",
@@ -3067,7 +3067,7 @@
     "status": "AGREED",
     "text": "A subtitle stream is either **embedded**, a track inside the media",
     "file": "docs/spec/media/README.md",
-    "line": 188
+    "line": 208
   },
   {
     "id": "MEDIA-29",
@@ -3077,7 +3077,7 @@
     "status": "AGREED",
     "text": "The first-class subtitle formats are **SRT**, **WebVTT** and",
     "file": "docs/spec/media/README.md",
-    "line": 192
+    "line": 212
   },
   {
     "id": "MEDIA-30",
@@ -3087,7 +3087,7 @@
     "status": "AGREED",
     "text": "The **forced** disposition, only the foreign-language lines a",
     "file": "docs/spec/media/README.md",
-    "line": 196
+    "line": 216
   },
   {
     "id": "MEDIA-31",
@@ -3097,7 +3097,7 @@
     "status": "AGREED",
     "text": "**Burning in**, rendering a subtitle permanently into the video, is",
     "file": "docs/spec/media/README.md",
-    "line": 199
+    "line": 219
   },
   {
     "id": "MEDIA-32",
@@ -3107,7 +3107,7 @@
     "status": "SHIPPED",
     "text": "Every title carries a **poster**, a **backdrop**, a **logo** and, per",
     "file": "docs/spec/media/README.md",
-    "line": 209
+    "line": 229
   },
   {
     "id": "MEDIA-33",
@@ -3117,7 +3117,7 @@
     "status": "AGREED",
     "text": "Image sources rank by trust: embedded in the media file, then a",
     "file": "docs/spec/media/README.md",
-    "line": 212
+    "line": 232
   },
   {
     "id": "MEDIA-34",
@@ -3127,7 +3127,7 @@
     "status": "AGREED",
     "text": "KROMA derives a fixed set of sizes per image, a small grid",
     "file": "docs/spec/media/README.md",
-    "line": 215
+    "line": 235
   },
   {
     "id": "MEDIA-35",
@@ -3137,7 +3137,7 @@
     "status": "AGREED",
     "text": "Derived sizes are cached and served without re-deriving, and a",
     "file": "docs/spec/media/README.md",
-    "line": 218
+    "line": 238
   },
   {
     "id": "MEDIA-36",
@@ -3147,7 +3147,7 @@
     "status": "AGREED",
     "text": "Artwork is never a reason a title fails to appear. A title with no",
     "file": "docs/spec/media/README.md",
-    "line": 220
+    "line": 240
   },
   {
     "id": "MEDIA-37",
@@ -3157,7 +3157,7 @@
     "status": "SHIPPED",
     "text": "KROMA learns a file's streams by **probing** it once, when the",
     "file": "docs/spec/media/README.md",
-    "line": 227
+    "line": 247
   },
   {
     "id": "MEDIA-38",
@@ -3167,7 +3167,7 @@
     "status": "AGREED",
     "text": "A probe is the authoritative stream truth until the file's bytes",
     "file": "docs/spec/media/README.md",
-    "line": 237
+    "line": 257
   },
   {
     "id": "MEDIA-39",
@@ -3177,7 +3177,7 @@
     "status": "AGREED",
     "text": "When a direct play fails in a way that implicates the stream",
     "file": "docs/spec/media/README.md",
-    "line": 240
+    "line": 260
   },
   {
     "id": "MEDIA-40",
@@ -3187,7 +3187,7 @@
     "status": "AGREED",
     "text": "Trust is per-file and durable: a corrected probe is written back,",
     "file": "docs/spec/media/README.md",
-    "line": 245
+    "line": 265
   },
   {
     "id": "MEDIA-41",
@@ -3197,7 +3197,7 @@
     "status": "AGREED",
     "text": "A file whose container opens and whose streams enumerate, but which",
     "file": "docs/spec/media/README.md",
-    "line": 259
+    "line": 288
   },
   {
     "id": "MEDIA-42",
@@ -3207,7 +3207,7 @@
     "status": "AGREED",
     "text": "The title **appears** in the library with whatever *is* known. A",
     "file": "docs/spec/media/README.md",
-    "line": 263
+    "line": 292
   },
   {
     "id": "MEDIA-43",
@@ -3217,7 +3217,7 @@
     "status": "AGREED",
     "text": "The unknown stream is marked **undescribed** and carries its raw",
     "file": "docs/spec/media/README.md",
-    "line": 266
+    "line": 295
   },
   {
     "id": "MEDIA-44",
@@ -3227,7 +3227,7 @@
     "status": "SHIPPED",
     "text": "An undescribed stream is *not direct-playable*, because KROMA will",
     "file": "docs/spec/media/README.md",
-    "line": 268
+    "line": 297
   },
   {
     "id": "MEDIA-45",
@@ -3237,7 +3237,7 @@
     "status": "SHIPPED",
     "text": "A file that will not open at all, a truncated or corrupt container,",
     "file": "docs/spec/media/README.md",
-    "line": 271
+    "line": 300
   },
   {
     "id": "MEDIA-46",
@@ -3247,7 +3247,7 @@
     "status": "AGREED",
     "text": "Undescribed and unreadable are distinct states. The first is \"we",
     "file": "docs/spec/media/README.md",
-    "line": 274
+    "line": 303
   },
   {
     "id": "MEDIA-47",
@@ -3257,7 +3257,7 @@
     "status": "AGREED",
     "text": "An audio stream carries the region of its language when the file says",
     "file": "docs/spec/media/README.md",
-    "line": 177
+    "line": 197
   },
   {
     "id": "MEDIA-48",
@@ -3267,7 +3267,7 @@
     "status": "SHIPPED",
     "text": "A video copied into fragmented MP4 keeps what makes it HDR: HEVC is",
     "file": "docs/spec/media/README.md",
-    "line": 168
+    "line": 169
   },
   {
     "id": "MEDIA-49",
@@ -3277,7 +3277,7 @@
     "status": "SHIPPED",
     "text": "A video re-encoded to 8-bit H.264 from an HDR source is tone-mapped",
     "file": "docs/spec/media/README.md",
-    "line": 172
+    "line": 184
   },
   {
     "id": "MEDIA-50",
@@ -3287,7 +3287,7 @@
     "status": "SHIPPED",
     "text": "A stub is a title like any other: it appears with the container",
     "file": "docs/spec/media/README.md",
-    "line": 287
+    "line": 316
   },
   {
     "id": "MEDIA-51",
@@ -3297,7 +3297,7 @@
     "status": "SHIPPED",
     "text": "A media file whose bytes are streamed says so (`remote`), so a",
     "file": "docs/spec/media/README.md",
-    "line": 291
+    "line": 320
   },
   {
     "id": "MEDIA-52",
@@ -3307,7 +3307,7 @@
     "status": "SHIPPED",
     "text": "Where a remote file's bytes are is answered by its source each",
     "file": "docs/spec/media/README.md",
-    "line": 293
+    "line": 322
   },
   {
     "id": "MEDIA-53",
@@ -3317,7 +3317,7 @@
     "status": "SHIPPED",
     "text": "A link is used only if it is `https`, carries no credentials, and",
     "file": "docs/spec/media/README.md",
-    "line": 296
+    "line": 325
   },
   {
     "id": "MEDIA-54",
@@ -3327,7 +3327,7 @@
     "status": "SHIPPED",
     "text": "A source that is off, gone or silent fails playback with a",
     "file": "docs/spec/media/README.md",
-    "line": 300
+    "line": 329
   },
   {
     "id": "MEDIA-55",
@@ -3337,7 +3337,17 @@
     "status": "SHIPPED",
     "text": "Work that reads a whole title (scrub thumbnails, intro and credits",
     "file": "docs/spec/media/README.md",
-    "line": 303
+    "line": 332
+  },
+  {
+    "id": "MEDIA-56",
+    "domain": "MEDIA",
+    "space": "media",
+    "number": 56,
+    "status": "SHIPPED",
+    "text": "A release that makes the probe learn something new (HDR format,",
+    "file": "docs/spec/media/README.md",
+    "line": 267
   },
   {
     "id": "MOD-1",
@@ -4387,7 +4397,7 @@
     "status": "AGREED",
     "text": "Every **audio stream the person might select** is decodable by the",
     "file": "docs/spec/playback/README.md",
-    "line": 33
+    "line": 34
   },
   {
     "id": "PLAY-5",
@@ -4397,7 +4407,7 @@
     "status": "AGREED",
     "text": "The chosen **subtitle**, if any, is either a format the client renders",
     "file": "docs/spec/playback/README.md",
-    "line": 37
+    "line": 38
   },
   {
     "id": "PLAY-6",
@@ -4407,7 +4417,7 @@
     "status": "AGREED",
     "text": "The **link** sustains the file's peak bitrate. On a local network this",
     "file": "docs/spec/playback/README.md",
-    "line": 39
+    "line": 40
   },
   {
     "id": "PLAY-7",
@@ -4417,7 +4427,7 @@
     "status": "AGREED",
     "text": "When a title cannot direct-play, KROMA walks a fixed ladder and stops at",
     "file": "docs/spec/playback/README.md",
-    "line": 50
+    "line": 51
   },
   {
     "id": "PLAY-8",
@@ -4427,7 +4437,7 @@
     "status": "AGREED",
     "text": "Change the least: the video stream is never touched while a cheaper",
     "file": "docs/spec/playback/README.md",
-    "line": 53
+    "line": 54
   },
   {
     "id": "PLAY-9",
@@ -4437,7 +4447,7 @@
     "status": "SHIPPED",
     "text": "Rung 1, **direct play**. The original file, untouched. No compromise.",
     "file": "docs/spec/playback/README.md",
-    "line": 56
+    "line": 57
   },
   {
     "id": "PLAY-10",
@@ -4447,7 +4457,7 @@
     "status": "SHIPPED",
     "text": "Rung 2, **remux**, also called direct stream. The video and audio",
     "file": "docs/spec/playback/README.md",
-    "line": 57
+    "line": 58
   },
   {
     "id": "PLAY-11",
@@ -4457,7 +4467,7 @@
     "status": "SHIPPED",
     "text": "Rung 3, **audio-only fallback**. The video is still copied and one",
     "file": "docs/spec/playback/README.md",
-    "line": 60
+    "line": 61
   },
   {
     "id": "PLAY-12",
@@ -4467,7 +4477,7 @@
     "status": "AGREED",
     "text": "Video is never touched to solve an audio problem.",
     "file": "docs/spec/playback/README.md",
-    "line": 64
+    "line": 65
   },
   {
     "id": "PLAY-13",
@@ -4477,7 +4487,7 @@
     "status": "AGREED",
     "text": "Rung 4, **subtitle burn-in**. Only when a selected subtitle can",
     "file": "docs/spec/playback/README.md",
-    "line": 65
+    "line": 66
   },
   {
     "id": "PLAY-14",
@@ -4487,7 +4497,7 @@
     "status": "SHIPPED",
     "text": "Rung 5, **video transcode**, the last resort. The video stream is",
     "file": "docs/spec/playback/README.md",
-    "line": 69
+    "line": 70
   },
   {
     "id": "PLAY-15",
@@ -4497,7 +4507,7 @@
     "status": "AGREED",
     "text": "KROMA takes the highest rung that satisfies the client and does not",
     "file": "docs/spec/playback/README.md",
-    "line": 74
+    "line": 76
   },
   {
     "id": "PLAY-16",
@@ -4507,7 +4517,7 @@
     "status": "AGREED",
     "text": "Transcode is a tolerated last resort, not a headline feature. KROMA is",
     "file": "docs/spec/playback/README.md",
-    "line": 82
+    "line": 84
   },
   {
     "id": "PLAY-17",
@@ -4517,7 +4527,7 @@
     "status": "AGREED",
     "text": "Transcode is always the lowest rung and is never the default for a",
     "file": "docs/spec/playback/README.md",
-    "line": 86
+    "line": 88
   },
   {
     "id": "PLAY-18",
@@ -4527,7 +4537,7 @@
     "status": "AGREED",
     "text": "An admin may **cap or disable** video transcode per server and per",
     "file": "docs/spec/playback/README.md",
-    "line": 88
+    "line": 90
   },
   {
     "id": "PLAY-19",
@@ -4537,7 +4547,7 @@
     "status": "AGREED",
     "text": "KROMA ships no adaptive multi-bitrate ladder, no quality knobs and no",
     "file": "docs/spec/playback/README.md",
-    "line": 91
+    "line": 93
   },
   {
     "id": "PLAY-20",
@@ -4547,7 +4557,7 @@
     "status": "SHIPPED",
     "text": "Any rung below direct play is a compromise, and the client always shows",
     "file": "docs/spec/playback/README.md",
-    "line": 99
+    "line": 101
   },
   {
     "id": "PLAY-21",
@@ -4557,7 +4567,7 @@
     "status": "AGREED",
     "text": "**Video transcode** and **subtitle burn-in** are shown as *reduced",
     "file": "docs/spec/playback/README.md",
-    "line": 103
+    "line": 105
   },
   {
     "id": "PLAY-22",
@@ -4567,7 +4577,7 @@
     "status": "SHIPPED",
     "text": "**Audio downmix** and **audio transcode** are shown as *audio",
     "file": "docs/spec/playback/README.md",
-    "line": 108
+    "line": 110
   },
   {
     "id": "PLAY-23",
@@ -4577,7 +4587,7 @@
     "status": "SHIPPED",
     "text": "**Remux** is shown as *repackaged*. Quality is untouched, so this is",
     "file": "docs/spec/playback/README.md",
-    "line": 110
+    "line": 112
   },
   {
     "id": "PLAY-24",
@@ -4587,7 +4597,7 @@
     "status": "SHIPPED",
     "text": "Direct play shows nothing. The absence of a notice *is* the signal",
     "file": "docs/spec/playback/README.md",
-    "line": 112
+    "line": 114
   },
   {
     "id": "PLAY-25",
@@ -4597,7 +4607,7 @@
     "status": "AGREED",
     "text": "KROMA never re-encodes video to save bandwidth unless the device",
     "file": "docs/spec/playback/README.md",
-    "line": 115
+    "line": 117
   },
   {
     "id": "PLAY-26",
@@ -4607,7 +4617,7 @@
     "status": "AGREED",
     "text": "KROMA never tone-maps HDR without saying so. The server tone-maps",
     "file": "docs/spec/playback/README.md",
-    "line": 118
+    "line": 120
   },
   {
     "id": "PLAY-27",
@@ -4617,7 +4627,7 @@
     "status": "AGREED",
     "text": "KROMA never burns in subtitles the person did not ask to see.",
     "file": "docs/spec/playback/README.md",
-    "line": 121
+    "line": 125
   },
   {
     "id": "PLAY-28",
@@ -4627,7 +4637,7 @@
     "status": "AGREED",
     "text": "When the only playable path is one a person or an admin has disabled,",
     "file": "docs/spec/playback/README.md",
-    "line": 123
+    "line": 127
   },
   {
     "id": "PLAY-29",
@@ -4637,7 +4647,7 @@
     "status": "SHIPPED",
     "text": "Under **direct play and remux**, seeking is instant and exact. The",
     "file": "docs/spec/playback/README.md",
-    "line": 130
+    "line": 134
   },
   {
     "id": "PLAY-30",
@@ -4647,7 +4657,7 @@
     "status": "AGREED",
     "text": "Under **transcode**, the stream is produced live from a play position,",
     "file": "docs/spec/playback/README.md",
-    "line": 133
+    "line": 137
   },
   {
     "id": "PLAY-31",
@@ -4657,7 +4667,7 @@
     "status": "AGREED",
     "text": "KROMA anchors at the requested position rather than pre-producing the",
     "file": "docs/spec/playback/README.md",
-    "line": 136
+    "line": 140
   },
   {
     "id": "PLAY-32",
@@ -4667,7 +4677,7 @@
     "status": "AGREED",
     "text": "Seeking accuracy is never silently coarsened. A transcoded seek lands",
     "file": "docs/spec/playback/README.md",
-    "line": 139
+    "line": 143
   },
   {
     "id": "PLAY-33",
@@ -4677,7 +4687,7 @@
     "status": "SHIPPED",
     "text": "Progress is **per person, per media version**, stored on the server. It",
     "file": "docs/spec/playback/README.md",
-    "line": 146
+    "line": 150
   },
   {
     "id": "PLAY-34",
@@ -4687,7 +4697,7 @@
     "status": "SHIPPED",
     "text": "The playing client reports position on a steady heartbeat while",
     "file": "docs/spec/playback/README.md",
-    "line": 150
+    "line": 154
   },
   {
     "id": "PLAY-35",
@@ -4697,7 +4707,7 @@
     "status": "AGREED",
     "text": "The write is idempotent on the person, the version, the position and",
     "file": "docs/spec/playback/README.md",
-    "line": 156
+    "line": 160
   },
   {
     "id": "PLAY-36",
@@ -4707,7 +4717,7 @@
     "status": "SHIPPED",
     "text": "Reopening a title in progress offers *Resume* from the stored position",
     "file": "docs/spec/playback/README.md",
-    "line": 159
+    "line": 163
   },
   {
     "id": "PLAY-37",
@@ -4717,7 +4727,7 @@
     "status": "SHIPPED",
     "text": "A title is **watched** at a credits or end marker where the media has",
     "file": "docs/spec/playback/README.md",
-    "line": 163
+    "line": 167
   },
   {
     "id": "PLAY-38",
@@ -4727,7 +4737,7 @@
     "status": "SHIPPED",
     "text": "At the watched threshold, continue-watching drops the title and, for",
     "file": "docs/spec/playback/README.md",
-    "line": 172
+    "line": 176
   },
   {
     "id": "PLAY-39",
@@ -4737,7 +4747,7 @@
     "status": "AGREED",
     "text": "Below the threshold, progress is retained and the title stays in",
     "file": "docs/spec/playback/README.md",
-    "line": 175
+    "line": 179
   },
   {
     "id": "PLAY-40",
@@ -4747,7 +4757,7 @@
     "status": "AGREED",
     "text": "Starting a watched title again resets it to unwatched and clears the",
     "file": "docs/spec/playback/README.md",
-    "line": 178
+    "line": 182
   },
   {
     "id": "PLAY-41",
@@ -4757,7 +4767,7 @@
     "status": "SHIPPED",
     "text": "A device watching offline queues its unsent progress reports and, on",
     "file": "docs/spec/playback/README.md",
-    "line": 181
+    "line": 185
   },
   {
     "id": "PLAY-42",
@@ -4767,7 +4777,7 @@
     "status": "AGREED",
     "text": "When queued reports from two offline sessions land for the same person",
     "file": "docs/spec/playback/README.md",
-    "line": 190
+    "line": 194
   },
   {
     "id": "PLAY-43",
@@ -4777,7 +4787,7 @@
     "status": "AGREED",
     "text": "An explicit **reset to start**, from finishing a title or choosing",
     "file": "docs/spec/playback/README.md",
-    "line": 196
+    "line": 200
   },
   {
     "id": "PLAY-44",
@@ -4787,7 +4797,7 @@
     "status": "AGREED",
     "text": "If either device crossed the watched threshold, the title is watched.",
     "file": "docs/spec/playback/README.md",
-    "line": 200
+    "line": 204
   },
   {
     "id": "PLAY-45",
@@ -4797,7 +4807,7 @@
     "status": "AGREED",
     "text": "One account may play on several clients at once. KROMA enforces no",
     "file": "docs/spec/playback/README.md",
-    "line": 206
+    "line": 210
   },
   {
     "id": "PLAY-46",
@@ -4807,7 +4817,7 @@
     "status": "AGREED",
     "text": "Each playing client is an independent session with its own fallback",
     "file": "docs/spec/playback/README.md",
-    "line": 210
+    "line": 214
   },
   {
     "id": "PLAY-47",
@@ -4817,7 +4827,7 @@
     "status": "AGREED",
     "text": "Sessions interleave into one continue-watching state under the",
     "file": "docs/spec/playback/README.md",
-    "line": 214
+    "line": 218
   },
   {
     "id": "PLAY-48",
@@ -4827,7 +4837,7 @@
     "status": "AGREED",
     "text": "KROMA does not hand off an active session between devices as a",
     "file": "docs/spec/playback/README.md",
-    "line": 217
+    "line": 221
   },
   {
     "id": "PLAY-49",
@@ -4837,7 +4847,7 @@
     "status": "AGREED",
     "text": "When a stream dies mid-playback, whether the network drops, a transcode",
     "file": "docs/spec/playback/README.md",
-    "line": 225
+    "line": 229
   },
   {
     "id": "PLAY-50",
@@ -4847,7 +4857,7 @@
     "status": "AGREED",
     "text": "A **transient** failure, a network drop or a brief server hiccup, is",
     "file": "docs/spec/playback/README.md",
-    "line": 230
+    "line": 234
   },
   {
     "id": "PLAY-51",
@@ -4857,7 +4867,7 @@
     "status": "SHIPPED",
     "text": "A **fatal** failure, a source gone, a transcode that cannot start, or",
     "file": "docs/spec/playback/README.md",
-    "line": 233
+    "line": 237
   },
   {
     "id": "PLAY-52",
@@ -4867,7 +4877,7 @@
     "status": "SHIPPED",
     "text": "When a television's older decoder cannot play a file a modern phone",
     "file": "docs/spec/playback/README.md",
-    "line": 241
+    "line": 245
   },
   {
     "id": "PLAY-53",
@@ -4877,7 +4887,7 @@
     "status": "AGREED",
     "text": "A settled seek also reports, so jumping and then losing the client does",
     "file": "docs/spec/playback/README.md",
-    "line": 153
+    "line": 157
   },
   {
     "id": "PLAY-54",
@@ -4887,7 +4897,7 @@
     "status": "SHIPPED",
     "text": "A detail page offers a trailer button only when the server can play the",
     "file": "docs/spec/playback/README.md",
-    "line": 275
+    "line": 279
   },
   {
     "id": "PLAY-55",
@@ -4897,7 +4907,7 @@
     "status": "SHIPPED",
     "text": "The trailer offered is the best one for the viewer's language: spoken in",
     "file": "docs/spec/playback/README.md",
-    "line": 279
+    "line": 283
   },
   {
     "id": "PLAY-56",
@@ -4907,7 +4917,7 @@
     "status": "SHIPPED",
     "text": "The button says when the trailer is not spoken in the viewer's language:",
     "file": "docs/spec/playback/README.md",
-    "line": 283
+    "line": 287
   },
   {
     "id": "PLAY-57",
@@ -4917,7 +4927,7 @@
     "status": "SHIPPED",
     "text": "A trailer never plays an AI-dubbed audio track. It plays the track its",
     "file": "docs/spec/playback/README.md",
-    "line": 286
+    "line": 290
   },
   {
     "id": "PLAY-58",
@@ -4927,7 +4937,7 @@
     "status": "SHIPPED",
     "text": "The first play of a trailer may wait while the server fetches it, and the",
     "file": "docs/spec/playback/README.md",
-    "line": 289
+    "line": 293
   },
   {
     "id": "PLAY-59",
@@ -4937,7 +4947,7 @@
     "status": "SHIPPED",
     "text": "A trailer saves no progress, marks nothing watched and offers no next",
     "file": "docs/spec/playback/README.md",
-    "line": 293
+    "line": 297
   },
   {
     "id": "PLAY-60",
@@ -4947,7 +4957,7 @@
     "status": "SHIPPED",
     "text": "When a trailer cannot be fetched, the player says so plainly. Where the",
     "file": "docs/spec/playback/README.md",
-    "line": 296
+    "line": 300
   },
   {
     "id": "PLAY-61",
@@ -4957,7 +4967,7 @@
     "status": "SHIPPED",
     "text": "Direct play of a remote file serves the original bytes with the",
     "file": "docs/spec/playback/README.md",
-    "line": 257
+    "line": 261
   },
   {
     "id": "PLAY-62",
@@ -4967,7 +4977,7 @@
     "status": "SHIPPED",
     "text": "Opening a remote file for playback asks its source to start",
     "file": "docs/spec/playback/README.md",
-    "line": 261
+    "line": 265
   },
   {
     "id": "PLAY-63",
@@ -4977,7 +4987,7 @@
     "status": "SHIPPED",
     "text": "A transcode, a remux and an offline download of a remote file",
     "file": "docs/spec/playback/README.md",
-    "line": 263
+    "line": 267
   },
   {
     "id": "SURF-1",

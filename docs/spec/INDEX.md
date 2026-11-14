@@ -3,7 +3,7 @@
 
 # Requirement index
 
-558 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
+559 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
 
 ## ACCT - [accounts](accounts/)
 
@@ -353,6 +353,7 @@
 - **MEDIA-53** (SHIPPED) - A link is used only if it is `https`, carries no credentials, and
 - **MEDIA-54** (SHIPPED) - A source that is off, gone or silent fails playback with a
 - **MEDIA-55** (SHIPPED) - Work that reads a whole title (scrub thumbnails, intro and credits
+- **MEDIA-56** (SHIPPED) - A release that makes the probe learn something new (HDR format,
 
 ## MOD - [modules](modules/)
 

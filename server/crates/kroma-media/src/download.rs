@@ -42,7 +42,7 @@ pub fn video_is_copied(request: &Request<'_>, can_tone_map: bool) -> bool {
         && StreamMode::new(VideoMode::Copy, AudioMode::Copy)
             .for_client_hdr(request.video, request.client_hdr, can_tone_map)
             .video
-            == VideoMode::Copy
+            .copies()
 }
 
 /// The arguments of the whole ffmpeg command, input to `pipe:1`.
@@ -52,7 +52,12 @@ pub fn args(request: &Request<'_>) -> Vec<OsString> {
     let mut args: Vec<OsString> = ["-v", "error", "-nostdin"].map(OsString::from).into();
     args.extend(input::media(request.input));
     args.extend(["-map", "0:v:0"].map(OsString::from));
-    args.extend(video_args(request.video, copied, tone_map).into_iter().map(OsString::from));
+    let dolby = request.client_hdr.is_some_and(|set| crate::hls::declares(set, "dv"));
+    args.extend(
+        video_args(request.video, copied, dolby, tone_map)
+            .into_iter()
+            .map(OsString::from),
+    );
     args.extend(
         download_audio_args(
             request.audio_tracks,

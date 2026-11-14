@@ -106,12 +106,40 @@ one to use. See the [configuration reference](configuration.md#transcoding).
 ## HDR films
 
 When KROMA converts an HDR film for a screen that cannot show HDR, it also
-converts the colours to standard ones, so the picture is not dark and grey.
-This step runs on the processor, even when a graphics chip does the rest, and
-it needs more power than a plain conversion. On a small NAS a 4K HDR film may
-not keep up. Set `KROMA_TONEMAP` to `off` to skip the step. Dolby Vision
-profile 5 films need a graphics card with Vulkan support for this step, and
-without it keep their colours as they are.
+converts the colours to standard ones, so the picture is not dark and grey. That
+picture is never larger than 1080p: KROMA shrinks it first, because mapping
+colours is the costliest step and costs in proportion to the pixels.
+
+With a graphics chip, KROMA keeps the chip decoding and shrinking the picture
+and, if it works on your machine, mapping the colours there too. At startup it
+tries, on a small test clip, the chip's own colour filter and then handing the
+1080p picture to the processor; it uses the first that works and falls back to
+the processor for every step when none does. The log line `tone-mapping settled`
+says which routes worked. When the processor maps the colours, the conversion
+counts as two of the conversions allowed at once and background work waits.
+
+On a small NAS without a graphics chip, a 4K HDR film is converted at 720p
+instead of 1080p when the machine has four cores or fewer, because that is the
+size it can keep up with (about 50 pictures a second against 28 on four cores
+at 1080p). Set `KROMA_TONEMAP` to `off` to skip the colour step, or to `cpu` to
+rule out the chip's own routes while you look for a problem. Dolby Vision
+profile 5 films need a graphics card with Vulkan support for this step, are
+decoded by the processor, and without it keep their colours as they are.
+
+Dolby Vision profile 7 films (Blu-ray rips) play as their HDR10 layer when KROMA
+streams them, even on a Dolby Vision screen, and their TrueHD soundtrack is
+converted rather than copied. Dolby Vision profile 5 films are sent as Dolby
+Vision only to apps that say their screen supports it; any other app gets the
+plain stream, or the converted one when your machine can map the colours.
+
+## After an upgrade
+
+A release that makes KROMA read more from your files (HDR format, Dolby Vision
+detail, audio profiles) does not make your library unreadable while it catches
+up. Every file keeps the details it had, and the ones that can gain are read
+again in the background, 200 at a time at each startup and each scan, one at a
+time and after any new files. A large library is up to date after a few days of
+ordinary use.
 
 ## When there is no graphics chip
 

@@ -9,9 +9,10 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use crate::input;
+use crate::input::{self, MediaInput};
 
 use super::super::ffmpeg::ffmpeg_output;
 use super::super::hwaccel::{HwAccel, Pipeline};
@@ -76,10 +77,10 @@ fn works(accel: HwAccel, map: ToneMap, clip: &Path) -> bool {
         frame: Some(CLIP_SIZE),
     };
     let mut cmd = Command::new("ffmpeg");
+    input::without_proxies(&mut cmd);
     cmd.args(["-v", "error", "-nostdin"])
         .args(pipeline.input_args())
-        .arg("-i")
-        .arg(clip)
+        .args(input::media(&MediaInput::Local(clip.to_path_buf())))
         .args(["-frames:v", "3"]);
     if let Some(filter) = pipeline.video_filter(Some(TARGET)) {
         cmd.args(["-vf", &filter]);
@@ -90,14 +91,17 @@ fn works(accel: HwAccel, map: ToneMap, clip: &Path) -> bool {
     crate::ffmpeg_run::run_capturing(cmd, ROUTE_TIMEOUT).is_ok()
 }
 
-struct Clip(PathBuf);
+pub(super) struct Clip(PathBuf);
 
 impl Clip {
-    fn make() -> Option<Self> {
+    pub(super) fn make() -> Option<Self> {
         if !contains(&ffmpeg_output(&["-hide_banner", "-encoders"]), b" libx265 ") {
             return None;
         }
-        let path = std::env::temp_dir().join(format!("kroma-tonemap-{}.mkv", std::process::id()));
+        static SEQ: AtomicU64 = AtomicU64::new(0);
+        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+        let path =
+            std::env::temp_dir().join(format!("kroma-tonemap-{}-{seq}.mkv", std::process::id()));
         let mut cmd = Command::new("ffmpeg");
         cmd.args(["-v", "error", "-nostdin", "-y"])
             .args(input::generated(CLIP_SOURCE))
@@ -109,7 +113,7 @@ impl Clip {
         made.then_some(clip)
     }
 
-    fn path(&self) -> &Path {
+    pub(super) fn path(&self) -> &Path {
         &self.0
     }
 }

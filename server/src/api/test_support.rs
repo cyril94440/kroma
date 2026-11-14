@@ -167,6 +167,8 @@ fn build_app_wired(
     configure: impl FnOnce(&mut Config),
     contributions: kroma_engine::state::Contributions,
 ) -> TestApp {
+    static PRIMED: std::sync::Once = std::sync::Once::new();
+    PRIMED.call_once(kroma_media::hls::prime_hwaccel);
     build_app_official(tmdb_api_key, web, configure, contributions, &[])
 }
 

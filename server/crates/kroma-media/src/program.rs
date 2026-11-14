@@ -23,8 +23,18 @@ use crate::{playlist, ByteMeter, Credential};
 /// absent leaves the source's own size standing. `hdr` names the dynamic-range
 /// formats its display shows, from `hdr10`, `hdr10plus`, `hlg` and `dv`: absent
 /// means undeclared (the requested mode is trusted), present but empty means
-/// SDR only, so an HDR source is tone-mapped down and a Dolby Vision profile 5
-/// stream is never sent to a client without `dv`.
+/// SDR only, so an HDR source is tone-mapped down to a picture of at most 1080p
+/// where this host can map it.
+///
+/// A Dolby Vision profile 5 stream has no picture a non-Dolby decoder can read
+/// as it is. Where the host can tone-map, a client that declared `hdr` without
+/// `dv` gets the mapped re-encode. Where it cannot (no libplacebo,
+/// `KROMA_TONEMAP=off`, a build without the filters), and for a client that
+/// declared no `hdr` at all, the stream is copied tagged as plain HEVC with no
+/// Dolby Vision box, as it was before the box existed: it opens everywhere and
+/// shows the base layer's own colours. Only a client that declared `dv` gets
+/// `dvh1` and the box, which is what the Apple HLS authoring rules ask of
+/// profile 5 and what no other decoder can open.
 #[derive(Debug, Default, Deserialize)]
 pub struct ClientDecoders {
     pub copy: Option<String>,
@@ -72,22 +82,26 @@ impl Program<'_> {
         declared: &ClientDecoders,
     ) -> StreamMode {
         let selected = self.track(audio);
-        mode.for_client_track(
+        let (codec, channels) = (
             selected.map(|t| t.codec.as_str()),
             selected.and_then(|t| t.channels),
-            declared.copy.as_deref(),
-        )
-        .for_client_video(
-            self.video.map(|v| v.codec.as_str()),
-            self.video.and_then(|v| v.bit_depth),
-            declared.video.as_deref(),
-        )
-        .for_client_hdr(
-            self.video,
-            declared.hdr.as_deref(),
-            declared.hdr.is_some() && self.video.is_some_and(|v| ToneMap::for_video(v).is_some()),
-        )
-        .for_client_frame(self.frame(), declared.maxw.zip(declared.maxh))
+        );
+        let tone_map = self.video.and_then(ToneMap::for_video);
+        mode.for_client_track(codec, channels, declared.copy.as_deref())
+            .for_client_video(
+                self.video.map(|v| v.codec.as_str()),
+                self.video.and_then(|v| v.bit_depth),
+                declared.video.as_deref(),
+            )
+            .for_client_hdr(
+                self.video,
+                declared.hdr.as_deref(),
+                declared.hdr.is_some() && tone_map.is_some(),
+            )
+            .within_tone_map_box(tone_map.is_some())
+            .for_client_frame(self.frame(), declared.maxw.zip(declared.maxh))
+            .for_tone_map_cost(self.frame(), tone_map.map(ToneMap::route))
+            .for_copied_picture(self.video, codec, channels, declared.copy.as_deref())
     }
 
     /// The media playlist of `session`, starting it over the file when none

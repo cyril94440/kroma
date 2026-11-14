@@ -58,7 +58,11 @@ impl Plan {
     }
 
     pub(super) const fn transcodes_video(&self) -> bool {
-        !matches!(self.mode.video, VideoMode::Copy)
+        !self.mode.video.copies()
+    }
+
+    pub(super) fn slots(&self) -> usize {
+        self.pipeline.slots()
     }
 }
 
@@ -70,7 +74,7 @@ pub struct Transcode {
     pub id: String,
     pub item_id: String,
     pub audio_track: u32,
-    /// `copy` | `h264` | `h264-1080` | `h264-720`.
+    /// `copy` | `copy-dv` | `h264` | `h264-1080` | `h264-720`.
     pub video: String,
     /// `copy` | `aac` | `aac-standard` | `aac-night` | `eac3` | `ac3`.
     pub audio: String,
@@ -181,6 +185,7 @@ const fn split(size: Option<(u32, u32)>) -> (Option<u32>, Option<u32>) {
 const fn video_label(video: VideoMode) -> &'static str {
     match video {
         VideoMode::Copy => "copy",
+        VideoMode::CopyDolby => "copy-dv",
         VideoMode::H264 => "h264",
         VideoMode::H264At(rung) => rung.label(),
     }
