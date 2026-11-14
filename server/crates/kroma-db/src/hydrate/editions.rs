@@ -73,6 +73,7 @@ mod tests {
 
     fn file(id: &str, edition: Option<&str>, width: u32, duration_ms: u64) -> MediaFile {
         MediaFile {
+            remote: false,
             id: id.into(),
             rel_path: None,
             container: "mkv".into(),

@@ -64,6 +64,10 @@ pub struct MediaFile {
     // path, which knows the item; a scan does not yet.
     #[serde(rename = "editionId", default, skip_serializing_if = "Option::is_none")]
     pub edition_id: Option<String>,
+    /// The bytes live with a module rather than on this disk, so playback is
+    /// relayed. Omitted when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub remote: bool,
     #[serde(skip)]
     pub abs_path: Option<String>,
 }

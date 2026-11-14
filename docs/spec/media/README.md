@@ -272,3 +272,33 @@ metadata, is **partially known**. It is never hidden and never silently dropped.
 - **MEDIA-46** (AGREED) - Undescribed and unreadable are distinct states. The first is "we
   see it but cannot vouch for it", the second is "we cannot see it". Both are on record;
   neither is a blank.
+
+## Remote files
+
+Status: **SHIPPED**.
+
+A media file need not hold its bytes. A **remote file** is a media file whose bytes live
+with a module, kept in the library as a small stub, so a title fetched through a service is
+streamed instead of stored. Everything above holds for it: the title appears, is probed,
+plays, and carries the facts a client decides on.
+
+- **MEDIA-50** (SHIPPED) - A stub is a title like any other: it appears with the container
+  and byte size of the video it stands for and its title and episode as that video's name
+  would give them, and a stub that cannot be read, or names no video container, is skipped
+  with a warning rather than shown broken.
+- **MEDIA-51** (SHIPPED) - A media file whose bytes are streamed says so (`remote`), so a
+  client can label it. The wire carries it only when it is true.
+- **MEDIA-52** (SHIPPED) - Where a remote file's bytes are is answered by its source each
+  time they are needed, as a complete local copy or as a short-lived link, and never kept
+  past the read that asked.
+- **MEDIA-53** (SHIPPED) - A link is used only if it is `https`, carries no credentials, and
+  names a public host the source declared it connects to. A local copy is used only if it is
+  a regular file of the declared size inside the source's own folders. Anything else is
+  refused, and the link, a bearer, never appears in a log or an error.
+- **MEDIA-54** (SHIPPED) - A source that is off, gone or silent fails playback with a
+  translated message that says which, never a hang, and fails a probe in a way a later
+  attempt can recover from.
+- **MEDIA-55** (SHIPPED) - Work that reads a whole title (scrub thumbnails, intro and credits
+  detection, loudness, embedded-subtitle extraction, transcription) runs on a remote file only
+  once its source holds a complete local copy. Until then it is deferred, neither run over the
+  network nor recorded as failed, and it never asks the source to fetch the copy.

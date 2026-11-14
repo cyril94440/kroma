@@ -9,6 +9,8 @@ use std::sync::{Arc, Mutex};
 use jwalk::{Parallelism, WalkDirGeneric};
 use tracing::{debug, warn};
 
+use kroma_primitives::remote_file;
+
 use crate::domain::naming;
 use crate::model::{MediaFile, MediaItem, Show};
 
@@ -16,7 +18,7 @@ use super::ids::{detect_edition, short_hash};
 use super::index::index_parsed;
 use super::now_iso8601;
 
-pub use kroma_media::video::{has_video_extension, VIDEO_EXTENSIONS};
+pub use kroma_media::video::{has_video_extension, is_media_file, VIDEO_EXTENSIONS};
 
 /// Scan one folder belonging to `lib_id`, accumulating items (by logical id) and
 /// shows into the shared maps. Flags/ids track what this library contributed so
@@ -76,7 +78,7 @@ pub(super) fn scan_root(
             continue;
         }
         let path = entry.path();
-        if !has_video_extension(&path) {
+        if !is_media_file(&path) {
             continue;
         }
         let rel = path
@@ -88,24 +90,33 @@ pub(super) fn scan_root(
         // path no extra stat / symlink resolution per file.
         let abs = abs_root.join(&rel);
 
-        let (size, mtime) = match entry.client_state {
+        let (mut size, mtime) = match entry.client_state {
             Some((s, m)) => (Some(s), Some(m)),
             None => (None, None),
         };
 
-        let container = path
+        let mut container = path
             .extension()
             .and_then(std::ffi::OsStr::to_str)
             .unwrap_or("")
             .to_ascii_lowercase();
+        if remote_file::is_remote_file(&path) {
+            let Some(stub) = readable_stub(&path) else {
+                continue;
+            };
+            container = stub.container.clone();
+            size = Some(stub.size);
+        }
+        let named = named_as(&path);
 
-        let file_name = path
+        let file_name = named
             .file_name()
             .and_then(std::ffi::OsStr::to_str)
             .unwrap_or("");
         let edition = detect_edition(file_name);
 
         let file = MediaFile {
+            remote: remote_file::is_remote_file(&path),
             id: short_hash(&abs.to_string_lossy()),
             rel_path: Some(rel),
             container,
@@ -122,7 +133,7 @@ pub(super) fn scan_root(
             abs_path: Some(abs.to_string_lossy().to_string()),
         };
         index_parsed(
-            naming::parse(root, &path),
+            naming::parse(root, &named),
             lib_id,
             &added_at,
             file,
@@ -147,6 +158,47 @@ pub(super) fn scan_root(
         );
     }
     unreadable
+}
+
+struct StubFacts {
+    container: String,
+    size: u64,
+}
+
+// A stub the library cannot index is skipped with a warning: one that is not
+// readable, or whose original name is not a video container, stands for nothing
+// a player could open.
+fn readable_stub(path: &Path) -> Option<StubFacts> {
+    let stub = match remote_file::read(path) {
+        Ok(stub) => stub,
+        Err(error) => {
+            warn!(file = %path.display(), %error, "skipping a remote file stub that cannot be read");
+            return None;
+        }
+    };
+    let Some(container) = stub.container() else {
+        warn!(file = %path.display(), name = %stub.name, "skipping a remote file stub that names no video container");
+        return None;
+    };
+    Some(StubFacts {
+        container,
+        size: stub.size,
+    })
+}
+
+// The path the title is read off: a stub is named like the video it stands for,
+// so `Film (2020).kremote` parses as `Film (2020)`, and so does
+// `Film (2020).mkv.kremote`.
+fn named_as(path: &Path) -> PathBuf {
+    if !remote_file::is_remote_file(path) {
+        return path.to_path_buf();
+    }
+    let inner = path.with_extension("");
+    if has_video_extension(&inner) {
+        inner
+    } else {
+        path.to_path_buf()
+    }
 }
 
 // jwalk `process_read_dir` body: prune Synology/hidden dirs and already-visited
@@ -225,5 +277,7 @@ fn file_meta(path: &Path) -> FileMeta {
     Some((md.len(), mtime))
 }
 
+#[cfg(test)]
+mod stub_tests;
 #[cfg(test)]
 mod tests;

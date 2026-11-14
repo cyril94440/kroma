@@ -69,16 +69,10 @@ pub async fn hls_master(
     };
     // Offline mount / moved file: fail in one stat instead of spawning ffmpeg and
     // polling ~20s for a playlist that will never appear.
-    let abs_check = abs.clone();
-    let exists = tokio::task::spawn_blocking(move || std::path::Path::new(&abs_check).exists())
-        .await
-        .unwrap_or(false);
-    if !exists {
-        return json_error(
-            StatusCode::NOT_FOUND,
-            "media file unavailable (mount offline?)",
-        );
-    }
+    let input = match super::remote::playable(&state, &viewer, &abs, true).await {
+        Ok(resolved) => resolved.input,
+        Err(refused) => return refused,
+    };
     let session = Session {
         mode,
         anchor,
@@ -87,7 +81,7 @@ pub async fn hls_master(
     let sink = byte_sink(&state, &headers, &addr);
     let opener = crate::api::media_ticket::opener(&state.media_ticket_key, &headers, &q.ticket);
     match program
-        .master(&state.hls, &abs, session, opener.as_deref(), &credential, sink)
+        .master(&state.hls, &input, session, opener.as_deref(), &credential, sink)
         .await
     {
         Ok(resp) => match q.subtitle.as_deref() {

@@ -27,6 +27,8 @@ time = { workspace = true }
 walkdir = { workspace = true }
 
 [dev-dependencies]
+# A URL on a loopback socket, which the shipped validator refuses.
+kroma-primitives = { workspace = true, features = ["insecure-test-urls"] }
 # The self-deleting scratch dir the session and probe tests write in.
 kroma-testing = { workspace = true }
 # `test-util` gives the runtime a clock a test can advance, so the sweep a seek

@@ -9,6 +9,7 @@ mod direct;
 mod media;
 mod modules;
 mod requests;
+mod source;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -28,8 +29,9 @@ pub use direct::{offer, offer_through_the_tunnel, proof_of, HOUSEHOLD_PUBLIC_IP,
 pub use media::{
     byte_routes, device_of, household_where_the_viewer_only_sees_films, ticketed, FILM,
 };
+pub use source::{probe, stubbed_movie, test_app_with_source, FakeSource, Stubbed};
 pub use modules::{installed_module, read_setting, store_settings, write_settings};
-pub use requests::{get, get_from, raw, send, text};
+pub use requests::{get, get_from, raw, raw_bytes, send, text};
 
 static SEQ: AtomicU32 = AtomicU32::new(0);
 
@@ -150,6 +152,15 @@ fn build_app_with(
     web: &[(&str, &str)],
     configure: impl FnOnce(&mut Config),
 ) -> TestApp {
+    build_app_wired(tmdb_api_key, web, configure, Arc::new(|_| Vec::new()))
+}
+
+fn build_app_wired(
+    tmdb_api_key: Option<&str>,
+    web: &[(&str, &str)],
+    configure: impl FnOnce(&mut Config),
+    contributions: kroma_engine::state::Contributions,
+) -> TestApp {
     let tmp = unique_data_dir();
     let data_dir = tmp.path().to_path_buf();
     let db = db::init(&data_dir.join("kroma.db")).expect("init db");
@@ -201,11 +212,15 @@ fn build_app_with(
         kroma_engine::state::ModuleWiring {
             services,
             jobs: &[],
-            contributions: std::sync::Arc::new(|_| Vec::new()),
+            contributions,
             official_modules: std::sync::Arc::new(Vec::new),
             permissions: std::sync::Arc::new(|_| None),
             network_providers: std::sync::Arc::new(Vec::new),
             network_listeners: std::sync::Arc::new(Vec::new),
+            source_roots: {
+                let root = data_dir.join("sources");
+                std::sync::Arc::new(move |module: &str| vec![root.join(module)])
+            },
         },
     );
 

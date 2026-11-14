@@ -107,6 +107,38 @@ mod tests {
     }
 
     #[test]
+    fn a_stub_is_paired_with_the_subtitles_named_after_it() {
+        let stub = Path::new("/movies/Sintel (2010)/Sintel (2010).kremote");
+        let files: Vec<PathBuf> = [
+            "/movies/Sintel (2010)/Sintel (2010).kremote",
+            "/movies/Sintel (2010)/Sintel (2010).fr.srt",
+            "/movies/Sintel (2010)/Sintel (2010).en.forced.srt",
+            "/movies/Sintel (2010)/Other.fr.srt",
+        ]
+        .map(PathBuf::from)
+        .to_vec();
+
+        let found = beside(stub, &files);
+
+        let tracks: Vec<_> = found.iter().map(|track| (track.language, track.forced)).collect();
+        assert_eq!(tracks, [(Some("en"), true), (Some("fr"), false)]);
+    }
+
+    #[test]
+    fn a_stub_among_stubs_is_a_release_of_several_videos() {
+        let stub = Path::new("/tv/Show/Show - S01E01.kremote");
+        let files: Vec<PathBuf> = [
+            "/tv/Show/Show - S01E01.kremote",
+            "/tv/Show/Show - S01E02.kremote",
+            "/tv/Show/Subs/2_English.srt",
+        ]
+        .map(PathBuf::from)
+        .to_vec();
+
+        assert!(beside(stub, &files).is_empty(), "a loose track in Subs/ belongs to no one of several");
+    }
+
+    #[test]
     fn a_film_with_nothing_beside_it_has_no_external_track() {
         assert!(beside_film(&[FILM]).is_empty());
     }

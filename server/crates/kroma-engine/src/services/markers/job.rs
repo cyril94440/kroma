@@ -74,6 +74,7 @@ fn process_season(
         .episodes
         .iter()
         .filter(|e| e.abs_path.is_some() && e.duration_ms.unwrap_or(0) > 0)
+        .filter(|e| has_whole_file(ctx, e))
         .collect();
     if eps.is_empty() {
         return Ok(0);
@@ -192,6 +193,15 @@ fn wait_while_idle(ctx: &JobContext, paused: &AtomicBool) {
     }
 }
 
+// An episode a source only streams is left out of a season's detection until it
+// has a complete local copy: both passes read the whole file.
+fn has_whole_file(ctx: &JobContext, episode: &MediaItem) -> bool {
+    episode
+        .abs_path
+        .as_deref()
+        .is_some_and(|abs| matches!(ctx.state.sources.local(abs), Ok(Some(_))))
+}
+
 fn decode_one(
     ctx: &JobContext,
     paused: &AtomicBool,
@@ -199,7 +209,18 @@ fn decode_one(
     do_fp: bool,
     ffprobe: bool,
 ) -> EpData {
-    let path = std::path::Path::new(e.abs_path.as_ref().unwrap());
+    let Some(path) = e
+        .abs_path
+        .as_deref()
+        .and_then(|abs| ctx.state.sources.local(abs).ok().flatten())
+    else {
+        return EpData {
+            chapters: Vec::new(),
+            start_fp: None,
+            end_fp: None,
+        };
+    };
+    let path = path.as_path();
     let result = probe_file(path, ffprobe).unwrap_or_default();
     let duration = result.duration_ms.or(e.duration_ms);
     let chapters = markers_from_chapters(&result.chapters, duration);

@@ -4,6 +4,7 @@ use axum::http::StatusCode;
 use kroma_module_sdk::host::testing::StubHost;
 use serde_json::json;
 
+#[cfg(not(target_family = "wasm"))]
 use crate::fake_alldebrid::{Fake, Resp};
 
 async fn call(path: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
@@ -53,8 +54,8 @@ async fn a_status_that_could_not_be_asked_is_a_bad_gateway_not_a_vanished_magnet
     assert_eq!(status, StatusCode::BAD_GATEWAY);
 }
 
+#[cfg(not(target_family = "wasm"))]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_family = "wasm", ignore = "binds a test server, and a component holds no socket")]
 async fn status_answers_null_for_a_forgotten_magnet_and_the_pinned_keys_otherwise() {
     let fake = Fake::start(|req| match req.query["id"].as_str() {
         "1" => Resp::failure("MAGNET_INVALID_ID", "gone"),

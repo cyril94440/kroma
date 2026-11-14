@@ -248,6 +248,22 @@ never blames the person and never implies the file is broken.
 
 The file is fine; this screen just cannot decode it.
 
+## Streamed titles
+
+Status: **SHIPPED**.
+
+A title that is a [remote file](../media/#remote-files) plays without the client knowing.
+
+- **PLAY-61** (SHIPPED) - Direct play of a remote file serves the original bytes with the
+  same `200`, `206`, `Content-Length` and `Content-Range` a stored file would, honouring
+  open-ended, bounded and past-the-end ranges, and stops reading from the source the
+  moment the client goes away.
+- **PLAY-62** (SHIPPED) - Opening a remote file for playback asks its source to start
+  caching a complete local copy, and once there is one the same requests are served from it.
+- **PLAY-63** (SHIPPED) - A transcode, a remux and an offline download of a remote file
+  read it from its link or its local copy, resolved again each time a session starts or
+  seeks, so a link that has expired is never reused.
+
 ## Trailers
 
 Status: **SHIPPED**

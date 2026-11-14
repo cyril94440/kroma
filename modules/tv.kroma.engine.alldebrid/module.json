@@ -45,50 +45,29 @@
       "default": "14"
     }
   ],
-  "dataDirs": [
-    "alldebrid"
-  ],
+  "dataDirs": ["alldebrid"],
   "permissions": {
     "net": {
       "connect": [
         {
           "purpose": "download-client",
-          "to": [
-            "api.alldebrid.com"
-          ],
-          "ports": [
-            443
-          ]
+          "to": ["api.alldebrid.com"],
+          "ports": [443]
         },
         {
           "purpose": "debrid-transfer",
-          "to": [
-            "*.debrid.it",
-            "*.alldeb.ovh",
-            "*.alldebrid.com"
-          ],
-          "ports": [
-            443
-          ]
+          "to": ["*.debrid.it", "*.alldeb.ovh", "*.alldebrid.com"],
+          "ports": [443]
         },
         {
           "purpose": "torrent-file",
-          "to": [
-            "public",
-            "lan"
-          ]
+          "to": ["public", "lan"]
         }
       ]
     },
     "fs": {
-      "read": [
-        "module",
-        "downloads"
-      ],
-      "write": [
-        "module",
-        "downloads"
-      ]
+      "read": ["module", "downloads"],
+      "write": ["module", "downloads"]
     }
   }
 }

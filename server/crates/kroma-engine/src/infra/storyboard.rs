@@ -121,8 +121,10 @@ impl Storyboard {
     }
 
     /// The manifest if cached; otherwise kick off generation (deduped +
-    /// concurrency-bounded) and report `Pending` for the caller to poll.
-    pub async fn get(&self, item: &MediaItem) -> Status {
+    /// concurrency-bounded) and report `Pending` for the caller to poll. The
+    /// sheet is keyed by the library file and drawn from `source`, which is that
+    /// file, or a stub's complete local copy.
+    pub async fn get(&self, item: &MediaItem, source: &Path) -> Status {
         let Some((abs, dur_s)) = playable(item) else {
             return Status::Unavailable;
         };
@@ -132,8 +134,9 @@ impl Storyboard {
         // a doomed ffmpeg (let alone one per poll).
         let abs_key = abs.clone();
         let tiles = tile_path(item);
+        let read_from = source.to_path_buf();
         let Ok((key, exists)) = tokio::task::spawn_blocking(move || {
-            (Self::key(&abs_key, tiles), Path::new(&abs_key).exists())
+            (Self::key(&abs_key, tiles), read_from.exists())
         })
         .await
         else {
@@ -162,11 +165,12 @@ impl Storyboard {
         let sem = self.sem.clone();
         let item_id = item.id.clone();
         let log_id = item.id.clone();
+        let read_from = source.to_string_lossy().into_owned();
         tokio::spawn(async move {
             let _permit = sem.acquire_owned().await; // bound concurrent ffmpeg
             let key2 = key.clone();
             let res = tokio::task::spawn_blocking(move || {
-                render::generate(&abs, &dir, &key2, &item_id, dur_s, &|| false)
+                render::generate(&read_from, &dir, &key2, &item_id, dur_s, &|| false)
             })
             .await
             .unwrap_or_else(|e| Err(format!("generation task crashed: {e}")));

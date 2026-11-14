@@ -153,6 +153,7 @@ mod tests {
 
     fn file_at(abs: &Path, probed: bool) -> MediaFile {
         MediaFile {
+            remote: false,
             id: "f1".into(),
             rel_path: None,
             container: "mkv".into(),

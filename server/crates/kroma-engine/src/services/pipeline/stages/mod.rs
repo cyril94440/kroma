@@ -13,6 +13,38 @@ pub mod probe;
 pub mod storyboard;
 pub mod subtitles;
 
+#[cfg(test)]
+mod remote_tests;
+
+/// `sig` for a stage that reads a whole file, and whose subject is out of scope
+/// while the file would have to be streamed: a stub whose source holds no
+/// complete local copy yet (or does not answer) is signed
+/// [`crate::db::pipeline::UNREADABLE_SIG`], so no task is created for it, and
+/// one that already has a task is left as it is. The stage picks it up on the
+/// drain after the copy lands, with nothing retrying in between.
+pub(crate) fn when_cached(state: &crate::state::SharedState, abs: &str, sig: String) -> String {
+    if !crate::services::source::is_stub(std::path::Path::new(abs)) {
+        return sig;
+    }
+    match state.sources.local(abs) {
+        Ok(Some(_)) => sig,
+        _ => crate::db::pipeline::UNREADABLE_SIG.to_string(),
+    }
+}
+
+/// The file a whole-file stage reads for the library file at `abs`: itself, or
+/// a stub's complete local copy. An `Err` for a stub that lost its copy between
+/// enumeration and now, which the ledger retries.
+pub(crate) fn whole_file(
+    state: &crate::state::SharedState,
+    abs: &str,
+) -> anyhow::Result<std::path::PathBuf> {
+    state
+        .sources
+        .local(abs)?
+        .ok_or_else(|| anyhow::anyhow!("{abs} is streamed and has no cached copy to read yet"))
+}
+
 /// A cheap change-signature for a file: `mtime:size`. Changes when the file is
 /// replaced, so the ledger re-queues that subject. Returns
 /// [`crate::db::pipeline::UNREADABLE_SIG`] when the file can't be stat'd (e.g. the

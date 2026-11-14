@@ -39,6 +39,8 @@ pub fn curl_available() -> bool {
 #[cfg(target_family = "wasm")]
 pub use fetch::guest::{set_guest_fetcher, GuestCall, GuestDownloader, GuestFetcher};
 pub use fetch::Fetch;
+#[cfg(not(target_family = "wasm"))]
+pub use fetch::Streamed;
 pub use loopback::{Loopback, Method, Request, Transport, MAX_BODY_BYTES};
 pub use multipart::FormPart;
 pub use response::Response;

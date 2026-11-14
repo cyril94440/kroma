@@ -128,6 +128,24 @@ the mounted folder as a library. On a network share:
   [configuration reference](configuration.md)), or when you select **Scan**
   under **Sources**.
 
+## Streamed titles
+
+A module that fetches titles through a service, such as a debrid service, can
+leave a small file ending in `.kremote` in your library instead of the video.
+KROMA lists it like any other title and plays it by reading the bytes from the
+service while you watch. Nothing is stored, apart from a copy the module may
+keep in its own folder under the server's data directory.
+
+- The title shows the real file size and a **Streamed** line under **Media
+  details**.
+- Subtitle files placed beside it, such as `Film (2020).fr.srt`, work as for a
+  video.
+- Scrub thumbnails, intro and credits detection and loudness analysis need the
+  whole file, so they appear only once the module has cached a copy. Until then
+  they are skipped, not reported as errors.
+- If the service is turned off or does not answer, playback stops with a message
+  saying so. Turn the module back on, or try again in a moment.
+
 ## Downloads and fast imports
 
 When the Acquisition module imports a finished download, it creates a hard

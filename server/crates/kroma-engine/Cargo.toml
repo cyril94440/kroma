@@ -6,6 +6,11 @@ rust-version.workspace = true
 description = "KROMA business logic: infra adapters + services + app state (everything the HTTP layer drives)"
 license.workspace = true
 
+[features]
+# Lets a test serve a title from a socket on this machine. No build of the
+# server enables it: only the integration tests do, as a dev-dependency.
+insecure-test-sources = ["kroma-primitives/insecure-test-urls"]
+
 [dependencies]
 # Lower layers (aliased inside lib.rs as crate::{db,config,domain}).
 kroma-domain = { workspace = true }

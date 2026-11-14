@@ -6,6 +6,8 @@ mod ffprobe_output;
 mod hdr10plus;
 mod parse;
 mod run;
+#[cfg(test)]
+mod remote_tests;
 
 use kroma_module_wire::{AudioStream, SubtitleTrack, VideoStream};
 

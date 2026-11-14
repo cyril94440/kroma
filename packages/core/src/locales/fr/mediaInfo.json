@@ -9,6 +9,8 @@
   "mediaInfo.noFile": "Aucun fichier pour cet élément.",
   "mediaInfo.noSubs": "Aucun",
   "mediaInfo.size": "Taille",
+  "mediaInfo.storage": "Stockage",
+  "mediaInfo.streamed": "En streaming",
   "mediaInfo.subtitles": "Sous-titres",
   "mediaInfo.title": "Détails du média",
   "mediaInfo.unknownFile": "Fichier inconnu",

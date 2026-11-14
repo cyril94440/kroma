@@ -184,3 +184,36 @@ async fn a_re_anchor_into_a_session_already_running_is_answered_out_of_it() {
     assert_eq!(start, 0.0, "the client is told where the stream it gets begins");
     assert!(playlist.contains("seg_00000.m4s"));
 }
+
+#[tokio::test]
+async fn a_title_behind_a_url_is_remuxed_from_the_network() {
+    let dir = kroma_testing::temp_dir("hls-remote");
+    let clip = kroma_testing::clip(dir.path());
+    let server = kroma_testing::RangedServer::serve(&clip);
+    let url = kroma_primitives::input::RemoteUrl::parse_insecure(&server.url("clip.mp4")).unwrap();
+    let input = MediaInput::Remote(url);
+    let engine = engine(dir.path());
+
+    let (playlist, start) = engine
+        .master(asked(&input, 0))
+        .await
+        .expect("a playlist out of a URL ffmpeg can read");
+
+    assert!(playlist.contains("#EXT-X-TARGETDURATION"));
+    assert_eq!(start, 0.0);
+    assert!(server.heard().iter().any(|r| r.range.is_some()), "{:?}", server.heard());
+    let session = dir.path().join("hls").read_dir().unwrap().next().unwrap().unwrap().path();
+    assert!(!session.join("ffmpeg.log").exists(), "a URL's errors are not kept on disk");
+}
+
+#[tokio::test]
+async fn a_seek_into_a_url_starts_on_a_keyframe_read_over_the_network() {
+    let dir = kroma_testing::temp_dir("hls-remote-seek");
+    let clip = kroma_testing::clip(dir.path());
+    let server = kroma_testing::RangedServer::serve(&clip);
+    let url = kroma_primitives::input::RemoteUrl::parse_insecure(&server.url("clip.mp4")).unwrap();
+
+    let start = super::ffmpeg::keyframe_before(&MediaInput::Remote(url), 3.2).await;
+
+    assert!((start - 3.0).abs() < 0.1, "{start}");
+}

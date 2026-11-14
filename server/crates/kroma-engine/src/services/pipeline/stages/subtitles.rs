@@ -5,7 +5,10 @@
 use anyhow::{anyhow, Result};
 
 use crate::infra::subtitles;
+use kroma_media::input::MediaInput;
+
 use crate::services::jobs::{JobContext, JobKey, Trigger};
+use crate::services::source::Resolved;
 use crate::state::SharedState;
 
 use super::common::stage;
@@ -22,7 +25,7 @@ stage! {
 }
 
 // Signed by the file's `mtime:size` so a replaced file re-extracts.
-fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
+pub(super) fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
     let items = crate::db::list_items(&state.db, None)?;
     Ok(items
         .into_iter()
@@ -35,12 +38,12 @@ fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
             {
                 return None;
             }
-            Some((i.id, super::sig_for_path(abs)))
+            Some((i.id, super::when_cached(state, abs, super::sig_for_path(abs))))
         })
         .collect())
 }
 
-fn process(ctx: &JobContext, item_id: &str) -> Result<()> {
+pub(super) fn process(ctx: &JobContext, item_id: &str) -> Result<()> {
     let item = crate::db::get_item(&ctx.state.db, item_id)?
         .ok_or_else(|| anyhow!("item {item_id} no longer exists"))?;
     let Some(abs) = item.abs_path.as_deref() else {
@@ -50,8 +53,19 @@ fn process(ctx: &JobContext, item_id: &str) -> Result<()> {
     // pre-warm; the cancel closure kills an in-flight ffmpeg pass at the next
     // poll tick instead of running out the full timeout.
     let cancel = || ctx.cancelled();
-    subtitles::extract_pending_locked(&ctx.state.config.data_dir, abs, &item.subtitles, &cancel)
-        .map_err(|e| anyhow!(e))
+    let local = super::whole_file(&ctx.state, abs)?;
+    let resolved = Resolved {
+        input: MediaInput::Local(local),
+        stub: None,
+    };
+    subtitles::extract_pending_locked(
+        &ctx.state.config.data_dir,
+        abs,
+        &resolved,
+        &item.subtitles,
+        &cancel,
+    )
+    .map_err(|e| anyhow!(e))
 }
 
 #[cfg(test)]

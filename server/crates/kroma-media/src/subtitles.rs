@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
 
-use crate::input;
+use crate::input::{self, MediaInput};
 use crate::tmp_file::{finalize, unique_tmp};
 
 const READ_BYTES_PER_SEC: u64 = 20 * 1024 * 1024;
@@ -23,19 +23,38 @@ pub fn is_text_codec(codec: &str) -> bool {
 /// The wall-clock budget one whole-file pass over `input` gets: its size at
 /// 20 MB/s, held between 150 s and two hours. A text-subtitle demux is
 /// bandwidth-bound, and a fixed ceiling times a 4K remux out and throws away
-/// the partial output, so the next attempt reads it all again.
-pub fn timeout_for(input: &str) -> Duration {
-    let size = std::fs::metadata(input).map(|m| m.len()).unwrap_or(0);
+/// the partial output, so the next attempt reads it all again. A file's size is
+/// read off disk; a URL has none, so the caller says how large it is.
+pub fn timeout_for_input(input: &MediaInput, declared_size: u64) -> Duration {
+    let size = match input {
+        MediaInput::Local(path) => std::fs::metadata(path).map(|m| m.len()).unwrap_or(0),
+        MediaInput::Remote(_) => declared_size,
+    };
     let secs = (size / READ_BYTES_PER_SEC).clamp(SHORTEST_BUDGET, LONGEST_BUDGET);
     Duration::from_secs(secs)
+}
+
+/// [`timeout_for_input`] for a file on this machine.
+pub fn timeout_for(path: &str) -> Duration {
+    timeout_for_input(&MediaInput::Local(path.into()), 0)
+}
+
+/// [`extract_vtt_from`] for a file on this machine.
+pub fn extract_vtt(
+    path: &str,
+    tracks: &[(usize, PathBuf)],
+    timeout: Duration,
+    cancel: &dyn Fn() -> bool,
+) -> Result<usize, String> {
+    extract_vtt_from(&MediaInput::Local(path.into()), tracks, timeout, cancel)
 }
 
 /// One ffmpeg pass writing each of `tracks` (a subtitle-relative index and
 /// where its WebVTT goes) out of `input`, so N tracks cost one read and not N.
 /// Each output lands atomically, and the count is how many did. Blocking; run
 /// it on a blocking thread.
-pub fn extract_vtt(
-    input: &str,
+pub fn extract_vtt_from(
+    input: &MediaInput,
     tracks: &[(usize, PathBuf)],
     timeout: Duration,
     cancel: &dyn Fn() -> bool,
@@ -65,10 +84,10 @@ pub fn extract_vtt(
 
 // Text-subtitle decode is trivial; the cost is the demux read, so one thread
 // keeps this from competing with a live remux for cores.
-fn pass(input: &str, tracks: &[(usize, PathBuf)], tmps: &[PathBuf]) -> Command {
+fn pass(input: &MediaInput, tracks: &[(usize, PathBuf)], tmps: &[PathBuf]) -> Command {
     let mut cmd = Command::new("ffmpeg");
     cmd.args(["-v", "error", "-nostdin", "-threads", "1", "-y"]);
-    cmd.args(input::file(input));
+    cmd.args(input::media(input));
     for ((track, _), tmp) in tracks.iter().zip(tmps) {
         cmd.arg("-map").arg(format!("0:s:{track}"));
         cmd.args(["-f", "webvtt"]).arg(tmp);
@@ -83,6 +102,10 @@ fn wrote_anything(vtt: &std::path::Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn local(path: &str) -> MediaInput {
+        MediaInput::Local(path.into())
+    }
 
     fn worded(cmd: &Command) -> Vec<String> {
         cmd.get_args()
@@ -104,7 +127,7 @@ mod tests {
     fn a_pass_over_a_whole_input_neither_seeks_nor_bounds_what_it_reads() {
         let tracks = [(2usize, PathBuf::from("/subs/a.vtt"))];
 
-        let args = worded(&pass("/films/one.mkv", &tracks, &[PathBuf::from("/t")]));
+        let args = worded(&pass(&local("/films/one.mkv"), &tracks, &[PathBuf::from("/t")]));
 
         assert!(!args.contains(&"-ss".to_string()));
         assert!(!args.contains(&"-to".to_string()));
@@ -119,7 +142,7 @@ mod tests {
         ];
         let tmps = [PathBuf::from("/a.part"), PathBuf::from("/b.part")];
 
-        let args = worded(&pass("/films/one.mkv", &tracks, &tmps));
+        let args = worded(&pass(&local("/films/one.mkv"), &tracks, &tmps));
 
         assert_eq!(args.iter().filter(|a| *a == "-map").count(), 2, "{args:?}");
         assert!(args.contains(&"0:s:4".to_string()));

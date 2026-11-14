@@ -141,8 +141,13 @@ fn the_real_alldebrid_module_stubs_a_ready_magnet_and_fills_its_cache_as_a_compo
         "{:?}",
         server.said.lock().unwrap()
     );
-    assert_eq!(
-        server.network.flows.lock().unwrap().iter().filter(|flow| flow.purpose == "debrid-transfer").count() >= 2,
-        true
-    );
+    let transfers = server
+        .network
+        .flows
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|flow| flow.purpose == "debrid-transfer")
+        .count();
+    assert!(transfers >= 2, "{transfers}");
 }

@@ -5,8 +5,6 @@
 //! when they do not, because it is direct evidence and a distant chapter mark is
 //! usually the last scene.
 
-use std::path::Path;
-
 use anyhow::Result;
 
 use super::video;
@@ -32,7 +30,8 @@ pub fn detect_movie(ctx: &JobContext, item: &MediaItem) -> Result<bool> {
     ) else {
         return Ok(false);
     };
-    let path = Path::new(path);
+    let whole = crate::services::pipeline::stages::whole_file(&ctx.state, path)?;
+    let path = whole.as_path();
     let probe = probe_file(path, ctx.state.ffprobe_available).unwrap_or_default();
     let duration_ms = probe.duration_ms.filter(|d| *d > 0).unwrap_or(duration_ms);
     let chapter = markers_from_chapters(&probe.chapters, Some(duration_ms))

@@ -263,6 +263,7 @@ mod tests {
         let mut it = base_item();
         it.duration_ms = Some(1000); // 1 second
         it.files = vec![MediaFile {
+            remote: false,
             id: "f1".into(),
             rel_path: None,
             container: "mkv".into(),

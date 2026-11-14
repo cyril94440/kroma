@@ -36,6 +36,7 @@ pub(super) fn lib(id: &str) -> Library {
 
 pub(super) fn file(id: &str, abs: &str, probed: bool) -> MediaFile {
     MediaFile {
+        remote: false,
         id: id.into(),
         rel_path: Some(format!("{id}.mkv")),
         container: "mkv".into(),

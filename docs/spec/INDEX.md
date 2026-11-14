@@ -3,7 +3,7 @@
 
 # Requirement index
 
-542 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
+551 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
 
 ## ACCT - [accounts](accounts/)
 
@@ -347,6 +347,12 @@
 - **MEDIA-47** (AGREED) - An audio stream carries the region of its language when the file says
 - **MEDIA-48** (SHIPPED) - A video copied into fragmented MP4 keeps what makes it HDR: HEVC is
 - **MEDIA-49** (SHIPPED) - A video re-encoded to 8-bit H.264 from an HDR source is tone-mapped
+- **MEDIA-50** (SHIPPED) - A stub is a title like any other: it appears with the container
+- **MEDIA-51** (SHIPPED) - A media file whose bytes are streamed says so (`remote`), so a
+- **MEDIA-52** (SHIPPED) - Where a remote file's bytes are is answered by its source each
+- **MEDIA-53** (SHIPPED) - A link is used only if it is `https`, carries no credentials, and
+- **MEDIA-54** (SHIPPED) - A source that is off, gone or silent fails playback with a
+- **MEDIA-55** (SHIPPED) - Work that reads a whole title (scrub thumbnails, intro and credits
 
 ## MOD - [modules](modules/)
 
@@ -507,6 +513,9 @@
 - **PLAY-58** (SHIPPED) - The first play of a trailer may wait while the server fetches it, and the
 - **PLAY-59** (SHIPPED) - A trailer saves no progress, marks nothing watched and offers no next
 - **PLAY-60** (SHIPPED) - When a trailer cannot be fetched, the player says so plainly. Where the
+- **PLAY-61** (SHIPPED) - Direct play of a remote file serves the original bytes with the
+- **PLAY-62** (SHIPPED) - Opening a remote file for playback asks its source to start
+- **PLAY-63** (SHIPPED) - A transcode, a remux and an offline download of a remote file
 
 ## SURF - [surfaces](surfaces/)
 

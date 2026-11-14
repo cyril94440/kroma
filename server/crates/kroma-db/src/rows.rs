@@ -116,7 +116,11 @@ pub(crate) fn row_to_file(r: &Row) -> rusqlite::Result<MediaFile> {
             })
     });
 
+    let abs_path: Option<String> = r.get(16)?;
     Ok(MediaFile {
+        remote: abs_path
+            .as_deref()
+            .is_some_and(|abs| kroma_primitives::remote_file::is_remote_file(std::path::Path::new(abs))),
         id: r.get(0)?,
         rel_path: r.get(1)?,
         container: r.get(2)?,
@@ -128,7 +132,7 @@ pub(crate) fn row_to_file(r: &Row) -> rusqlite::Result<MediaFile> {
         audio,
         audio_tracks,
         subtitles,
-        abs_path: r.get(16)?,
+        abs_path,
         unreadable: r.get(18)?,
         edition_id: None,
     })

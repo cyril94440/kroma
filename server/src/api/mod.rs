@@ -164,6 +164,8 @@ mod it_server_status;
 #[cfg(test)]
 mod it_store_versions;
 #[cfg(test)]
+mod it_remote_stream;
+#[cfg(test)]
 mod it_stream_hls;
 #[cfg(test)]
 mod it_suggest;

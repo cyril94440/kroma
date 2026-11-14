@@ -64,12 +64,7 @@ pub async fn download_item(
         .abs_path
         .clone()
         .ok_or_else(|| json_error(StatusCode::NOT_FOUND, "no file for item"))?;
-    if !std::path::Path::new(&abs).exists() {
-        return Err(json_error(
-            StatusCode::NOT_FOUND,
-            "media file unavailable (mount offline?)",
-        ));
-    }
+    let input = super::remote::playable(&state, &user, &abs, true).await?.input;
 
     let source_video = item.video.as_ref().map(|v| v.codec.as_str());
     let video_copy = match (q.video.as_deref(), source_video) {
@@ -79,7 +74,7 @@ pub async fn download_item(
     };
     let mut cmd = tokio::process::Command::new("ffmpeg");
     cmd.args(["-v", "error", "-nostdin"])
-        .args(input::file(&abs))
+        .args(input::media(&input))
         .args(["-map", "0:v:0"]);
     let tone_map = item.video.as_ref().and_then(ToneMap::for_video);
     let video_copy = video_copy
@@ -135,7 +130,7 @@ pub async fn download_item(
             Some(e) => {
                 let mut buf = String::new();
                 let _ = e.read_to_string(&mut buf).await;
-                buf.lines().last().unwrap_or_default().trim().to_string()
+                input.redact(buf.lines().last().unwrap_or_default().trim())
             }
             None => String::new(),
         };
@@ -156,6 +151,7 @@ pub async fn download_item(
     // on a full pipe. The permit rides along so the slot returns when the process is
     // gone, not when the handler returns.
     let item_id = item.id.clone();
+    let redacting = input.clone();
     tokio::spawn(async move {
         let mut detail = String::new();
         if let Some(mut e) = stderr {
@@ -163,7 +159,7 @@ pub async fn download_item(
         }
         match child.wait().await {
             Ok(status) if !status.success() => {
-                tracing::warn!(item = %item_id, %status, error = %detail.trim(), "download remux exited non-zero");
+                tracing::warn!(item = %item_id, %status, error = %redacting.redact(detail.trim()), "download remux exited non-zero");
             }
             _ => {}
         }

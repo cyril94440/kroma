@@ -7,6 +7,7 @@ use crate::services::scan::short_hash;
 pub(super) fn demo_file(item: &MediaItem) -> MediaFile {
     let fid = short_hash(&format!("{}|file", item.id));
     MediaFile {
+        remote: false,
         id: fid.clone(),
         rel_path: item.rel_path.clone(),
         container: item.container.clone(),

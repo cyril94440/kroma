@@ -44,6 +44,7 @@ pub struct ModuleWiring {
     pub permissions: crate::services::network::DeclaredPermissions,
     pub network_providers: crate::services::network::NetworkProviders,
     pub network_listeners: crate::services::network::DeclaredListeners,
+    pub source_roots: crate::services::source::SourceRoots,
 }
 
 pub struct AppState {
@@ -64,6 +65,7 @@ pub struct AppState {
     pub cast: crate::services::cast::Registry,
     pub metrics: Metrics,
     pub embedder: crate::point::Point,
+    pub sources: Arc<crate::services::source::Sources>,
     pub network: Arc<crate::services::network::Network>,
     pub direct: crate::services::direct::Direct,
     pub search: Arc<SearchEngine>,
@@ -119,6 +121,7 @@ impl AppState {
             permissions,
             network_providers,
             network_listeners,
+            source_roots,
         } = wiring;
         let hls = hls::HlsEngine::new(
             config.data_dir.join("hls"),
@@ -151,6 +154,11 @@ impl AppState {
         let _ = crate::db::reconcile_running_runs(&db);
         crate::services::pipeline::recover_on_boot(&db);
         let metrics = Metrics::new(db.clone());
+        let sources = Arc::new(crate::services::source::Sources::new(
+            contributions.clone(),
+            permissions.clone(),
+            source_roots,
+        ));
         let network = Arc::new(crate::services::network::Network::new(
             db.clone(),
             settings.clone(),
@@ -179,6 +187,7 @@ impl AppState {
             cast: crate::services::cast::Registry::new(),
             metrics,
             embedder,
+            sources,
             network,
             direct,
             search: Arc::new(SearchEngine::new().expect("init search index")),
@@ -258,6 +267,7 @@ mod tests {
                 permissions: Arc::new(|_| None),
                 network_providers: Arc::new(Vec::new),
                 network_listeners: Arc::new(Vec::new),
+                source_roots: Arc::new(|_| Vec::new()),
             },
         );
         state.own_scratch_dir(dir);

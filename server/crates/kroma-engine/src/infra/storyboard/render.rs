@@ -113,6 +113,7 @@ impl Storyboard {
     pub fn generate_blocking_cancellable(
         &self,
         item: &MediaItem,
+        source: &Path,
         cancel: Cancel,
     ) -> std::result::Result<(), String> {
         if self.is_cached(item) {
@@ -122,7 +123,7 @@ impl Storyboard {
             return Err("no media file or unknown duration".to_string());
         };
         let key = Self::key(&abs, super::tile_path(item));
-        generate(&abs, &self.dir, &key, &item.id, dur_s, cancel)
+        generate(&source.to_string_lossy(), &self.dir, &key, &item.id, dur_s, cancel)
     }
 }
 

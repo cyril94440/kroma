@@ -109,15 +109,21 @@ pub(crate) fn audio_analysis_for_files(
     Ok(out)
 }
 
-/// `(id, "mtime:size")` of every **probed** file, for the `pipeline.loudness`
+/// `(id, abs_path, "mtime:size")` of every **probed** file, for the `pipeline.loudness`
 /// stage's enumeration: unprobed files stay out of scope (their track layout is
 /// unknown) and flow in once the probe stage lands.
-pub fn analyzable_file_sigs(pool: &Pool) -> Result<Vec<(String, String)>> {
+pub fn analyzable_file_sigs(pool: &Pool) -> Result<Vec<(String, String, String)>> {
     let conn = pool.get()?;
     let mut stmt = conn.prepare(
-        "SELECT id, COALESCE(mtime,0) || ':' || COALESCE(size,0) FROM files WHERE probed = 1",
+        "SELECT id, abs_path, COALESCE(mtime,0) || ':' || COALESCE(size,0) FROM files WHERE probed = 1",
     )?;
-    let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+    let rows = stmt.query_map([], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+        ))
+    })?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
@@ -217,9 +223,15 @@ mod tests {
     #[test]
     fn enumeration_and_target_lookups() {
         let p = pool_with_file();
-        let sigs: std::collections::HashMap<String, String> =
-            analyzable_file_sigs(&p).unwrap().into_iter().collect();
-        assert_eq!(sigs.get("f1").map(String::as_str), Some("100:2000"));
+        let sigs: std::collections::HashMap<String, (String, String)> = analyzable_file_sigs(&p)
+            .unwrap()
+            .into_iter()
+            .map(|(id, abs, sig)| (id, (abs, sig)))
+            .collect();
+        assert_eq!(
+            sigs.get("f1"),
+            Some(&("/media/m1.mkv".to_string(), "100:2000".to_string()))
+        );
 
         let (abs, tracks) = loudness_target(&p, "f1").unwrap().unwrap();
         assert_eq!(abs, "/media/m1.mkv");

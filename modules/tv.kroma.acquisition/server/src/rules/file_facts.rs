@@ -81,6 +81,7 @@ mod tests {
 
     fn file() -> MediaFile {
         MediaFile {
+            remote: false,
             id: "f1".into(),
             rel_path: Some("Show/Season 01/Show - S01E01 - 1080p.mkv".into()),
             container: "mkv".into(),

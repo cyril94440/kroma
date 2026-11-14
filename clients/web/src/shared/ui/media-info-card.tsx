@@ -56,6 +56,9 @@ export function FileCard({
             label={t('mediaInfo.duration')}
             value={file.durationMs != null ? fmt.duration(file.durationMs) : '-'}
           />
+          {file.remote ? (
+            <FileField label={t('mediaInfo.storage')} value={t('mediaInfo.streamed')} />
+          ) : null}
         </Grid>
       </Box>
 

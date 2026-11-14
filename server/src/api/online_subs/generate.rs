@@ -187,21 +187,28 @@ async fn run_generation(t: GenTask) {
     // service in the composition root); translate-only generations don't need
     // it, so a missing one only fails a transcribe.
     let transcriber = kroma_module_host::service::<TranscriberClient>(&state);
+    let sources = state.sources.clone();
     // The model (ffmpeg + Whisper / LLM) is blocking: run it on the blocking pool
     // and finalize the registry entry with its result.
     let _ = tokio::task::spawn_blocking(move || {
-        let result = match transcriber.as_ref() {
-            Some(transcriber) => subtitles::generate(
+        let whole = match sources.local(&abs) {
+            Ok(Some(path)) => Ok(path),
+            Ok(None) => Err("this title is only streamed so far: transcription reads the whole file, so try again once it has been cached".to_string()),
+            Err(error) => Err(format!("could not reach the title: {error}")),
+        };
+        let result = match (whole, transcriber.as_ref()) {
+            (Err(reason), _) if spec.mode == GenMode::Transcribe => Err(reason),
+            (whole, Some(transcriber)) => subtitles::generate(
                 &settings,
                 &data_dir,
                 &pool,
                 &item_id,
-                std::path::Path::new(&abs),
+                whole.as_deref().unwrap_or(std::path::Path::new(&abs)),
                 &spec,
                 &handle,
                 &transcriber.step(),
             ),
-            None => Err("no transcription module is installed".to_string()),
+            (_, None) => Err("no transcription module is installed".to_string()),
         };
         match result {
             Ok(sub) => handle.done(&sub.id),
@@ -248,7 +255,13 @@ async fn resolve_source(
         };
     }
     if let Some(track) = req.source_track {
-        return match crate::api::stream::extract_webvtt(abs, track).await {
+        let held = state.clone();
+        let path = abs.to_string();
+        let resolved = tokio::task::spawn_blocking(move || held.sources.resolve(&path, false))
+            .await
+            .map_err(|_| "could not read the source subtitle track".to_string())?
+            .map_err(|error| format!("could not reach the title: {error}"))?;
+        return match crate::api::stream::extract_webvtt(&resolved, track).await {
             Some(bytes) => Ok(subtitles::to_vtt(&String::from_utf8_lossy(&bytes))),
             None => Err("could not read the source subtitle track".to_string()),
         };

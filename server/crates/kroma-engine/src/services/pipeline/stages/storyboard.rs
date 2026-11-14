@@ -28,7 +28,7 @@ stage! {
 // enumerated so the ledger shows them `done`; `process` no-ops on a cache hit.
 // Unprobed items (duration unknown) are simply skipped until a later probe/scan
 // makes them eligible that is the probe dependency, encoded as a filter.
-fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
+pub(super) fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
     let items = crate::db::list_items(&state.db, None)?;
     Ok(items
         .into_iter()
@@ -37,13 +37,13 @@ fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
             if i.duration_ms.unwrap_or(0) == 0 {
                 return None;
             }
-            let sig = super::sig_for_path(abs);
+            let sig = super::when_cached(state, abs, super::sig_for_path(abs));
             Some((i.id, sig))
         })
         .collect())
 }
 
-fn process(ctx: &JobContext, item_id: &str) -> Result<()> {
+pub(super) fn process(ctx: &JobContext, item_id: &str) -> Result<()> {
     let item = crate::db::get_item(&ctx.state.db, item_id)?
         .ok_or_else(|| anyhow!("item {item_id} no longer exists"))?;
     // `generate_blocking_cancellable` returns `Err(String)` with the real cause
@@ -51,9 +51,14 @@ fn process(ctx: &JobContext, item_id: &str) -> Result<()> {
     // Thread the stage's cancellation so cancelling the job kills the in-flight
     // ffmpeg pass at the next poll tick instead of running out the full timeout.
     let cancel = || ctx.cancelled();
+    let abs = item
+        .abs_path
+        .as_deref()
+        .ok_or_else(|| anyhow!("item {item_id} has no media file"))?;
+    let source = super::whole_file(&ctx.state, abs)?;
     ctx.state
         .storyboard
-        .generate_blocking_cancellable(&item, &cancel)
+        .generate_blocking_cancellable(&item, &source, &cancel)
         .map_err(|e| anyhow!(e))
 }
 

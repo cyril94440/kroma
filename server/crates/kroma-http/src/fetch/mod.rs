@@ -10,6 +10,10 @@ mod native;
 mod render;
 #[cfg(not(target_family = "wasm"))]
 mod send;
+#[cfg(not(target_family = "wasm"))]
+mod stream;
+#[cfg(not(target_family = "wasm"))]
+pub use stream::Streamed;
 
 /// A prepared request: builder-style options, then one of the executors
 /// ([`Fetch::get`], [`Fetch::post_json`], [`Fetch::post_form`]). Every executor

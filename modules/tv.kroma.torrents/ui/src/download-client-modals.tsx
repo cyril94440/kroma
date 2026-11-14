@@ -22,8 +22,9 @@ export const DownloadClientModal = createCallable<
   const [url, setUrl] = useState(client.url);
   const [username, setUsername] = useState(client.username);
   const [password, setPassword] = useState('');
-  const declared = useEnabledEngines('tv.kroma.torrents/client').find((e) => e.id === client.kind)
-    ?.fields;
+  const declared = useEnabledEngines('tv.kroma.torrents/client').find(
+    (e) => e.id === client.kind,
+  )?.fields;
   const field = (key: string) => declared?.find((f) => f.key === key);
   const shows = (key: string) => declared === undefined || field(key) !== undefined;
   const urlRequired = declared === undefined || field('url')?.required === true;

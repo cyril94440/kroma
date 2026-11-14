@@ -1,7 +1,6 @@
 //! Probing a whole library: the phase-2 background pass, its worker pool, and
 //! the single-file write both it and the `pipeline.probe` stage go through.
 
-use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -12,7 +11,9 @@ use crate::db::{self, FileProbe, Pool};
 use crate::infra::events::{Bus, ServerEvent};
 use crate::services::activity::{self, Shared as Activity};
 
-use super::probe_file;
+use crate::services::source::Sources;
+
+use super::probe_input;
 
 // Half the cores, clamped to 2..4: each ffprobe is a real process, and more at
 // once starves interactive work on a small NAS. `KROMA_PROBE_WORKERS` overrides.
@@ -38,7 +39,13 @@ struct ProbeJob {
 /// ffprobe every file with `probed=0`, write the result, and emit live events so
 /// clients fill in codec/HDR badges. Returns immediately; work runs on a small
 /// pool of detached threads. A no-op when there are no unprobed files.
-pub fn spawn_probe_pass(pool: Pool, ffprobe_present: bool, bus: Bus, activity: Activity) {
+pub fn spawn_probe_pass(
+    pool: Pool,
+    ffprobe_present: bool,
+    bus: Bus,
+    activity: Activity,
+    sources: Arc<Sources>,
+) {
     let unprobed = match db::unprobed_files(&pool) {
         Ok(v) => v,
         Err(e) => {
@@ -66,7 +73,9 @@ pub fn spawn_probe_pass(pool: Pool, ffprobe_present: bool, bus: Bus, activity: A
     let queue = Arc::new(Mutex::new(jobs));
     let done = Arc::new(AtomicUsize::new(0));
 
-    thread::spawn(move || run_probe_pass(pool, ffprobe_present, bus, activity, queue, done, total));
+    thread::spawn(move || {
+        run_probe_pass(pool, ffprobe_present, bus, activity, sources, queue, done, total)
+    });
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -75,6 +84,7 @@ fn run_probe_pass(
     ffprobe_present: bool,
     bus: Bus,
     activity: Activity,
+    sources: Arc<Sources>,
     queue: Arc<Mutex<Vec<ProbeJob>>>,
     done: Arc<AtomicUsize>,
     total: usize,
@@ -87,10 +97,12 @@ fn run_probe_pass(
         let done = done.clone();
         let bus = bus.clone();
         let activity = activity.clone();
+        let sources = sources.clone();
         handles.push(thread::spawn(move || {
             probe_worker_loop(
                 &pool,
                 ffprobe_present,
+                &sources,
                 &queue,
                 &done,
                 &bus,
@@ -114,6 +126,7 @@ fn run_probe_pass(
 fn probe_worker_loop(
     pool: &Pool,
     ffprobe_present: bool,
+    sources: &Sources,
     queue: &Arc<Mutex<Vec<ProbeJob>>>,
     done: &Arc<AtomicUsize>,
     bus: &Bus,
@@ -128,12 +141,13 @@ fn probe_worker_loop(
         if let Err(e) = probe_one(
             pool,
             ffprobe_present,
+            sources,
             bus,
             &job.file_id,
             &job.abs_path,
             &job.item_id,
         ) {
-            warn!(file = %job.file_id, error = %e, "failed to store probe result");
+            warn!(file = %job.file_id, error = %e, "failed to probe; it stays unprobed for a later pass");
         }
         let n = done.fetch_add(1, Ordering::Relaxed) + 1;
         activity::probe_progress(activity, n);
@@ -148,10 +162,14 @@ fn probe_worker_loop(
 /// file. Shared by the background probe pass and the `pipeline.probe` stage.
 ///
 /// A probe a signal took writes nothing: the file keeps `probed = 0` so a later
-/// pass reads it, rather than standing as a title with no streams for good.
+/// pass reads it, rather than standing as a title with no streams for good. The
+/// same holds for a stub whose source did not answer, and that is an `Err`: it
+/// has nothing to do with the file, and the pipeline retries it. A stub whose
+/// source answered something the core refuses is recorded as unreadable.
 pub fn probe_one(
     pool: &Pool,
     ffprobe: bool,
+    sources: &Sources,
     bus: &Bus,
     file_id: &str,
     abs_path: &str,
@@ -160,7 +178,13 @@ pub fn probe_one(
     let first_for_item = db::item_has_probed_file(pool, item_id)
         .map(|has| !has)
         .unwrap_or(true);
-    let Some(result) = probe_file(Path::new(abs_path), ffprobe) else {
+    let resolved = match sources.resolve(abs_path, false) {
+        Ok(resolved) => resolved,
+        Err(error) if error.is_transient() => return Err(error.into()),
+        Err(error) => return store_unreadable(pool, bus, file_id, item_id, first_for_item, &error.to_string()),
+    };
+    let container = resolved.container().unwrap_or_default();
+    let Some(result) = probe_input(&resolved.input, &container, ffprobe) else {
         warn!(file = %file_id, "ffprobe was killed before it answered; leaving the file unprobed");
         return Ok(());
     };
@@ -179,6 +203,30 @@ pub fn probe_one(
     for (kind, start, end) in super::markers_from_chapters(&result.chapters, result.duration_ms) {
         let _ = db::set_marker(pool, item_id, kind, start, end, "chapters");
     }
+    if first_for_item {
+        bus.publish(ServerEvent::ItemUpdated {
+            id: item_id.to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn store_unreadable(
+    pool: &Pool,
+    bus: &Bus,
+    file_id: &str,
+    item_id: &str,
+    first_for_item: bool,
+    reason: &str,
+) -> anyhow::Result<()> {
+    db::set_file_probe(
+        pool,
+        file_id,
+        &FileProbe {
+            unreadable: Some(reason),
+            ..FileProbe::default()
+        },
+    )?;
     if first_for_item {
         bus.publish(ServerEvent::ItemUpdated {
             id: item_id.to_string(),

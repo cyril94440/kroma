@@ -101,14 +101,14 @@ pub(super) fn spawn_stream(spec: &Spec) -> std::io::Result<Child> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .kill_on_drop(true);
-    match std::fs::File::create(spec.dir.join("ffmpeg.log")) {
-        Ok(f) => {
-            cmd.stderr(Stdio::from(f));
-        }
-        Err(_) => {
-            cmd.stderr(Stdio::null());
-        }
-    }
+    let log = spec
+        .input
+        .local()
+        .and_then(|_| std::fs::File::create(spec.dir.join("ffmpeg.log")).ok());
+    match log {
+        Some(f) => cmd.stderr(Stdio::from(f)),
+        None => cmd.stderr(Stdio::null()),
+    };
     cmd.spawn()
 }
 

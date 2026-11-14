@@ -13,6 +13,7 @@ pub async fn spawn(state: &state::SharedState) {
         state.ffprobe_available,
         state.events.clone(),
         state.activity.clone(),
+        state.sources.clone(),
     );
 
     services::search::spawn_reindex(state.clone());

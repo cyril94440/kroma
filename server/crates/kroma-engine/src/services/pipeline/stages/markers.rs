@@ -23,7 +23,7 @@ stage! {
 
 // With detection off nothing is in scope, which is how the ledger purges the
 // existing tasks.
-fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
+pub(super) fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
     let mode = state.settings.get_str("introDetection", "chapters");
     if mode == "off" {
         return Ok(Vec::new());
@@ -35,7 +35,7 @@ fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
             continue;
         };
         for season in &detail.seasons {
-            if let Some(sig) = season_signature(&mode, season) {
+            if let Some(sig) = season_signature(state, &mode, season) {
                 out.push((format!("{}#{}", show.id, season.number), sig));
             }
         }
@@ -46,13 +46,17 @@ fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
 // One unreadable episode (a mount blip) collapses the whole season to
 // `UNREADABLE_SIG`, so `reconcile` skips it instead of re-fingerprinting on
 // every flap.
-fn season_signature(mode: &str, season: &crate::model::Season) -> Option<String> {
+fn season_signature(
+    state: &SharedState,
+    mode: &str,
+    season: &crate::model::Season,
+) -> Option<String> {
     let mut parts = vec![mode.to_string()];
     let mut playable = 0usize;
     let mut unreadable = false;
     for ep in &season.episodes {
         if let (Some(abs), Some(d)) = (ep.abs_path.as_deref(), ep.duration_ms) {
-            if d > 0 {
+            if d > 0 && readable_now(state, abs) {
                 playable += 1;
                 let sig = super::sig_for_path(abs);
                 unreadable |= sig == crate::db::pipeline::UNREADABLE_SIG;
@@ -70,7 +74,13 @@ fn season_signature(mode: &str, season: &crate::model::Season) -> Option<String>
     }
 }
 
-fn process(ctx: &JobContext, subject_id: &str) -> Result<()> {
+// An episode a source only streams is not part of the season until its copy
+// lands, and the season is signed again then, so the detection runs again.
+fn readable_now(state: &SharedState, abs: &str) -> bool {
+    super::when_cached(state, abs, String::new()) != crate::db::pipeline::UNREADABLE_SIG
+}
+
+pub(super) fn process(ctx: &JobContext, subject_id: &str) -> Result<()> {
     let (show_id, season_num) = subject_id
         .rsplit_once('#')
         .ok_or_else(|| anyhow!("malformed season subject id {subject_id}"))?;
@@ -136,24 +146,23 @@ mod tests {
     #[test]
     fn season_signature_none_without_probed_episodes() {
         assert_eq!(
-            season_signature("chapters", &season(vec![episode(None, Some(1000))])),
+            season_signature(&test_state(), "chapters", &season(vec![episode(None, Some(1000))])),
             None
         );
         assert_eq!(
-            season_signature("chapters", &season(vec![episode(Some("/x.mkv"), None)])),
+            season_signature(&test_state(), "chapters", &season(vec![episode(Some("/x.mkv"), None)])),
             None
         );
         assert_eq!(
-            season_signature("chapters", &season(vec![episode(Some("/x.mkv"), Some(0))])),
+            season_signature(&test_state(), "chapters", &season(vec![episode(Some("/x.mkv"), Some(0))])),
             None
         );
-        assert_eq!(season_signature("chapters", &season(vec![])), None);
+        assert_eq!(season_signature(&test_state(), "chapters", &season(vec![])), None);
     }
 
     #[test]
     fn season_signature_unreadable_file_collapses_to_sentinel() {
-        let sig = season_signature(
-            "chapters",
+        let sig = season_signature(&test_state(), "chapters",
             &season(vec![episode(Some("/no/such/kroma/file.mkv"), Some(1000))]),
         );
         assert_eq!(sig.as_deref(), Some(crate::db::pipeline::UNREADABLE_SIG));
@@ -167,10 +176,10 @@ mod tests {
         let abs = path.to_string_lossy().to_string();
 
         let s = season(vec![episode(Some(&abs), Some(1000))]);
-        let a = season_signature("chapters", &s).unwrap();
+        let a = season_signature(&test_state(), "chapters", &s).unwrap();
         assert_ne!(a, crate::db::pipeline::UNREADABLE_SIG);
-        assert_eq!(a, season_signature("chapters", &s).unwrap());
-        assert_ne!(a, season_signature("silence", &s).unwrap());
+        assert_eq!(a, season_signature(&test_state(), "chapters", &s).unwrap());
+        assert_ne!(a, season_signature(&test_state(), "silence", &s).unwrap());
     }
 
     use super::{enumerate, process};

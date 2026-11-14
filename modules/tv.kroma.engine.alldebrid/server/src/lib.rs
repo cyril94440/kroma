@@ -25,13 +25,13 @@ mod lifecycle;
 pub mod resolve;
 mod status;
 
-#[cfg(test)]
+#[cfg(all(test, not(target_family = "wasm")))]
 mod fake_alldebrid;
-#[cfg(test)]
+#[cfg(all(test, not(target_family = "wasm")))]
 mod it_engine;
-#[cfg(test)]
+#[cfg(all(test, not(target_family = "wasm")))]
 mod it_locate;
-#[cfg(test)]
+#[cfg(all(test, not(target_family = "wasm")))]
 mod it_ready;
 
 pub const KIND: &str = "alldebrid";
