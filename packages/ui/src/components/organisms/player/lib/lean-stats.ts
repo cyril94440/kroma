@@ -1,7 +1,7 @@
 // For surfaces whose player exposes no decode counters; the web builds its own
 // richer snapshot instead.
 
-import { pictureFormat } from '@kromatv/core';
+import { audioFormatName, pictureFormat } from '@kromatv/core';
 import type { Translate } from '@kromatv/i18n';
 import type { PlayerStats } from '#ui/components/organisms/player/types';
 import type { PlayerAudioTrack, PlayerStatsItem } from '../media-types';
@@ -37,7 +37,7 @@ function audioFormatLabel(track: PlayerAudioTrack | undefined): string | undefin
   if (!track) return undefined;
   const channels = track.channels ? ` ${track.channels}.0` : '';
   const lang = track.language ? ` (${track.language})` : '';
-  return `${track.codec.toUpperCase()}${channels}${lang}`;
+  return `${audioFormatName(track)}${channels}${lang}`;
 }
 
 const LOW_BUFFER_SEC = 10;

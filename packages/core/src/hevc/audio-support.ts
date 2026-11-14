@@ -29,6 +29,24 @@ export function audioSupport(
  * surround; others (DTS/TrueHD/FLAC/Opus) fall back to a stereo-AAC transcode. */
 export const FMP4_COPY_CODECS = new Set<string>(['aac', 'ac3', 'eac3']);
 
+/** The track a title plays first: the one asked for, else the file's own default. */
+export function selectedAudioTrack(item: MediaItem, audioIndex?: number): AudioTrack | undefined {
+  const tracks = audioTracksOf(item);
+  return (
+    tracks.find((t) => t.index === audioIndex) ?? tracks.find((t) => t.default) ?? tracks[0]
+  );
+}
+
+/** Whether the track a title plays first is one this device decodes, so direct
+ * play does not open a file the viewer would hear nothing from. */
+export function decodesSelectedAudio(
+  item: MediaItem,
+  caps: PlaybackCapabilities = capabilities(),
+  audioIndex?: number,
+): boolean {
+  return canDecodeAudioCodec(selectedAudioTrack(item, audioIndex)?.codec, caps);
+}
+
 /** Falls back to a single track for older payloads that only carry the
  * representative `audio`. */
 export function audioTracksOf(item: MediaItem): AudioTrack[] {
@@ -58,12 +76,29 @@ export function canSeamlessAudioSwitch(
   return audioTracksOf(item).length > 1;
 }
 
+/** A codec the server's surround target can stand in for: it re-encodes a
+ * multichannel track the device cannot take to Dolby Digital Plus or Dolby Digital
+ * when the device declares one of them. */
+export function surroundTargetFor(
+  track: AudioTrack,
+  caps: PlaybackCapabilities = capabilities(),
+): 'eac3' | 'ac3' | null {
+  if ((track.channels ?? 0) <= 2) return null;
+  if (caps.audio.eac3) return 'eac3';
+  return caps.audio.ac3 ? 'ac3' : null;
+}
+
+function copyable(track: AudioTrack, caps: PlaybackCapabilities): boolean {
+  return !!track.codec && canDecodeAudioCodec(track.codec, caps) && FMP4_COPY_CODECS.has(track.codec);
+}
+
 /**
  * For a master stream, whether audio must be transcoded to stereo AAC (true) or
- * can be stream-copied (false). Copy preserves surround and needs EVERY track to
- * be natively decodable and fMP4-copy-safe here. Unprobed audio must be AAC:
- * stream-copying a codec the browser cannot decode stalls the load on
- * `HAVE_NOTHING`.
+ * can be handed to the server's copy path (false), which stream-copies what the
+ * device decodes and re-encodes the rest to the surround target the device
+ * declares. Every track must be either copyable here or have a surround target.
+ * Unprobed audio must be AAC: stream-copying a codec the browser cannot decode
+ * stalls the load on `HAVE_NOTHING`.
  */
 export function masterNeedsAac(
   item: MediaItem,
@@ -72,7 +107,7 @@ export function masterNeedsAac(
   const tracks = audioTracksOf(item);
   if (tracks.length === 0) return true;
   return !tracks.every(
-    (t) => !!t.codec && canDecodeAudioCodec(t.codec, caps) && FMP4_COPY_CODECS.has(t.codec),
+    (t) => !!t.codec && t.codec !== UNNAMED_CODEC && (copyable(t, caps) || surroundTargetFor(t, caps) !== null),
   );
 }
 

@@ -3,14 +3,13 @@ use crate::lifecycle::test_fixtures::{param, req, req_by, user};
 use crate::lifecycle::test_support::{seed_movie_item, seed_show, test_host};
 
 #[test]
-fn only_the_four_outcomes_worth_interrupting_someone_for_notify() {
+fn only_the_outcomes_worth_interrupting_someone_for_stay_loud() {
     let host = test_host();
     let silent = [
         RequestStatus::Pending,
         RequestStatus::Searching,
         RequestStatus::Downloading,
         RequestStatus::Importing,
-        RequestStatus::Failed,
     ];
     for status in silent {
         notify_requester(
@@ -57,6 +56,29 @@ fn only_the_four_outcomes_worth_interrupting_someone_for_notify() {
     assert_eq!(sent[0].1.title_key, "notifications.request.approved.title");
     assert_eq!(sent[1].1.body_key, "notifications.request.denied.body");
     assert_eq!(sent[2].1.title_key, "notifications.request.available.title");
+}
+
+#[test]
+fn a_failed_request_tells_its_requester_and_the_managers_once_each() {
+    let host = test_host();
+    let failed = req_by(RequestKind::Movie, RequestStatus::Failed, "u1");
+
+    notify_requester(&host, &failed, RequestStatus::Failed, "/requests");
+
+    let sent = host.notifications();
+    assert_eq!(sent.len(), 2);
+    assert_eq!(sent[0].0, Audience::user("u1"));
+    assert_eq!(sent[0].1.event, NotificationEvent::RequestFailed);
+    assert_eq!(sent[0].1.body_key, "notifications.request.failed.body");
+    assert_eq!(sent[0].1.link.as_deref(), Some("/requests"));
+    assert_eq!(sent[1].0, Audience::permission(Permission::RequestsManage));
+    assert_eq!(sent[1].1.body_key, "notifications.request.failed.managerBody");
+    assert_eq!(sent[0].1.dedupe_key, sent[1].1.dedupe_key);
+    assert!(sent[0]
+        .1
+        .dedupe_key
+        .as_deref()
+        .is_some_and(|key| key.starts_with("request.failed:")));
 }
 
 #[test]

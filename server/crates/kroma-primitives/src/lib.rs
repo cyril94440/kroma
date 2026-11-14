@@ -7,6 +7,7 @@ pub mod external_subtitles;
 pub mod input;
 pub mod language;
 pub mod pcm;
+pub mod remote_file;
 pub mod video;
 
 use std::fs::File;

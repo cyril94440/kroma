@@ -6,7 +6,7 @@ import { RequestId, RequestKind, RequestStatus } from '../requests';
 import type { Notification } from './schemas';
 
 /** `request.submitted` · `request.approved` · `request.denied` ·
- * `request.available`. */
+ * `request.available` · `request.failed`. */
 export const RequestEventData = z.object({
   requestId: RequestId,
   kind: RequestKind,
@@ -50,6 +50,7 @@ const BY_EVENT = {
   'request.approved': RequestEventData,
   'request.denied': RequestEventData,
   'request.available': RequestEventData,
+  'request.failed': RequestEventData,
   'media.added': MediaAddedData,
   'media.episode': MediaEpisodeData,
   'report.submitted': ReportEventData,

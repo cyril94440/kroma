@@ -3,6 +3,7 @@
 //! guess; a file ffprobe itself refused is recorded as unreadable instead.
 
 mod ffprobe_output;
+mod hdr10plus;
 mod parse;
 mod run;
 

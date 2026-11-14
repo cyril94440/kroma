@@ -22,6 +22,7 @@ to them:
 |---|---|
 | Someone requested a title | Admins who handle requests |
 | A request was approved, denied, or became watchable | The person who requested it |
+| A request could not be fulfilled after several attempts | The person who requested it, and the admins who handle requests |
 | New titles arrived in the library | Everyone |
 | New episodes of a show arrived | The people following that show |
 | A report was filed | Admins who handle reports |

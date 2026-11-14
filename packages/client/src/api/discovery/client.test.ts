@@ -18,9 +18,27 @@ describe('the discovery endpoints', () => {
     },
     {
       name: 'trending',
-      call: (c) => c.discovery.trending(),
+      call: (c) => c.discovery.list('trending'),
       method: 'GET',
       path: '/discover/trending',
+    },
+    {
+      name: 'a list narrowed to one kind and page',
+      call: (c) => c.discovery.list('top-rated', { type: 'tv', page: 3 }),
+      method: 'GET',
+      path: '/discover/top-rated?type=tv&page=3',
+    },
+    {
+      name: 'genres',
+      call: (c) => c.discovery.genres('movie'),
+      method: 'GET',
+      path: '/discover/genres?type=movie',
+    },
+    {
+      name: 'a genre',
+      call: (c) => c.discovery.genre(28, 'movie', 2),
+      method: 'GET',
+      path: '/discover/genre/28?type=movie&page=2',
     },
     {
       name: 'detail',
@@ -35,6 +53,22 @@ describe('the discovery endpoints', () => {
       path: '/discover/tv/1399/season/2',
     },
   ])('$name', checkEndpoint);
+});
+
+describe('the genre list', () => {
+  it('reads the genres a server names', async () => {
+    const { client } = recordingClient(() => ({ json: { genres: [{ id: 28, name: 'Action' }] } }));
+
+    await expect(client.discovery.genres('movie')).resolves.toEqual({
+      genres: [{ id: 28, name: 'Action' }],
+    });
+  });
+
+  it('refuses a genre without a name', async () => {
+    const { client } = recordingClient(() => ({ json: { genres: [{ id: 28 }] } }));
+
+    await expect(client.discovery.genres('movie')).rejects.toThrow();
+  });
 });
 
 describe('a season of a show', () => {

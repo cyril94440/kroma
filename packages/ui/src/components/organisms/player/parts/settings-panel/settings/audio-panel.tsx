@@ -1,4 +1,4 @@
-import { channelLabel, langName } from '@kromatv/core';
+import { audioFormatName, channelLabel, langName } from '@kromatv/core';
 import { Text } from '#ui/components/atoms/text';
 import { useStyles } from '#ui/core';
 import { useT } from '#ui/services/i18n';
@@ -35,7 +35,7 @@ export function AudioPanel({ tracks, current, onSelect, onBack }: Readonly<Audio
     <FocusColumn style={panelScoped.panelList}>
       {tracks.map((a, i) => {
         const ch = channelLabel(a.channels);
-        const codec = a.codec.toUpperCase();
+        const codec = audioFormatName(a);
         return (
           <SelectRow
             key={a.index}

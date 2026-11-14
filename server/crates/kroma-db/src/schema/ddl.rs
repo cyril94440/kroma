@@ -707,7 +707,8 @@ pub(crate) const SCHEMA: &str = "
 pub(crate) const FILE_COLS: &str = "id,rel_path,container,size,edition,probed,\
     duration_ms,v_codec,v_width,v_height,v_hdr,v_bit_depth,\
     a_codec,a_channels,a_language,subtitles,abs_path,audio_tracks,unreadable,\
-    v_hdr_format,v_dv_profile,v_color_primaries,v_color_transfer,v_color_matrix";
+    v_hdr_format,v_dv_profile,v_color_primaries,v_color_transfer,v_color_matrix,\
+    v_dv_level,v_dv_compat,v_dv_el";
 
 /// Explicit column list for item SELECTs keeps [`crate::row_to_item`] index-stable.
 /// `metadata` is appended last (index 21).

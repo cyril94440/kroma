@@ -19,7 +19,7 @@ import {
 // so each file stays small and every branch reads as its own named piece.
 
 import type { AudioTrack, MediaFile, SubtitleTrack, VideoTrack } from '@kromatv/client/media';
-import { channelLabel, codecLabel, langName } from '@kromatv/core';
+import { audioFormatName, channelLabel, codecLabel, hdrLabel, langName } from '@kromatv/core';
 import { useFormat, useT } from '@kromatv/ui';
 
 import { IconFileInfo } from '@tabler/icons-react';
@@ -177,7 +177,7 @@ function VideoLine({ video }: Readonly<{ video: VideoTrack }>) {
       parts={[
         codecLabel(video.codec),
         video.width && video.height ? `${video.width}×${video.height}` : null,
-        video.hdr ? 'HDR' : null,
+        hdrLabel(video),
         video.bitDepth ? `${video.bitDepth} ${t('mediaInfo.bit')}` : null,
       ]}
     />
@@ -191,7 +191,7 @@ function AudioLine({ track }: Readonly<{ track: AudioTrack }>) {
       badge={track.default ? t('mediaInfo.default') : null}
       parts={[
         langName(t, track.language) ?? track.language ?? null,
-        codecLabel(track.codec),
+        audioFormatName(track),
         channelLabel(track.channels),
         track.title ?? null,
       ]}

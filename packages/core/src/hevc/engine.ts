@@ -1,8 +1,23 @@
 import type { MediaItem } from '@kromatv/client/media';
-import { audioTracksOf, canDecodeAudioCodec, masterNeedsAac } from './audio-support';
+import {
+  audioTracksOf,
+  canDecodeAudioCodec,
+  decodesSelectedAudio,
+  masterNeedsAac,
+} from './audio-support';
 import type { PlaybackCapabilities } from './capabilities';
+import { capabilities } from './capabilities';
 import { canDirectPlay } from './directplay';
-import { MSE_CAPS, NATIVE_TV_CAPS, SAFARI_CAPS } from './runtime-caps';
+import {
+  ANDROID_TV_CAPS,
+  APPLE_TV_CAPS,
+  AVPLAY_HLS_CAPS,
+  MPV_CAPS,
+  MSE_CAPS,
+  SAFARI_CAPS,
+  TIZEN_CAPS,
+  WEBOS_CAPS,
+} from './runtime-caps';
 
 export type PlayerEngineKind = 'direct' | 'web-mse' | 'tizen-avplay' | 'webos' | 'desktop-mpv';
 
@@ -37,12 +52,15 @@ function plainCompatibleMp4(item: MediaItem, caps: PlaybackCapabilities): boolea
 const AVPLAY_CONTAINERS = new Set(['mp4', 'mov', 'm4v', 'mkv', 'webm', 'ts', 'm2ts']);
 
 /** Whether Tizen's native AVPlay can play the ORIGINAL file with no server
- * remux. Audio is not a gate; the engine falls back to the HLS master on a real
- * playback error. */
-export function avplayDirectPlayable(item: MediaItem): boolean {
+ * remux: the container, the picture and the track it opens on all have to be
+ * ones this set takes. */
+export function avplayDirectPlayable(item: MediaItem, audioIndex?: number): boolean {
   const container = (item.container ?? '').toLowerCase();
   if (!AVPLAY_CONTAINERS.has(container)) return false;
-  return canDirectPlay(item, NATIVE_TV_CAPS).canDirectPlay;
+  return (
+    canDirectPlay(item, TIZEN_CAPS).canDirectPlay &&
+    decodesSelectedAudio(item, TIZEN_CAPS, audioIndex)
+  );
 }
 
 // AVFoundation demuxes the QuickTime/MP4 family and nothing else: no Matroska,
@@ -52,6 +70,13 @@ const APPLE_CONTAINERS = new Set(['mp4', 'mov', 'm4v']);
 // LG's AV format tables for webOS TV name the QuickTime family, Matroska and
 // MPEG-TS; WebM and M2TS are in none of them, so those take the remux.
 const LG_CONTAINERS = new Set(['mp4', 'mov', 'm4v', 'mkv', 'ts']);
+
+const NATIVE_CAPS = {
+  ios: APPLE_TV_CAPS,
+  android: ANDROID_TV_CAPS,
+  tizen: TIZEN_CAPS,
+  webos: WEBOS_CAPS,
+} as const;
 
 const NATIVE_CONTAINERS = {
   ios: APPLE_CONTAINERS,
@@ -66,10 +91,15 @@ const NATIVE_CONTAINERS = {
  * ORIGINAL file rather than the server's remux. Split by platform because
  * container support is where the players differ.
  */
-export function nativeDirectPlayable(item: MediaItem, os: keyof typeof NATIVE_CONTAINERS): boolean {
+export function nativeDirectPlayable(
+  item: MediaItem,
+  os: keyof typeof NATIVE_CONTAINERS,
+  audioIndex?: number,
+): boolean {
   const container = (item.container ?? '').toLowerCase();
   if (!NATIVE_CONTAINERS[os].has(container)) return false;
-  return canDirectPlay(item, NATIVE_TV_CAPS).canDirectPlay;
+  const caps = NATIVE_CAPS[os];
+  return canDirectPlay(item, caps).canDirectPlay && decodesSelectedAudio(item, caps, audioIndex);
 }
 
 /**
@@ -85,7 +115,7 @@ export function selectEngine(item: MediaItem, env: PlayEnv): EngineDecision {
     return { kind: 'tizen-avplay', aacMaster: false };
   }
   if (env.platform === 'webos') {
-    if (plainCompatibleMp4(item, NATIVE_TV_CAPS)) return { kind: 'direct', aacMaster: false };
+    if (plainCompatibleMp4(item, WEBOS_CAPS)) return { kind: 'direct', aacMaster: false };
     // The webOS MSE/hls.js path cannot decode AC3/EAC3; the TV's native pipeline can.
     return { kind: 'webos', aacMaster: !env.nativeHls };
   }
@@ -94,5 +124,13 @@ export function selectEngine(item: MediaItem, env: PlayEnv): EngineDecision {
   // hardware-decodes HEVC in a bare `<video>` where available.
   if (plainCompatibleMp4(item, env.runtimeCaps ?? caps))
     return { kind: 'direct', aacMaster: false };
-  return { kind: 'web-mse', aacMaster: masterNeedsAac(item, caps) };
+  return { kind: 'web-mse', aacMaster: masterNeedsAac(item, env.runtimeCaps ?? caps) };
+}
+
+/** The capability table of the plane a title is drawn on: mpv and AVPlay decode
+ * on their own, so the runtime the page was probed in says nothing about them. */
+export function surfaceCapabilities(surface: string): PlaybackCapabilities {
+  if (surface === 'mpv') return MPV_CAPS;
+  if (surface === 'avplay') return AVPLAY_HLS_CAPS;
+  return capabilities();
 }

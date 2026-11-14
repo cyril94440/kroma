@@ -37,8 +37,14 @@ describe('the cache keys', () => {
     expect(catalogQueries.showBundle(ShowId.parse('a')).queryKey).not.toEqual(
       catalogQueries.showBundle(ShowId.parse('b')).queryKey,
     );
-    expect(discoverQueries.trending('movie', 1).queryKey).not.toEqual(
-      discoverQueries.trending('movie', 2).queryKey,
+    expect(discoverQueries.list('popular', 'movie', 1).queryKey).not.toEqual(
+      discoverQueries.list('popular', 'movie', 2).queryKey,
+    );
+    expect(discoverQueries.list('popular', 'movie', 1).queryKey).not.toEqual(
+      discoverQueries.list('upcoming', 'movie', 1).queryKey,
+    );
+    expect(discoverQueries.genre(28, 'movie', 1).queryKey).not.toEqual(
+      discoverQueries.genre(35, 'movie', 1).queryKey,
     );
     expect(discoverQueries.detail('movie', 603).queryKey).not.toEqual(
       discoverQueries.detail('tv', 603).queryKey,
@@ -127,18 +133,20 @@ describe('the plain reads', () => {
     ['server.splash', () => serverQueries.splash(), c.media.splash],
     ['discover.detail', () => discoverQueries.detail('movie', 603), c.discovery.detail],
     [
-      'discover.trending',
-      () => discoverQueries.trending('movie', 2),
-      c.discovery.trending,
-      { type: 'movie', page: 2 },
+      'discover.list',
+      () => discoverQueries.list('popular', 'movie', 2),
+      c.discovery.list,
+      ['popular', { type: 'movie', page: 2 }],
     ],
+    ['discover.genres', () => discoverQueries.genres('tv'), c.discovery.genres, ['tv']],
+    ['discover.genre', () => discoverQueries.genre(18, 'tv', 2), c.discovery.genre, [18, 'tv', 2]],
   ];
 
   it.each(cases)('%s reaches the endpoint it names', async (_name, build, endpoint, arg) => {
     endpoint.mockResolvedValue('payload');
     await run(build());
     expect(endpoint).toHaveBeenCalledTimes(1);
-    if (arg !== undefined) expect(endpoint).toHaveBeenCalledWith(arg);
+    if (arg !== undefined) expect(endpoint).toHaveBeenCalledWith(...(Array.isArray(arg) ? arg : [arg]));
   });
 });
 

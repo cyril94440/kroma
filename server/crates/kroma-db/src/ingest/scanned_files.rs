@@ -40,14 +40,16 @@ pub(super) fn sync_files(
              v_height=NULL, v_hdr=NULL, v_bit_depth=NULL, a_codec=NULL, a_channels=NULL, \
              a_language=NULL, subtitles='[]', audio_tracks='[]', unreadable=NULL, \
              v_hdr_format=NULL, v_dv_profile=NULL, v_color_primaries=NULL, \
-             v_color_transfer=NULL, v_color_matrix=NULL",
+             v_color_transfer=NULL, v_color_matrix=NULL, v_dv_level=NULL, v_dv_compat=NULL, \
+             v_dv_el=NULL",
     )?;
     // Pre-probed files (demo/seed content) skip the phase-2 probe pass.
     let mut preprobed_stmt = tx.prepare(
         "INSERT INTO files (id,item_id,abs_path,rel_path,container,size,mtime,edition,probed,\
              duration_ms,v_codec,v_width,v_height,v_hdr,v_bit_depth,a_codec,a_channels,a_language,subtitles,audio_tracks,\
-             v_hdr_format,v_dv_profile,v_color_primaries,v_color_transfer,v_color_matrix) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24) \
+             v_hdr_format,v_dv_profile,v_color_primaries,v_color_transfer,v_color_matrix,\
+             v_dv_level,v_dv_compat,v_dv_el) \
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27) \
          ON CONFLICT(abs_path) DO UPDATE SET \
              id=excluded.id, item_id=excluded.item_id, rel_path=excluded.rel_path, \
              container=excluded.container, size=excluded.size, mtime=excluded.mtime, \
@@ -58,7 +60,8 @@ pub(super) fn sync_files(
              audio_tracks=excluded.audio_tracks, unreadable=NULL, \
              v_hdr_format=excluded.v_hdr_format, v_dv_profile=excluded.v_dv_profile, \
              v_color_primaries=excluded.v_color_primaries, v_color_transfer=excluded.v_color_transfer, \
-             v_color_matrix=excluded.v_color_matrix",
+             v_color_matrix=excluded.v_color_matrix, v_dv_level=excluded.v_dv_level, \
+             v_dv_compat=excluded.v_dv_compat, v_dv_el=excluded.v_dv_el",
     )?;
 
     for i in items {
@@ -171,6 +174,9 @@ fn upsert_scanned_file<'a>(
             color.and_then(|c| c.primaries.clone()),
             color.and_then(|c| c.transfer.clone()),
             color.and_then(|c| c.matrix.clone()),
+            v.and_then(|v| v.dolby_vision_level),
+            v.and_then(|v| v.dolby_vision_compatibility),
+            v.and_then(|v| v.dolby_vision_enhancement_layer.then_some(1)),
         ])?;
         return Ok(());
     }

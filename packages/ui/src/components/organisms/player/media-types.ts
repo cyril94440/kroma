@@ -19,6 +19,8 @@ export interface PlayerAudioTrack {
   language: string | null;
   title?: string | null;
   default: boolean;
+  profile?: string | null;
+  spatial?: 'atmos' | 'dtsx' | null;
 }
 
 /** The picture, as the stats panel reports it. */

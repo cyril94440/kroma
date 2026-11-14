@@ -6,6 +6,10 @@ import { RequestId, RequestKind, RequestStatus } from '../requests';
 export const DiscoverType = z.enum(['movie', 'tv', 'all']);
 export type DiscoverType = z.infer<typeof DiscoverType>;
 
+/** The named TMDB lists a person can browse; each path segment is the name. */
+export const DiscoverList = z.enum(['trending', 'popular', 'upcoming', 'top-rated']);
+export type DiscoverList = z.infer<typeof DiscoverList>;
+
 /** The route vocabulary a TMDB detail is fetched under, which is TMDB's split
  * rather than the catalog's. */
 export const TmdbKind = DiscoverType.exclude(['all']);
@@ -78,7 +82,15 @@ export type DiscoverEpisode = z.infer<typeof DiscoverEpisode>;
 export const DiscoverSeasonEpisodes = z.object({ episodes: z.array(DiscoverEpisode) });
 export type DiscoverSeasonEpisodes = z.infer<typeof DiscoverSeasonEpisodes>;
 
-/** `GET /api/discover/search` / `GET /api/discover/trending`. */
+/** One genre TMDB files titles under, named in the reader's language. */
+export const DiscoverGenre = z.object({ id: z.number(), name: z.string() });
+export type DiscoverGenre = z.infer<typeof DiscoverGenre>;
+
+/** `GET /api/discover/genres`. */
+export const DiscoverGenres = z.object({ genres: z.array(DiscoverGenre) });
+export type DiscoverGenres = z.infer<typeof DiscoverGenres>;
+
+/** `GET /api/discover/search` and every list under `/api/discover`. */
 export const DiscoverResponse = z.object({
   results: z.array(DiscoverEntry),
   page: z.number(),

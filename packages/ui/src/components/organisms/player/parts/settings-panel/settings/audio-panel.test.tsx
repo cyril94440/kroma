@@ -38,7 +38,7 @@ describe('AudioPanel', () => {
       />,
     );
     expect(screen.getByText('TrueHD 7.1')).toBeTruthy();
-    expect(screen.getByText('TRUEHD · 7.1')).toBeTruthy();
+    expect(screen.getByText('Dolby TrueHD · 7.1')).toBeTruthy();
     expect(screen.getByText('French')).toBeTruthy();
   });
 

@@ -13,6 +13,7 @@ use rusqlite::params;
 use crate::auto::title_kind;
 use crate::rules::blocklist::{self, Blocked};
 
+mod give_up;
 mod progress;
 
 const HOUR_MS: i64 = 60 * 60 * 1000;
@@ -22,6 +23,7 @@ pub struct FailureSummary {
     pub stalled: usize,
     pub blocklisted: usize,
     pub missing_again: usize,
+    pub requests_failed: usize,
 }
 
 /// One download as this pass reads it from the shared ledger.
@@ -101,6 +103,7 @@ pub fn failure_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<F
             summary.blocklisted += 1;
         }
     }
+    summary.requests_failed = give_up::fail_exhausted_requests(state, log)?;
     let conn = state.db().get()?;
     let grabbed = kroma_module_sdk::db::wanted_in_status(&conn, "grabbed")?;
     drop(conn);

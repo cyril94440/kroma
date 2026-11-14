@@ -78,6 +78,9 @@ mod tests {
             title: None,
             default,
             region: None,
+            profile: None,
+            layout: None,
+            spatial: None,
         }
     }
 

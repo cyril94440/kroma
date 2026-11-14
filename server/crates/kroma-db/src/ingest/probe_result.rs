@@ -31,7 +31,8 @@ pub fn set_file_probe(pool: &Pool, file_id: &str, probe: &FileProbe) -> Result<(
             v_codec=?3, v_width=?4, v_height=?5, v_hdr=?6, v_bit_depth=?7, \
             a_codec=?8, a_channels=?9, a_language=?10, subtitles=?11, audio_tracks=?12, \
             unreadable=?13, v_hdr_format=?14, v_dv_profile=?15, \
-            v_color_primaries=?16, v_color_transfer=?17, v_color_matrix=?18 \
+            v_color_primaries=?16, v_color_transfer=?17, v_color_matrix=?18, \
+            v_dv_level=?19, v_dv_compat=?20, v_dv_el=?21 \
          WHERE id = ?1",
         params![
             file_id,
@@ -52,6 +53,9 @@ pub fn set_file_probe(pool: &Pool, file_id: &str, probe: &FileProbe) -> Result<(
             color.and_then(|c| c.primaries.clone()),
             color.and_then(|c| c.transfer.clone()),
             color.and_then(|c| c.matrix.clone()),
+            video.and_then(|v| v.dolby_vision_level),
+            video.and_then(|v| v.dolby_vision_compatibility),
+            video.and_then(|v| v.dolby_vision_enhancement_layer.then_some(1)),
         ],
     )?;
 

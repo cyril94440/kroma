@@ -10,7 +10,8 @@ use kroma_module_wire::VideoStream;
 
 use crate::input;
 
-use super::parse::build_result;
+use super::hdr10plus;
+use super::parse::{build_result, video_index};
 use super::ProbeResult;
 
 const REASON_CHARS: usize = 200;
@@ -60,7 +61,7 @@ pub fn probe_file(path: &Path, ffprobe_present: bool) -> Option<ProbeResult> {
         return Some(fallback_from_extension(path));
     }
     match run_ffprobe(path) {
-        Outcome::Read(result) => Some(*result),
+        Outcome::Read(result, video_stream) => Some(with_hdr10plus(path, *result, video_stream)),
         Outcome::Unreadable(reason) => Some(ProbeResult {
             unreadable: Some(reason),
             ..ProbeResult::default()
@@ -71,10 +72,17 @@ pub fn probe_file(path: &Path, ffprobe_present: bool) -> Option<ProbeResult> {
 }
 
 enum Outcome {
-    Read(Box<ProbeResult>),
+    Read(Box<ProbeResult>, Option<u32>),
     Unreadable(String),
     NotProbed,
     Killed,
+}
+
+fn with_hdr10plus(path: &Path, mut result: ProbeResult, stream: Option<u32>) -> ProbeResult {
+    if let (Some(video), Some(stream)) = (result.video.as_mut(), stream) {
+        hdr10plus::upgrade(video, || hdr10plus::first_frame_carries(path, stream));
+    }
+    result
 }
 
 // Failures log at DEBUG, not WARN: every worker probing every file would flood
@@ -114,7 +122,10 @@ fn outcome_of(path: &Path, exit_code: Option<i32>, stdout: &[u8], stderr: &[u8])
         return Outcome::Unreadable(reason);
     }
     match serde_json::from_slice(stdout) {
-        Ok(parsed) => Outcome::Read(Box::new(build_result(parsed))),
+        Ok(parsed) => {
+            let video_stream = video_index(&parsed);
+            Outcome::Read(Box::new(build_result(parsed)), video_stream)
+        }
         Err(e) => {
             debug!(file = %path.display(), error = %e, "failed to parse ffprobe JSON; using extension guess");
             Outcome::NotProbed
@@ -162,6 +173,9 @@ fn fallback_from_extension(path: &Path) -> ProbeResult {
             bit_depth: None,
             hdr_format: None,
             dolby_vision_profile: None,
+            dolby_vision_level: None,
+            dolby_vision_compatibility: None,
+            dolby_vision_enhancement_layer: false,
             color: None,
         }),
         ..ProbeResult::default()
@@ -175,7 +189,7 @@ mod tests {
     fn reason_of(outcome: Outcome) -> String {
         match outcome {
             Outcome::Unreadable(reason) => reason,
-            Outcome::Read(_) => panic!("a refusal must not read as a description"),
+            Outcome::Read(..) => panic!("a refusal must not read as a description"),
             Outcome::NotProbed => panic!("a refusal must not read as a missing probe"),
             Outcome::Killed => panic!("a refusal must not read as a killed probe"),
         }
@@ -241,7 +255,7 @@ mod tests {
 
         let outcome = outcome_of(Path::new("/media/x.mkv"), Some(0), stdout, b"");
 
-        let Outcome::Read(result) = outcome else {
+        let Outcome::Read(result, _) = outcome else {
             panic!("a parsable description must read as one");
         };
         assert_eq!(

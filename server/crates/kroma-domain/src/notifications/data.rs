@@ -10,7 +10,7 @@ use crate::reports::{ReportStatus, ReportSubjectKind};
 use crate::requests::{RequestKind, RequestStatus};
 
 /// `request.submitted` · `request.approved` · `request.denied` ·
-/// `request.available`.
+/// `request.available` · `request.failed`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestEventData {

@@ -37,7 +37,7 @@ export function useEngineDecision(item: MovieView): EngineChoice {
     if (forceHls || enginePref === 'remux' || enginePref === 'shaka') {
       return {
         kind: 'web-mse',
-        aacMaster: masterNeedsAac(item, env.safari ? SAFARI_CAPS : MSE_CAPS),
+        aacMaster: masterNeedsAac(item, env.runtimeCaps ?? (env.safari ? SAFARI_CAPS : MSE_CAPS)),
       };
     }
     if (enginePref === 'direct') return { kind: 'direct', aacMaster: false };

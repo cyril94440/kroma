@@ -1,6 +1,8 @@
 import type { Query, RequestContext } from '../../core/client';
 import {
   DiscoverDetail,
+  DiscoverGenres,
+  type DiscoverList,
   DiscoverResponse,
   DiscoverSeasonEpisodes,
   type DiscoverType,
@@ -27,7 +29,8 @@ export function discoverQuery({ type = 'all', page }: DiscoverPage = {}): Query 
 }
 
 /** TMDB discovery for the request flow: search titles the library may not have,
- * trending for the empty state, and a title detail with its season list. */
+ * the browsable lists and genres for the empty state, and a title detail with
+ * its season list. */
 export default function discoveryApi(ctx: RequestContext) {
   return {
     search: (query: string, opts?: DiscoverPage) =>
@@ -35,9 +38,21 @@ export default function discoveryApi(ctx: RequestContext) {
         query: { q: query, ...discoverQuery(opts) },
       }),
 
-    trending: (opts?: DiscoverPage) =>
-      ctx.get('/discover/trending', DiscoverResponse, {
+    list: (list: DiscoverList, opts?: DiscoverPage) =>
+      ctx.get('/discover/:list', DiscoverResponse, {
+        params: { list },
         query: discoverQuery(opts),
+        concurrency: 'share',
+      }),
+
+    /** The genres of one kind; `all` has none, so the caller names movie or tv. */
+    genres: (type: TmdbKind) =>
+      ctx.get('/discover/genres', DiscoverGenres, { query: { type } }),
+
+    genre: (genreId: number, type: TmdbKind, page?: number) =>
+      ctx.get('/discover/genre/:genreId', DiscoverResponse, {
+        params: { genreId },
+        query: { type, page: beyondFirst(page) },
         concurrency: 'share',
       }),
 

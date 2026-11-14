@@ -5,27 +5,17 @@ import {
   Box,
   Button,
   classes,
+  qualityTone,
   Row,
   Skeleton,
   styles,
   Text,
   useStyles,
 } from '@kromatv/ui/kit';
-import type { MovieCardView } from '#web/shared/lib/api';
+import { qualityBadges } from '#web/shared/lib/quality-badges';
 import type { HeroEntry } from '#web/shared/lib/queries';
 import { Image } from '#web/shared/ui';
 import { RouteLink } from '#web/shared/ui/route-link';
-
-type HeroBadge = '4K' | 'HDR' | 'H.265';
-
-function heroBadges(v: MovieCardView['video']): HeroBadge[] {
-  if (!v) return [];
-  const out: HeroBadge[] = [];
-  if ((v.width ?? 0) >= 3840) out.push('4K');
-  if (v.hdr) out.push('HDR');
-  if (v.codec === 'hevc') out.push('H.265');
-  return out;
-}
 
 // Bled to the content edges (cancels the page gutter) and faded into the rails
 // below. The gutter is a fluid CSS custom property, which no style number can
@@ -76,7 +66,7 @@ export function Hero({ entry }: Readonly<{ entry: HeroEntry }>) {
   const colors = posterColors(media.id);
   const gradient = `linear-gradient(158deg, ${colors[0]}, ${colors[1]})`;
   const meta = media.metadata;
-  const badges = heroBadges(media.video);
+  const badges = qualityBadges(media.video);
   const line =
     entry.type === 'movie'
       ? metaLine(entry.movie)
@@ -112,7 +102,7 @@ export function Hero({ entry }: Readonly<{ entry: HeroEntry }>) {
             {line}
           </Text>
           {badges.map((b) => (
-            <Badge key={b} tone={b}>
+            <Badge key={b} tone={qualityTone(b)}>
               {b}
             </Badge>
           ))}

@@ -17,6 +17,9 @@ pub(super) fn video() -> VideoStream {
         bit_depth: Some(10),
         hdr_format: None,
         dolby_vision_profile: None,
+        dolby_vision_level: None,
+        dolby_vision_compatibility: None,
+        dolby_vision_enhancement_layer: false,
         color: None,
     }
 }

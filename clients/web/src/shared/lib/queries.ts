@@ -1,7 +1,7 @@
 // Central query-options factory: one place for every query key + fetcher, so
 // route loaders (`ensureQueryData`) and components (`useSuspenseQuery`/`useQuery`)
 // share the exact same cache entry.
-import type { DiscoverDetail, DiscoverType } from '@kromatv/client/discovery';
+import type { DiscoverDetail, DiscoverList, DiscoverType, TmdbKind } from '@kromatv/client/discovery';
 import type { ItemId, Show, ShowDetail, ShowId, UpNext } from '@kromatv/client/media';
 import type { QueryClient } from '@kromatv/client/query';
 import { genreSlugs } from '@kromatv/core';
@@ -197,7 +197,13 @@ export function createQueries(client: QueryClient) {
 
     season: (tmdbId: number, season: number) => client.query.discovery.season(tmdbId, season),
 
-    trending: (type: DiscoverType, page: number) => client.query.discovery.trending({ type, page }),
+    list: (list: DiscoverList, type: DiscoverType, page: number) =>
+      client.query.discovery.list(list, { type, page }),
+
+    genres: (type: TmdbKind) => client.query.discovery.genres(type),
+
+    genre: (genreId: number, type: TmdbKind, page: number) =>
+      client.query.discovery.genre(genreId, type, page),
   } as const;
 
   return { catalogQueries, userQueries, serverQueries, discoverQueries };

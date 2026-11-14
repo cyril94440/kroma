@@ -123,6 +123,7 @@ const EVENT_META: Record<(typeof KNOWN_NOTIFICATION_EVENTS)[number], EventMeta> 
   'request.approved': { icon: 'circle-check', fg: 'success' },
   'request.denied': { icon: 'circle-x', fg: 'dangerHover' },
   'request.available': { icon: 'sparkles', fg: 'accent' },
+  'request.failed': { icon: 'alert-triangle', fg: 'dangerHover' },
   'media.added': { icon: 'player-play-filled', fg: 'info' },
   'media.episode': { icon: 'device-tv', fg: 'info' },
   'report.submitted': { icon: 'flag-3', fg: 'hdr' },

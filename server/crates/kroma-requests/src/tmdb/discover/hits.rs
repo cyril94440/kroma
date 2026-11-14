@@ -36,36 +36,6 @@ pub fn search(
     Ok(map_page(resp, scope))
 }
 
-/// This week's trending titles. `All` (movies + shows, page 1) powers the
-/// discover empty-state rails; the scoped variants back the full "trending
-/// movies" / "trending shows" pages with real pagination.
-// The `()` Err is the unit error threaded up from `tmdb_json` via `?`; callers only
-// care ok/err, so a richer error type would add nothing here.
-#[allow(clippy::result_unit_err)]
-pub fn trending(
-    api_key: &str,
-    language: &str,
-    scope: DiscoverScope,
-    page: u32,
-) -> Result<DiscoverPage, ()> {
-    let path = match scope {
-        DiscoverScope::Movies => "trending/movie/week",
-        DiscoverScope::Shows => "trending/tv/week",
-        DiscoverScope::All => "trending/all/week",
-    };
-    let params = vec![
-        ("language", language.to_string()),
-        ("page", page.max(1).to_string()),
-    ];
-    let resp: PageResp = tmdb_json(
-        super::super::PURPOSE,
-        &format!("{}/{path}", api()),
-        api_key,
-        &params,
-    )?;
-    Ok(map_page(resp, scope))
-}
-
 // Skips rows with no usable title.
 pub(super) fn hit_from(kind: RequestKind, h: RawHit) -> Option<DiscoverHit> {
     let title = h.title.or(h.name)?;
@@ -82,7 +52,7 @@ pub(super) fn hit_from(kind: RequestKind, h: RawHit) -> Option<DiscoverHit> {
     })
 }
 
-fn map_page(resp: PageResp, scope: DiscoverScope) -> DiscoverPage {
+pub(super) fn map_page(resp: PageResp, scope: DiscoverScope) -> DiscoverPage {
     let hits = resp
         .results
         .into_iter()

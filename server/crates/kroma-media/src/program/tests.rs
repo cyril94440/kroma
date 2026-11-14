@@ -18,6 +18,9 @@ fn video(codec: &str, width: u32, height: u32, bit_depth: Option<u32>) -> VideoS
         bit_depth,
         hdr_format: None,
         dolby_vision_profile: None,
+        dolby_vision_level: None,
+        dolby_vision_compatibility: None,
+        dolby_vision_enhancement_layer: false,
         color: None,
     }
 }
@@ -31,6 +34,9 @@ fn audio(index: u32, codec: &str) -> AudioStream {
         title: None,
         default: index == 0,
         region: None,
+        profile: None,
+        layout: None,
+        spatial: None,
     }
 }
 

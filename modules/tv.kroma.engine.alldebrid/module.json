@@ -1,0 +1,55 @@
+{
+  "$schema": "https://modules.kroma.tv/schemas/3/manifest.json",
+  "schemaVersion": 3,
+  "id": "tv.kroma.engine.alldebrid",
+  "name": "AllDebrid engine",
+  "version": "0.1.0",
+  "description": "AllDebrid as a download engine for the Downloads module. AllDebrid fetches the torrent on its servers, then KROMA copies the finished files onto this server for import.",
+  "engines": {
+    "server": ">=0.1.39"
+  },
+  "dependencies": {
+    "tv.kroma.torrents": ">=0.6.40"
+  },
+  "contributes": [
+    {
+      "point": "tv.kroma.torrents/client",
+      "id": "alldebrid",
+      "label": "AllDebrid",
+      "fields": [
+        {
+          "key": "password",
+          "label": "field.apiKey",
+          "type": "string",
+          "secret": true,
+          "required": true
+        }
+      ]
+    }
+  ],
+  "dataDirs": ["alldebrid"],
+  "permissions": {
+    "net": {
+      "connect": [
+        {
+          "purpose": "download-client",
+          "to": ["api.alldebrid.com"],
+          "ports": [443]
+        },
+        {
+          "purpose": "download-client.transfer",
+          "to": ["*.debrid.it", "*.alldeb.ovh", "*.alldebrid.com"],
+          "ports": [443]
+        },
+        {
+          "purpose": "torrent-file",
+          "to": ["public", "lan"]
+        }
+      ]
+    },
+    "fs": {
+      "read": ["module", "downloads"],
+      "write": ["module", "downloads"]
+    }
+  }
+}

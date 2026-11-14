@@ -10,7 +10,7 @@ import type { AudioTrack } from '@kromatv/client/media';
 import type { PlaybackMode } from '@kromatv/client/playback';
 import {
   attachHlsRecovery,
-  decodableVideoCodecs,
+  deviceDeclaration,
   type EngineDecision,
   hlsBufferConfig,
   itemBufferPlan,
@@ -180,9 +180,7 @@ export function attachMediaSource(
     decision.aacMaster,
     startSec,
     audioRel,
-    {
-      videoCodecs: decodableVideoCodecs(),
-    },
+    deviceDeclaration(),
   );
   let destroyed = false;
 

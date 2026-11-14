@@ -1,10 +1,12 @@
 //! `/api/discover/*` TMDB discovery for the request flow: search titles the
-//! library may not have, trending for the empty state, a title detail (with the
+//! library may not have, the trending / popular / upcoming / top-rated lists and
+//! genre browsing for the empty state, a title detail (with the
 //! season list for the picker) and one season's episodes. Every result is
 //! flagged against the local catalog + open requests so cards render Play /
 //! chip / Demander directly. Gated on `requests.create`.
 
 mod flags;
+mod lists;
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -30,14 +32,16 @@ use flags::{flag_detail, flag_hits};
 pub fn routes() -> Router<SharedState> {
     Router::new()
         .route("/discover/search", get(search))
-        .route("/discover/trending", get(trending))
+        .route("/discover/genres", get(lists::genres))
+        .route("/discover/genre/{genre_id}", get(lists::by_genre))
+        .route("/discover/{list}", get(lists::browse))
         .route("/discover/{kind}/{tmdb_id}", get(detail))
         .route("/discover/tv/{tmdb_id}/season/{season}", get(season))
 }
 
 // TMDB works zero-config via the built-in key, so absence means the operator
 // explicitly blanked it: surface that rather than a silent empty page.
-fn require_tmdb(state: &SharedState, user: &User) -> Result<String, Response> {
+pub(super) fn require_tmdb(state: &SharedState, user: &User) -> Result<String, Response> {
     state.config.tmdb_api_key.clone().ok_or_else(|| {
         lerr(
             i18n::user_locale(user),
@@ -47,7 +51,7 @@ fn require_tmdb(state: &SharedState, user: &User) -> Result<String, Response> {
     })
 }
 
-fn scope_from_type(kind: Option<&str>) -> discover::DiscoverScope {
+pub(super) fn scope_from_type(kind: Option<&str>) -> discover::DiscoverScope {
     match kind {
         Some("movie") => discover::DiscoverScope::Movies,
         Some("tv") | Some("show") => discover::DiscoverScope::Shows,
@@ -88,42 +92,6 @@ pub async fn search(
     let out = blocking(move || {
         let found = discover::search(&key, &lang, scope, &query, page)
             .map_err(|()| anyhow::anyhow!("TMDB search failed"))?;
-        let conn = state.db.get()?;
-        Ok(DiscoverResponse {
-            results: flag_hits(&conn, found.hits, &user)?,
-            page: found.page,
-            total_pages: found.total_pages,
-        })
-    })
-    .await?;
-    Ok(Json(out).into_response())
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TrendingParams {
-    #[serde(rename = "type", default)]
-    kind: Option<String>,
-    #[serde(default)]
-    page: Option<u32>,
-}
-
-/// `GET /api/discover/trending?type=&page=` this week's trending titles. No
-/// `type` = merged movies + shows (page 1) for the discover empty-state rails;
-/// `type=movie|tv` = a paginated single-kind list backing the full page.
-pub async fn trending(
-    State(state): State<SharedState>,
-    AskedLocale(reader): AskedLocale,
-    AuthUser(user): AuthUser,
-    Query(params): Query<TrendingParams>,
-) -> Result<Response, Response> {
-    require(&user, Permission::RequestsCreate)?;
-    let key = require_tmdb(&state, &user)?;
-    let lang = settings::metadata_language_for(&state.settings, &state.config, reader);
-    let scope = scope_from_type(params.kind.as_deref());
-    let page = params.page.unwrap_or(1);
-    let out = blocking(move || {
-        let found = discover::trending(&key, &lang, scope, page)
-            .map_err(|()| anyhow::anyhow!("TMDB trending failed"))?;
         let conn = state.db.get()?;
         Ok(DiscoverResponse {
             results: flag_hits(&conn, found.hits, &user)?,

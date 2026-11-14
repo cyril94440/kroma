@@ -1,5 +1,5 @@
 import type { ItemId } from '@kromatv/client/media';
-import { decodableVideoCodecs, type EngineDecision, streamRefusal } from '@kromatv/core';
+import { deviceDeclaration, type EngineDecision, streamRefusal } from '@kromatv/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StreamFailure } from '#web/features/playback/stream-failure';
 import { useWebRuntime } from '#web/shared/lib/web-runtime';
@@ -109,9 +109,7 @@ export function useStreamProbe({
       decision.aacMaster,
       anchor,
       audioIndex,
-      {
-        videoCodecs: decodableVideoCodecs(),
-      },
+      deviceDeclaration(),
     );
     fetch(url)
       .then((r) => {

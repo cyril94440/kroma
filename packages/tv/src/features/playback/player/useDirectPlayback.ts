@@ -21,6 +21,7 @@ export interface Playback {
   engineRef: React.RefObject<TvEngine | null>;
   objectRef: React.RefObject<HTMLObjectElement | null>;
   surface: Surface;
+  playbackMode: 'direct' | 'remux' | 'transcode';
   enginePref: EnginePref;
   setEngine: (p: EnginePref) => void;
   setPlaneRect: (rect: PlaneRect | null) => void;
@@ -180,6 +181,7 @@ export function useDirectPlayback(
     objectRef,
     engineRef,
     surface,
+    playbackMode,
     enginePref: engine.enginePref,
     setEngine: engine.setEngine,
     setPlaneRect,

@@ -4,6 +4,7 @@ import { useT, useThemeAudio } from '@kromatv/ui';
 import {
   BackButton,
   Badge,
+  qualityTone,
   Box,
   Button,
   classes,
@@ -213,7 +214,7 @@ export function DetailHero({
                 {meta}
               </Text>
               {badges.map((b) => (
-                <Badge key={b} tone={b}>
+                <Badge key={b} tone={qualityTone(b)}>
                   {b}
                 </Badge>
               ))}

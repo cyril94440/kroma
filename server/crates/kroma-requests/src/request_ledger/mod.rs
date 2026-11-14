@@ -228,6 +228,9 @@ fn video_of(file: &db::EpisodeOnDisk) -> Option<VideoStream> {
         bit_depth: file.bit_depth,
         hdr_format: None,
         dolby_vision_profile: None,
+        dolby_vision_level: None,
+        dolby_vision_compatibility: None,
+        dolby_vision_enhancement_layer: false,
         color: None,
     })
 }

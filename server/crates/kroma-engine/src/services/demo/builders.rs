@@ -1,5 +1,6 @@
 use crate::model::{
-    AudioStream, ColorInfo, HdrFormat, Kind, MediaFile, MediaItem, SubtitleTrack, VideoStream,
+    AudioStream, ColorInfo, HdrFormat, Kind, MediaFile, MediaItem, SpatialAudio, SubtitleTrack,
+    VideoStream,
 };
 use crate::services::scan::short_hash;
 
@@ -142,6 +143,9 @@ pub(super) fn video(
         bit_depth: Some(bit_depth),
         hdr_format,
         dolby_vision_profile: None,
+        dolby_vision_level: None,
+        dolby_vision_compatibility: None,
+        dolby_vision_enhancement_layer: false,
         color: Some(demo_color(hdr_format)),
     })
 }
@@ -169,7 +173,35 @@ pub(super) fn audio(codec: &str, channels: u32, language: Option<&str>) -> Audio
         title: None,
         default: false,
         region: None,
+        profile: None,
+        layout: None,
+        spatial: None,
     }
+}
+
+pub(super) fn with_profile(mut track: AudioStream, profile: &str, layout: &str) -> AudioStream {
+    track.profile = Some(profile.into());
+    track.layout = Some(layout.into());
+    track.spatial = [("atmos", SpatialAudio::Atmos), ("dts:x", SpatialAudio::Dtsx)]
+        .into_iter()
+        .find(|(name, _)| profile.to_ascii_lowercase().contains(name))
+        .map(|(_, spatial)| spatial);
+    track
+}
+
+pub(super) fn dolby_vision(
+    video: Option<VideoStream>,
+    profile: u32,
+    level: u8,
+    compatibility: u8,
+) -> Option<VideoStream> {
+    video.map(|v| VideoStream {
+        hdr_format: Some(HdrFormat::DolbyVision),
+        dolby_vision_profile: Some(profile),
+        dolby_vision_level: Some(level),
+        dolby_vision_compatibility: Some(compatibility),
+        ..v
+    })
 }
 
 pub(super) fn tracks(list: Vec<AudioStream>) -> Vec<AudioStream> {
@@ -212,6 +244,30 @@ mod tests {
     fn show_id_is_deterministic_and_case_insensitive() {
         assert_eq!(show_id("lib", "The Office"), show_id("lib", "the office"));
         assert_ne!(show_id("lib", "The Office"), show_id("other", "The Office"));
+    }
+
+    #[test]
+    fn a_profile_naming_atmos_marks_the_demo_track_spatial() {
+        let atmos = with_profile(
+            audio("truehd", 8, Some("eng")),
+            "Dolby TrueHD + Dolby Atmos",
+            "7.1",
+        );
+        let plain = with_profile(audio("eac3", 6, None), "Dolby Digital Plus", "5.1(side)");
+
+        assert_eq!(atmos.spatial, Some(SpatialAudio::Atmos));
+        assert_eq!(plain.spatial, None);
+        assert_eq!(plain.layout.as_deref(), Some("5.1(side)"));
+    }
+
+    #[test]
+    fn a_dolby_vision_demo_title_names_its_base_layer() {
+        let v = dolby_vision(video("hevc", 3840, 2160, Some(HdrFormat::Hdr10), 10), 8, 6, 1)
+            .unwrap();
+
+        assert_eq!(v.hdr_format, Some(HdrFormat::DolbyVision));
+        assert_eq!(v.dolby_vision_compatibility, Some(1));
+        assert!(v.hdr);
     }
 
     #[test]

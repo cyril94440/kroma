@@ -2380,6 +2380,8 @@ dependencies = [
  "getrandom 0.3.4",
  "hex",
  "kroma-testing",
+ "serde",
+ "serde_json",
  "sha2 0.10.9",
  "time",
 ]
@@ -2442,6 +2444,7 @@ dependencies = [
  "kroma-module-kernel",
  "kroma-module-manifest",
  "kroma-module-supervisor",
+ "kroma-requests",
  "kroma-testing",
  "libmimalloc-sys",
  "mimalloc",

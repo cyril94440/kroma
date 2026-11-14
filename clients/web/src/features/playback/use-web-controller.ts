@@ -1,9 +1,10 @@
 import {
   audioTrackLabel,
+  capabilities,
   declaredAspect,
   pictureBadge,
   refineTrackLang,
-  streamNotice,
+  streamNotices,
 } from '@kromatv/core';
 import type { Translate } from '@kromatv/i18n';
 import {
@@ -191,15 +192,17 @@ export function useWebController(item: MovieView): WebController {
   const qualities = useMemo(() => {
     const badge = pictureBadge(item.video);
     const badgeSuffix = badge ? ` · ${badge}` : '';
-    const notice = streamNotice(item, pb.mode);
+    const note = streamNotices(item, pb.mode, capabilities(), pb.audioIndex)
+      .map((n) => t(n.messageKey, n.messageVars))
+      .join(' · ');
     return [
       {
         id: 'auto',
         label: `${t('player.qualityAuto')}${badgeSuffix}`,
-        note: notice ? t(notice.messageKey, notice.messageVars) : undefined,
+        note: note || undefined,
       },
     ];
-  }, [item, pb.mode, t]);
+  }, [item, pb.mode, pb.audioIndex, t]);
 
   const failure = pb.failure ? failureCopy(t, pb.failure) : null;
 

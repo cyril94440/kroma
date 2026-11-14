@@ -1,6 +1,7 @@
 import type { MediaFile, MediaItem } from '@kromatv/client/media';
 import type { MessageKey, TVars } from '@kromatv/i18n';
 import { capabilities, type FrameSize, type PlaybackCapabilities } from './capabilities';
+import { pictureOutcome } from './dolby-vision';
 
 export interface DirectPlayVerdict {
   canDirectPlay: boolean;
@@ -139,25 +140,16 @@ function nameless(item: MediaItem, file: MediaFile | undefined): boolean {
   return probed && (item.video?.codec ?? UNNAMED_CODEC) === UNNAMED_CODEC;
 }
 
-// Dolby Vision profiles whose base layer is not a picture on its own. A device
-// with no Dolby Vision decoder draws 5 and 7 in the wrong colours rather than
-// merely without the dynamic metadata, which 8 and 9 degrade to cleanly.
-const DV_WITHOUT_A_BASE_LAYER: ReadonlySet<number> = new Set([5, 7]);
-
 /**
- * Whether this device can draw the stream's exact HDR variant, which is not the
- * same question as whether it can decode the codec. Only Dolby Vision without a
- * compatible base layer answers false: every other variant has one, so a device
- * that cannot read the dynamic metadata still draws the picture.
+ * Whether this device can put the stream's HDR variant on screen at all, which
+ * is not the same question as whether it can decode the codec. Only Dolby Vision
+ * with no compatible base layer answers false.
  */
 export function canRenderHdr(
   item: MediaItem,
   caps: PlaybackCapabilities = capabilities(),
 ): boolean {
-  const video = item.video;
-  if (video?.hdrFormat !== 'dolbyVision' || caps.hdr.dolbyVision) return true;
-  const profile = video.dolbyVisionProfile;
-  return profile == null || !DV_WITHOUT_A_BASE_LAYER.has(profile);
+  return pictureOutcome(item.video, caps).kind !== 'refused';
 }
 
 function depthVerdict(options: {

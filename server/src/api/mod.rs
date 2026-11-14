@@ -76,6 +76,8 @@ mod it_cast;
 #[cfg(test)]
 mod it_content;
 #[cfg(test)]
+mod it_discover_lists;
+#[cfg(test)]
 mod it_diagnostics;
 #[cfg(test)]
 mod it_direct;

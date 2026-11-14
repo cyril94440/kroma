@@ -15,7 +15,9 @@ mod trailer;
 
 pub use card::*;
 pub use edition::*;
-pub use kroma_module_wire::{AudioStream, ColorInfo, HdrFormat, SubtitleTrack, VideoStream};
+pub use kroma_module_wire::{
+    AudioStream, ColorInfo, HdrFormat, SpatialAudio, SubtitleTrack, VideoStream,
+};
 pub use loudness::*;
 pub use preference::*;
 pub use trailer::*;

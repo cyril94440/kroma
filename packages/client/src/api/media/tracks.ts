@@ -27,6 +27,9 @@ export const VideoTrack = z.object({
   bitDepth: z.number().nullable(),
   hdrFormat: HdrFormat.nullish(),
   dolbyVisionProfile: z.number().nullish(),
+  dolbyVisionLevel: z.number().nullish(),
+  dolbyVisionCompatibility: z.number().nullish(),
+  dolbyVisionEnhancementLayer: z.boolean().nullish(),
   color: ColorInfo.nullish(),
 });
 export type VideoTrack = z.infer<typeof VideoTrack>;
@@ -41,6 +44,9 @@ export const AudioTrack = z.object({
   title: z.string().nullish(),
   default: z.boolean(),
   region: z.string().nullish(),
+  profile: z.string().nullish(),
+  layout: z.string().nullish(),
+  spatial: z.enum(['atmos', 'dtsx']).nullish(),
 });
 export type AudioTrack = z.infer<typeof AudioTrack>;
 
