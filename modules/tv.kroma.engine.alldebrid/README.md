@@ -23,6 +23,13 @@ Only then does `status` report `completed`, and acquisition imports the stubs
 like the videos they stand for. A magnet that is ready stays on AllDebrid after
 the import, because the library streams from it.
 
+The manifest declares `fs.read` and `fs.write` for `downloads` although the stubs are
+written under the module's own data directory: the host holds
+`<data>/alldebrid/downloads` for the import (and the core) only for a first-party
+module that declares `downloads`, and mounts it as its own root, writable only when
+the module also declares `fs.write: downloads`. Without them the importer cannot read
+the stubs and the module cannot write them.
+
 ## Instant
 
 `POST /_port/tv.kroma.torrents/client/instant` takes

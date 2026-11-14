@@ -35,6 +35,8 @@ function stateOf(result: WatchNowResult): WatchNowState {
   switch (result.status) {
     case 'ready':
       return { phase: 'ready', itemId: result.itemId, fileId: result.fileId ?? null };
+    case 'preparing':
+      return { phase: 'ready', itemId: result.itemId, fileId: result.fileId ?? null };
     case 'requested':
       return { phase: 'requested' };
     case 'unavailable':

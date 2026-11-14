@@ -79,3 +79,16 @@ fn every_outcome_answers_in_the_shape_the_clients_read() {
         .unwrap()
         .contains("Rien ne correspond"));
 }
+
+#[test]
+fn a_title_still_being_cached_is_answered_preparing_with_its_item() {
+    let said = answer(
+        Outcome::Preparing {
+            item_id: "i1".into(),
+            file_id: Some("f1".into()),
+        },
+        "en",
+    );
+
+    assert_eq!(said, json!({ "status": "preparing", "itemId": "i1", "fileId": "f1" }));
+}

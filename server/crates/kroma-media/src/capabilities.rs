@@ -1,5 +1,10 @@
 //! What the ffmpeg on this host can do that a build is free to leave out, read
 //! once from its own listings: reading `http`, and the AC-3 / E-AC-3 encoders.
+//!
+//! [`prime`] reads them at boot. Until it has, a request is answered with the
+//! conservative reading (no network input, no surround encoders) instead of
+//! waiting on two child processes; [`settled`] is for the background work that
+//! can wait.
 
 use std::process::Command;
 use std::sync::OnceLock;
@@ -49,24 +54,50 @@ fn listing(flag: &str) -> String {
         .unwrap_or_default()
 }
 
-fn detected() -> &'static Capabilities {
-    static CAPS: OnceLock<Capabilities> = OnceLock::new();
-    CAPS.get_or_init(|| Capabilities::from_listings(&listing("-protocols"), &listing("-encoders")))
+static CAPS: OnceLock<Capabilities> = OnceLock::new();
+
+#[cfg(not(test))]
+const UNPRIMED: Capabilities = Capabilities {
+    http_input: false,
+    audio: AudioTargets {
+        ac3: false,
+        eac3: false,
+    },
+};
+
+fn read() -> Capabilities {
+    Capabilities::from_listings(&listing("-protocols"), &listing("-encoders"))
 }
 
-/// Reads the listings now so the first request does not pay for them.
+/// Reads the listings now so no request has to.
 pub fn prime() {
-    detected();
+    CAPS.get_or_init(read);
+}
+
+/// The capabilities, waiting for the listings if nothing has read them yet.
+/// Blocking: only for work that runs on its own thread, never a request.
+pub fn settled() -> &'static Capabilities {
+    CAPS.get_or_init(read)
+}
+
+#[cfg(not(test))]
+fn known() -> &'static Capabilities {
+    CAPS.get().unwrap_or(&UNPRIMED)
+}
+
+#[cfg(test)]
+fn known() -> &'static Capabilities {
+    settled()
 }
 
 /// Whether ffmpeg and ffprobe here can read a title over the loopback relay. A
 /// build without it reads a remote title only once its local copy exists.
 pub fn network_input() -> bool {
-    detected().http_input
+    known().http_input
 }
 
 pub fn audio_targets() -> AudioTargets {
-    detected().audio
+    known().audio
 }
 
 #[cfg(test)]

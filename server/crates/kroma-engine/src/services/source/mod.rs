@@ -147,6 +147,10 @@ impl Sources {
     /// one. Where it cannot, a title with no copy is [`SourceError::Preparing`]
     /// and, with `warm`, its source starts caching it. Blocking.
     pub fn resolve(&self, abs: &str, warm: bool) -> Result<Resolved, SourceError> {
+        self.resolve_with(abs, warm, kroma_media::capabilities::network_input())
+    }
+
+    fn resolve_with(&self, abs: &str, warm: bool, network: bool) -> Result<Resolved, SourceError> {
         let path = Path::new(abs);
         if !remote_file::is_remote_file(path) {
             return Ok(Resolved {
@@ -155,7 +159,7 @@ impl Sources {
             });
         }
         let found = self.find(abs, warm)?;
-        self.input_of(abs, found, kroma_media::capabilities::network_input())
+        self.input_of(abs, found, network)
     }
 
     /// What a route reads for the library file at `abs`: [`Self::resolve`], once a
@@ -173,12 +177,24 @@ impl Sources {
     /// ffmpeg cannot read the relay, a title with no copy is warmed so the probe
     /// can run once it lands, and only a few titles are warmed at once.
     pub fn resolve_for_probe(&self, abs: &str) -> Result<Resolved, SourceError> {
-        self.resolve_probing(abs, kroma_media::capabilities::network_input())
+        self.resolve_probing(abs, kroma_media::capabilities::settled().http_input)
+    }
+
+    /// [`Self::resolve_for_probe`] for a probe nobody is waiting on, which never
+    /// asks a source to cache a title: a stub with no copy this ffmpeg can read
+    /// is [`SourceError::Preparing`] and is left for a later pass. Blocking.
+    pub fn resolve_without_warming(&self, abs: &str) -> Result<Resolved, SourceError> {
+        let network = kroma_media::capabilities::settled().http_input;
+        if network || !remote_file::is_remote_file(Path::new(abs)) {
+            return self.resolve_with(abs, false, network);
+        }
+        let found = self.find(abs, false)?;
+        self.input_of(abs, found, false)
     }
 
     fn resolve_probing(&self, abs: &str, network: bool) -> Result<Resolved, SourceError> {
         if network || !remote_file::is_remote_file(Path::new(abs)) {
-            return self.resolve(abs, false);
+            return self.resolve_with(abs, false, network);
         }
         let found = self.find(abs, false)?;
         if matches!(found.place, Place::Upstream(_)) && self.memo.may_warm(abs) {

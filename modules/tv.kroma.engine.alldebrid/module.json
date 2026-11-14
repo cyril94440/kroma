@@ -66,8 +66,8 @@
       ]
     },
     "fs": {
-      "read": ["module"],
-      "write": ["module"]
+      "read": ["module", "downloads"],
+      "write": ["module", "downloads"]
     }
   }
 }

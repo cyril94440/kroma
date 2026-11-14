@@ -11,11 +11,14 @@
 //! all from the outside, and the operator is the only one who can fix it.
 
 mod probe;
+mod tonemapped;
 
 use std::sync::OnceLock;
 
 use super::software::Effort;
 use super::tonemap::{ToneMap, SDR_TAGS};
+
+const TONEMAP_SLOTS: usize = 2;
 
 pub use probe::{detect, detected, prime, Detection};
 
@@ -23,62 +26,50 @@ pub use probe::{detect, detected, prime, Detection};
 /// that device is the CPU, how hard it is allowed to work per frame. The two are
 /// one decision - the tier only means anything on the software path - so they
 /// are chosen and carried together. `tonemap` is set when the source is HDR and
-/// this host can map it: the frames then pass through system memory, because
-/// every tone-map here runs on the CPU.
+/// this host can map it, and carries the [`Route`] it takes; `frame` is the size
+/// of the source, which a device scaler needs spelled out.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Pipeline {
     pub accel: HwAccel,
     pub effort: Effort,
     pub tonemap: Option<ToneMap>,
+    pub frame: Option<(u32, u32)>,
 }
 
 impl Pipeline {
     /// The device this host has, and the tier this job can afford on it, from the
-    /// picture going in and the box it is fitted into.
+    /// picture going in and the box it is fitted into. A source nobody measured
+    /// cannot be scaled on a device, so its tone-map stays on the CPU.
     pub fn choose(
         source: Option<(u32, u32)>,
         target: Option<(u32, u32)>,
         tonemap: Option<ToneMap>,
     ) -> Self {
+        let tonemap = tonemap.map(|map| if source.is_some() { map } else { map.on_the_cpu() });
+        let target = tonemap.map_or(target, |_| Some(tonemapped::within_box(target)));
         Self {
             accel: detect(),
-            effort: Effort::choose(source, target),
+            effort: Effort::choose(source, target, tonemap.is_some()),
             tonemap,
+            frame: source,
         }
     }
 
-    /// Args that must precede `-i`. A tone-mapped picture is not decoded into
-    /// device memory, which the CPU filters cannot read; a device that needs an
-    /// upload afterwards is declared explicitly, the way its startup validation
-    /// declares it, and decodes on the CPU.
+    /// Args that must precede `-i`.
     pub fn input_args(self) -> Vec<String> {
-        if self.tonemap.is_none() {
-            return owned(self.accel.input_args(self.effort));
-        }
-        match self.accel {
-            HwAccel::Qsv | HwAccel::Vaapi => {
-                let mut args = owned(HwAccel::Software.input_args(self.effort));
-                args.extend(self.accel.upload_device_args());
-                args
-            }
-            accel => without_device_frames(accel.input_args(self.effort)),
+        match self.tonemap {
+            None => owned(self.accel.input_args(self.effort)),
+            Some(map) => self.tonemapped_input(map),
         }
     }
 
     /// The `-vf` for this job: the scale and depth change the device needs, or
-    /// the scale, the tone-map and the upload to the encoder's memory.
+    /// the scale and tone-map of a picture that is never larger than 1080p.
     pub fn video_filter(self, size: Option<(u32, u32)>) -> Option<String> {
-        let Some(map) = self.tonemap else {
-            return self.accel.video_filter(size, self.effort);
-        };
-        let scale = HwAccel::Software.video_filter(size, self.effort);
-        let upload = self.accel.upload_filter().map(str::to_owned);
-        let steps: Vec<String> = scale
-            .into_iter()
-            .chain([map.chain()])
-            .chain(upload)
-            .collect();
-        Some(steps.join(","))
+        match self.tonemap {
+            None => self.accel.video_filter(size, self.effort),
+            Some(map) => Some(self.tonemapped_filter(map, size)),
+        }
     }
 
     /// Tags a tone-mapped picture as the SDR it now is.
@@ -90,10 +81,21 @@ impl Pipeline {
         }
     }
 
-    /// Whether the frames are rebuilt by the CPU, which is the only case where
-    /// the box has to be taken away from background work.
-    pub const fn on_the_cpu(self) -> bool {
-        !self.accel.is_device()
+    /// Whether the frames are rebuilt by the CPU, which is the case where the box
+    /// has to be taken away from background work: a software encode, or a
+    /// tone-map that any part of runs on the CPU.
+    pub fn on_the_cpu(self) -> bool {
+        !self.accel.is_device() || self.maps_on_the_cpu()
+    }
+
+    /// How many of the host's re-encode slots this session takes. A tone-map on
+    /// the CPU is a float pipeline over every pixel and fills a small host alone.
+    pub fn slots(self) -> usize {
+        if self.maps_on_the_cpu() {
+            TONEMAP_SLOTS
+        } else {
+            1
+        }
     }
 }
 
@@ -154,6 +156,12 @@ impl HwAccel {
     /// the CPU, which is what decides whether the effort tier matters at all.
     pub const fn is_device(self) -> bool {
         !matches!(self, Self::Software)
+    }
+
+    /// Whether a filter of this device's own could map HDR to SDR, to be tried at
+    /// boot: nothing about a driver says it will work until it has.
+    pub const fn has_device_tonemap(self) -> bool {
+        matches!(self, Self::Qsv | Self::Vaapi | Self::Nvenc)
     }
 
     /// Args that must precede `-i`: they choose the decoder and say which memory

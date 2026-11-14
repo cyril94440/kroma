@@ -118,6 +118,7 @@ describe('watching a title now', () => {
   it.each([
     { status: 'ready', itemId: 'm1', fileId: 'f1' },
     { status: 'ready', itemId: 'm1' },
+    { status: 'preparing', itemId: 'm1', fileId: 'f1' },
     { status: 'requested', requestId: 'r1' },
     { status: 'requested', requestId: null },
     { status: 'unavailable', reason: 'noRelease', message: 'Nothing fits.', requestId: 'r1' },

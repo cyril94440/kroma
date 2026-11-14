@@ -249,6 +249,21 @@ The core does not take your word for the answer:
 - An `Err`, a slow answer or a missing module is a localized error on playback,
   never a hang, and a probe that failed that way is retried later.
 
+Only an **official** module (one the official registry shipped) is asked for the
+`source` point: one installed from anywhere else that contributes it is never
+called, and two official modules naming one instance id are both refused with a
+log line. A stub's `name` must be a bare file name (no path separator, not `.`
+or `..`, no control character, nothing empty or oversized) and its size at most
+2^50, or `remote_file::read` refuses the stub.
+
+While a title is not on this machine and the host's ffmpeg cannot read it over
+the network, the host asks you to cache it (`warm`) and answers the player with
+`error.sourcePreparing` instead of an error: the probe is deferred, nothing is
+recorded against the file, and it is read once your copy lands. A module should
+therefore answer `locate` quickly with a `url` and fill the copy in the
+background. The core remembers a resolved link for 30 s per stub, warms at most
+once per window, and on a 401, 403, 404 or 410 from your URL asks you once more.
+
 ### Reacting to what happens
 
 A module can also be woken by the bus instead of only being called. Declare the

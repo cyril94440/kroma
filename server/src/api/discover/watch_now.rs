@@ -81,6 +81,9 @@ fn answer(outcome: Outcome, locale: &'static str) -> serde_json::Value {
         Outcome::Ready { item_id, file_id } => {
             json!({ "status": "ready", "itemId": item_id, "fileId": file_id })
         }
+        Outcome::Preparing { item_id, file_id } => {
+            json!({ "status": "preparing", "itemId": item_id, "fileId": file_id })
+        }
         Outcome::Requested { request_id } => {
             json!({ "status": "requested", "requestId": request_id })
         }

@@ -28,6 +28,8 @@ use verify::{Facts, Promise, Verdict};
 const TOTAL_BUDGET: Duration = Duration::from_secs(25);
 const MODULE_BUDGET: Duration = Duration::from_secs(20);
 const ATTEMPTS: usize = 3;
+const VERIFY_POLLS: u32 = 180;
+const VERIFY_EVERY: Duration = Duration::from_secs(5);
 
 /// What one title or episode a viewer asked to watch now is.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,6 +66,10 @@ pub enum Reason {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
     Ready {
+        item_id: String,
+        file_id: Option<String>,
+    },
+    Preparing {
         item_id: String,
         file_id: Option<String>,
     },
@@ -129,6 +135,7 @@ struct Attempt<'a> {
 }
 
 enum Read {
+    Preparing(String, Option<String>),
     Ready(String, Option<String>),
     Fake(String),
     Unverified,
@@ -188,6 +195,10 @@ impl<'a> Attempt<'a> {
                     self.check_the_others(&resolve, &imported);
                     return Ok(Outcome::Ready { item_id, file_id });
                 }
+                Read::Preparing(item_id, file_id) => {
+                    self.verify_later(&resolve, &imported, item_id.clone(), file_id.clone());
+                    return Ok(Outcome::Preparing { item_id, file_id });
+                }
                 Read::Unverified => break,
                 Read::Fake(reason) => {
                     self.turn_down(&resolve, &imported, &reason);
@@ -237,6 +248,15 @@ impl<'a> Attempt<'a> {
             &file.item_id,
         );
         if let Err(error) = probed {
+            if error.downcast_ref::<crate::infra::probe::Deferred>()
+                == Some(&crate::infra::probe::Deferred::Preparing)
+            {
+                let visible = crate::db::get_item(&self.state.db, &file.item_id)?
+                    .is_some_and(|item| self.user.sees_library(&item.library));
+                if visible {
+                    return Ok(Read::Preparing(file.item_id.clone(), Some(file.file_id.clone())));
+                }
+            }
             tracing::warn!(error = %format!("{error:#}"), "watch now: could not probe the imported file");
             return Ok(Read::Unverified);
         }
@@ -266,6 +286,61 @@ impl<'a> Attempt<'a> {
             Verdict::Genuine if !self.user.sees_library(&item.library) => Ok(Read::Unverified),
             Verdict::Genuine => Ok(Read::Ready(item.id, Some(file.file_id.clone()))),
         }
+    }
+
+    fn verify_later(&mut self, resolve: &kroma_module_host::Resolver, imported: &Imported, item_id: String, file_id: Option<String>) {
+        let Some(file_id) = file_id else { return };
+        let (state, resolve, imported, scope) = (
+            self.state.clone(),
+            resolve.clone(),
+            imported.clone(),
+            self.scope.clone(),
+        );
+        let runtime = self.runtime();
+        tokio::task::spawn_blocking(move || {
+            for _ in 0..VERIFY_POLLS {
+                std::thread::sleep(VERIFY_EVERY);
+                let Ok(Some(item)) = crate::db::get_item(&state.db, &item_id) else {
+                    return;
+                };
+                let Some(stored) = item.files.iter().find(|f| f.id == file_id) else {
+                    return;
+                };
+                if !stored.probed && stored.unreadable.is_none() {
+                    continue;
+                }
+                let facts = Facts {
+                    unreadable: stored.unreadable.clone(),
+                    duration_ms: stored.duration_ms,
+                    width: stored.video.as_ref().and_then(|v| v.width),
+                    height: stored.video.as_ref().and_then(|v| v.height),
+                };
+                let promise = Promise {
+                    runtime_min: runtime,
+                    claimed_height: imported.release.claimed_height,
+                    episodes: imported.episodes,
+                    multi_part: imported.multi_part,
+                };
+                match verify::judge(&facts, &promise) {
+                    Verdict::Genuine => {
+                        let confirmation = point::Confirmation { download_id: &imported.download_id };
+                        if let Err(error) = point::confirm(&resolve, &confirmation) {
+                            tracing::warn!(error = %format!("{error:#}"), "watch now: the module could not confirm a release");
+                        }
+                    }
+                    Verdict::Fake(reason) => {
+                        let rejection = point::Rejection { download_id: &imported.download_id, reason: &reason };
+                        if let Err(error) = point::reject(&resolve, &rejection) {
+                            tracing::warn!(error = %format!("{error:#}"), "watch now: the module could not discard a release");
+                        }
+                        let gone: Vec<String> = imported.paths.iter().map(|p| canonical(p)).collect();
+                        let _ = crate::services::scan::forget_files(&state, &gone);
+                        tracing::info!(title = scope.tmdb_id, %reason, "watch now: a release read after the answer was not genuine");
+                    }
+                }
+                return;
+            }
+        });
     }
 
     fn confirm(&self, resolve: &kroma_module_host::Resolver, imported: &Imported) {

@@ -116,6 +116,11 @@ export const WatchNowResult = z.discriminatedUnion('status', [
     fileId: z.string().nullish(),
   }),
   z.object({
+    status: z.literal('preparing'),
+    itemId: z.string(),
+    fileId: z.string().nullish(),
+  }),
+  z.object({
     status: z.literal('requested'),
     requestId: z.string().nullish(),
   }),
