@@ -15,7 +15,7 @@
 //! [`Transport`] is chosen per URL, loopback TCP for `http://127.0.0.1:<port>`
 //! and a Unix socket for a URL built by [`loopback::unix_url`].
 
-pub mod address;
+pub use kroma_primitives::address;
 mod builder;
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 mod config;

@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use kroma_http::address::{is_public, web_target};
+use crate::address::{is_public, web_target};
 
 const MAX_URL_BYTES: usize = 8 * 1024;
 

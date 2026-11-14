@@ -7,6 +7,7 @@ description = "KROMA's two HTTP transports: a curl process per call for the outs
 license.workspace = true
 
 [dependencies]
+kroma-primitives = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
