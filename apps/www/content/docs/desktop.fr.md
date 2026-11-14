@@ -73,6 +73,22 @@ Utilisez plutôt la version web dans votre navigateur.
 KROMA lit la vidéo avec mpv, qui est inclus dans l'application : vous n'avez
 rien d'autre à installer.
 
+## HDR et son surround
+
+KROMA demande à mpv d'envoyer le HDR à votre écran quand l'écran et le système
+déclarent le gérer ; sinon mpv adapte l'image à un écran standard. La sortie HDR
+via mpv existe sous Windows et sous Wayland ; sous Linux l'application dessine
+via X11, attendez-vous donc à une image standard. Dolby Vision est lu comme son
+image de base HDR, remise en forme par le moteur `gpu-next` de mpv.
+
+Le son surround reste surround quand le système déclare les enceintes
+correspondantes. Le passthrough Dolby et DTS vers un récepteur est désactivé :
+il ne fonctionne qu'en HDMI vers un récepteur qui décode le format, sinon il
+donne du silence ou du bruit. Pour l'activer, définissez la variable
+d'environnement `KROMA_AUDIO_SPDIF=1` avant de lancer KROMA, ou listez des
+codecs, par exemple `KROMA_AUDIO_SPDIF=ac3,eac3,truehd`. Il n'y a pas encore
+d'interrupteur dans l'application.
+
 ## Steam Deck
 
 1. Passez en **mode bureau**.

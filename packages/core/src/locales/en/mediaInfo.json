@@ -9,6 +9,8 @@
   "mediaInfo.noFile": "No file for this element.",
   "mediaInfo.noSubs": "None",
   "mediaInfo.size": "Size",
+  "mediaInfo.storage": "Storage",
+  "mediaInfo.streamed": "Streamed",
   "mediaInfo.subtitles": "Subtitles",
   "mediaInfo.title": "Media details",
   "mediaInfo.unknownFile": "Unknown file",

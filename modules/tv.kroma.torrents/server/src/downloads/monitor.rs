@@ -13,6 +13,7 @@ use super::DownloadManager;
 
 mod notice;
 mod status;
+mod unreachable;
 
 const ACTIVE_TICK: Duration = Duration::from_secs(5);
 const IDLE_TICK: Duration = Duration::from_secs(30);
@@ -183,8 +184,12 @@ impl DownloadManager {
             }
         };
         match engine.status(&row.client_ref) {
-            Ok(Some(status)) => self.apply_status(host, row, &status),
+            Ok(Some(status)) => {
+                self.poll_answered(&row.id);
+                self.apply_status(host, row, &status)
+            }
             Ok(None) => {
+                self.poll_answered(&row.id);
                 let _ = db::set_download_status(
                     self.core(),
                     &row.id,
@@ -195,6 +200,7 @@ impl DownloadManager {
             }
             Err(e) => {
                 tracing::debug!(id = %row.id, error = %format!("{e:#}"), "status poll failed");
+                self.poll_failed(row, &e);
                 false
             }
         }

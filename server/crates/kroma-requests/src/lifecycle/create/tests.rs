@@ -174,6 +174,37 @@ fn a_requester_who_may_self_approve_skips_the_queue() {
 }
 
 #[test]
+fn a_requester_whose_title_plays_at_once_is_approved_without_paging_a_moderator() {
+    let host = test_host();
+    let _tmdb = FakeTmdb::start(|_| (200, movie_detail("The Matrix", "1999-03-31")));
+    seed_user(&host, "manager");
+
+    let req = create_approved(&host, "manager", &body("manager")).unwrap();
+
+    assert_eq!(req.status, RequestStatus::Approved);
+    assert!(
+        host.notifications()
+            .iter()
+            .all(|(a, _)| a != &Audience::permission(Permission::RequestsManage)),
+    );
+}
+
+#[test]
+fn asking_again_for_a_pending_request_approves_it_for_a_requester_who_plays_at_once() {
+    let host = test_host();
+    let _tmdb = FakeTmdb::start(|_| (200, movie_detail("The Matrix", "1999-03-31")));
+    seed_user(&host, "someone");
+    seed_user(&host, "manager");
+    let first = create_request(&host, &user("someone", vec![Permission::Playback]), &body("someone")).unwrap();
+    assert_eq!(first.status, RequestStatus::Pending);
+
+    let again = create_approved(&host, "manager", &body("manager")).unwrap();
+
+    assert_eq!(again.id, first.id);
+    assert_eq!(again.status, RequestStatus::Approved);
+}
+
+#[test]
 fn a_failed_auto_approval_stays_pending_and_the_next_ask_retries_it() {
     let host = test_host();
     let calls = Arc::new(AtomicUsize::new(0));

@@ -51,7 +51,9 @@ fn client() -> &'static Client<HttpConnector, Full<Bytes>> {
 }
 
 fn is_loopback(url: &str) -> Result<bool> {
-    let uri: hyper::Uri = url.parse().with_context(|| format!("parse the URL: {url}"))?;
+    let uri: hyper::Uri = url
+        .parse()
+        .with_context(|| format!("parse the URL: {url}"))?;
     if uri.scheme_str() != Some("http") {
         return Ok(false);
     }

@@ -31,7 +31,8 @@ pub fn set_file_probe(pool: &Pool, file_id: &str, probe: &FileProbe) -> Result<(
             v_codec=?3, v_width=?4, v_height=?5, v_hdr=?6, v_bit_depth=?7, \
             a_codec=?8, a_channels=?9, a_language=?10, subtitles=?11, audio_tracks=?12, \
             unreadable=?13, v_hdr_format=?14, v_dv_profile=?15, \
-            v_color_primaries=?16, v_color_transfer=?17, v_color_matrix=?18 \
+            v_color_primaries=?16, v_color_transfer=?17, v_color_matrix=?18, \
+            v_dv_level=?19, v_dv_compat=?20, v_dv_el=?21, probe_schema=?22 \
          WHERE id = ?1",
         params![
             file_id,
@@ -52,6 +53,10 @@ pub fn set_file_probe(pool: &Pool, file_id: &str, probe: &FileProbe) -> Result<(
             color.and_then(|c| c.primaries.clone()),
             color.and_then(|c| c.transfer.clone()),
             color.and_then(|c| c.matrix.clone()),
+            video.and_then(|v| v.dolby_vision_level),
+            video.and_then(|v| v.dolby_vision_compatibility),
+            video.and_then(|v| v.dolby_vision_enhancement_layer.then_some(1)),
+            super::probe::PROBE_SCHEMA,
         ],
     )?;
 
@@ -113,161 +118,4 @@ pub(super) fn recompute_all_representatives(pool: &Pool) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ingest::test_support::*;
-    use crate::sync_all;
-    use crate::testing::TempPool;
-    use std::collections::HashMap;
-
-    fn pool_with_probed_movie() -> TempPool {
-        let p = pool();
-        sync_all(
-            &p,
-            &[lib("lib")],
-            &[],
-            &[movie(
-                "m1",
-                "Dune",
-                "lib",
-                vec![file("f1", "/media/m1.mkv", false)],
-            )],
-            &HashMap::new(),
-        )
-        .unwrap();
-        p
-    }
-
-    fn one_ms() -> FileProbe<'static> {
-        FileProbe {
-            duration_ms: Some(1),
-            ..FileProbe::default()
-        }
-    }
-
-    fn broken() -> FileProbe<'static> {
-        FileProbe {
-            unreadable: Some("Invalid data found when processing input"),
-            ..FileProbe::default()
-        }
-    }
-
-    #[test]
-    fn a_refused_file_write_fails_the_probe_rather_than_reporting_success() {
-        let p = pool_with_probed_movie();
-        p.get()
-            .unwrap()
-            .execute_batch(
-                "CREATE TRIGGER no_file_update BEFORE UPDATE ON files \
-                 BEGIN SELECT RAISE(ABORT, 'refused'); END",
-            )
-            .unwrap();
-
-        assert!(set_file_probe(&p, "f1", &one_ms()).is_err());
-    }
-
-    #[test]
-    fn a_refused_item_write_fails_the_probe_that_triggered_the_recompute() {
-        let p = pool_with_probed_movie();
-        p.get()
-            .unwrap()
-            .execute_batch(
-                "CREATE TRIGGER no_item_update BEFORE UPDATE ON items \
-                 BEGIN SELECT RAISE(ABORT, 'refused'); END",
-            )
-            .unwrap();
-
-        assert!(set_file_probe(&p, "f1", &one_ms()).is_err());
-    }
-
-    #[test]
-    fn a_probe_result_for_a_file_that_is_gone_is_recorded_against_no_item() {
-        let p = pool_with_probed_movie();
-        set_file_probe(&p, "no-such-file", &one_ms()).unwrap();
-
-        let container: String = p
-            .get()
-            .unwrap()
-            .query_row("SELECT container FROM items WHERE id='m1'", [], |r| {
-                r.get(0)
-            })
-            .unwrap();
-        assert_eq!(container, "mkv", "no item was recomputed");
-    }
-
-    #[test]
-    fn an_item_with_nothing_probed_yet_keeps_its_scanned_columns() {
-        let p = pool_with_probed_movie();
-        let conn = p.get().unwrap();
-        recompute_item_representative(&conn, "m1").unwrap();
-
-        let container: String = conn
-            .query_row("SELECT container FROM items WHERE id='m1'", [], |r| {
-                r.get(0)
-            })
-            .unwrap();
-        assert_eq!(container, "mkv");
-    }
-
-    #[test]
-    fn an_unreadable_file_never_represents_an_item_that_has_a_readable_one() {
-        let p = pool();
-        sync_all(
-            &p,
-            &[lib("lib")],
-            &[],
-            &[movie(
-                "m1",
-                "Dune",
-                "lib",
-                vec![
-                    file("f1", "/media/broken.mkv", false),
-                    file("f2", "/media/good.mkv", false),
-                ],
-            )],
-            &HashMap::new(),
-        )
-        .unwrap();
-
-        set_file_probe(&p, "f1", &broken()).unwrap();
-        set_file_probe(
-            &p,
-            "f2",
-            &FileProbe {
-                duration_ms: Some(7_200_000),
-                video: Some(&video()),
-                ..FileProbe::default()
-            },
-        )
-        .unwrap();
-
-        let item = crate::get_item(&p, "m1").unwrap().unwrap();
-        assert_eq!(item.default_file_id.as_deref(), Some("f2"));
-        assert_eq!(item.duration_ms, Some(7_200_000));
-        let fault = item.files.iter().find(|f| f.id == "f1").unwrap();
-        assert_eq!(
-            fault.unreadable.as_deref(),
-            Some("Invalid data found when processing input")
-        );
-    }
-
-    #[test]
-    fn a_file_that_opens_on_a_re_probe_clears_the_fault_it_carried() {
-        let p = pool_with_probed_movie();
-        set_file_probe(&p, "f1", &broken()).unwrap();
-        set_file_probe(
-            &p,
-            "f1",
-            &FileProbe {
-                duration_ms: Some(100),
-                video: Some(&video()),
-                ..FileProbe::default()
-            },
-        )
-        .unwrap();
-
-        let item = crate::get_item(&p, "m1").unwrap().unwrap();
-        assert!(item.files[0].unreadable.is_none());
-        assert_eq!(item.default_file_id.as_deref(), Some("f1"));
-    }
-}
+mod tests;

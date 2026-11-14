@@ -44,6 +44,7 @@ pub struct ModuleWiring {
     pub permissions: crate::services::network::DeclaredPermissions,
     pub network_providers: crate::services::network::NetworkProviders,
     pub network_listeners: crate::services::network::DeclaredListeners,
+    pub source_roots: crate::services::source::SourceRoots,
 }
 
 pub struct AppState {
@@ -53,6 +54,7 @@ pub struct AppState {
     pub settings: Settings,
     pub metadata_cache: Arc<metadata::Cache>,
     pub art_refills: crate::services::art_refill::Inflight,
+    pub watch_flights: crate::services::watch_now::Flights,
     pub events: Bus,
     pub activity: activity::Shared,
     pub hls: hls::HlsEngine,
@@ -64,6 +66,7 @@ pub struct AppState {
     pub cast: crate::services::cast::Registry,
     pub metrics: Metrics,
     pub embedder: crate::point::Point,
+    pub sources: Arc<crate::services::source::Sources>,
     pub network: Arc<crate::services::network::Network>,
     pub direct: crate::services::direct::Direct,
     pub search: Arc<SearchEngine>,
@@ -119,6 +122,7 @@ impl AppState {
             permissions,
             network_providers,
             network_listeners,
+            source_roots,
         } = wiring;
         let hls = hls::HlsEngine::new(
             config.data_dir.join("hls"),
@@ -160,6 +164,15 @@ impl AppState {
         .with_listeners(network_listeners)
         .with_core_ports(config.port, config.https_port_override)
         .with_declared(permissions));
+        let sources = crate::services::source::Sources::new(
+            contributions.clone(),
+            official_modules.clone(),
+            {
+                let network = network.clone();
+                Arc::new(move |module, target| network.declares_connect(module, target))
+            },
+            source_roots,
+        );
         let direct = crate::services::direct::Direct::new(config.public_ip_url.clone());
         Arc::new_cyclic(|weak| AppState {
             config,
@@ -168,6 +181,7 @@ impl AppState {
             settings,
             metadata_cache: Arc::new(metadata::Cache::new()),
             art_refills: Default::default(),
+            watch_flights: Default::default(),
             events: Bus::new(),
             activity: activity::new(),
             hls,
@@ -179,6 +193,7 @@ impl AppState {
             cast: crate::services::cast::Registry::new(),
             metrics,
             embedder,
+            sources,
             network,
             direct,
             search: Arc::new(SearchEngine::new().expect("init search index")),
@@ -258,6 +273,7 @@ mod tests {
                 permissions: Arc::new(|_| None),
                 network_providers: Arc::new(Vec::new),
                 network_listeners: Arc::new(Vec::new),
+                source_roots: Arc::new(|_| Vec::new()),
             },
         );
         state.own_scratch_dir(dir);

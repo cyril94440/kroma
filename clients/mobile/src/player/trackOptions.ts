@@ -1,5 +1,12 @@
 import type { AudioTrack, MediaItem } from '@kromatv/client/media';
-import { audioTrackLabel, audioTracksOf, langBase, langName, refineTrackLang } from '@kromatv/core';
+import {
+  audioTrackLabel,
+  audioTracksOf,
+  hdrLabel,
+  langBase,
+  langName,
+  refineTrackLang,
+} from '@kromatv/core';
 import type { useT } from '#mobile/lib/i18n';
 import type { Engine } from './engine';
 import type { Subtitles, SubView } from './useSubtitles';
@@ -114,6 +121,6 @@ export function qualityBadge(item: MediaItem): string {
   if (!v) return '';
   const res = v.height ? `${v.height}p` : null;
   const codec = v.codec ? v.codec.toUpperCase() : null;
-  const parts = [res, codec, v.hdr ? 'HDR' : null].filter(Boolean);
+  const parts = [res, codec, hdrLabel(v)].filter(Boolean);
   return parts.length ? ` · ${parts.join(' ')}` : '';
 }

@@ -28,6 +28,12 @@ describe('purposeWord', () => {
   it('quotes a purpose the core has no words for as the module wrote it', () => {
     expect(purposeWord('telemetry', t)).toBe('its telemetry use');
   });
+
+  it('words the purpose the AllDebrid module declares for its transfers', () => {
+    expect(purposeWord('debrid-transfer', t)).toBe(
+      'copy finished downloads from the debrid service',
+    );
+  });
 });
 
 describe('opening', () => {

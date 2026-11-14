@@ -8,21 +8,24 @@ fn engine(root: &Path) -> HlsEngine {
     HlsEngine::new(root.join("hls"), 2, 0)
 }
 
-fn asked<'a>(input: &'a Path, anchor: u64) -> Asked<'a> {
+fn asked<'a>(input: &'a MediaInput, anchor: u64) -> Asked<'a> {
     Asked {
         item_id: "it1",
-        input: input.to_str().unwrap(),
+        input,
         opener: None,
         audio: 0,
         mode: COPY,
         anchor,
         source: Some((320, 180)),
+        video: None,
+        track: None,
     }
 }
 
 async fn remux(engine: &HlsEngine, input: &Path) -> String {
+    let input = MediaInput::Local(input.to_path_buf());
     engine
-        .master(asked(input, 0))
+        .master(asked(&input, 0))
         .await
         .expect("a playlist out of a file ffmpeg can read")
         .0
@@ -47,10 +50,10 @@ async fn the_length_a_file_carries_is_read_once_and_kept() {
     let dir = kroma_testing::temp_dir("hls-duration");
     let input = kroma_testing::clip(dir.path());
     let engine = engine(dir.path());
-    let path = input.to_str().unwrap();
+    let path = MediaInput::Local(input.clone());
 
-    let first = engine.input_duration_ms(path).await;
-    let again = engine.input_duration_ms(path).await;
+    let first = engine.input_duration_ms(&path).await;
+    let again = engine.input_duration_ms(&path).await;
 
     assert_eq!(first, again);
     assert!(
@@ -64,8 +67,8 @@ async fn a_file_nothing_can_open_has_no_length_and_is_not_probed_twice() {
     let dir = kroma_testing::temp_dir("hls-no-duration");
     let engine = engine(dir.path());
 
-    let first = engine.input_duration_ms("/nowhere/absent.mkv").await;
-    let again = engine.input_duration_ms("/nowhere/absent.mkv").await;
+    let first = engine.input_duration_ms(&MediaInput::Local("/nowhere/absent.mkv".into())).await;
+    let again = engine.input_duration_ms(&MediaInput::Local("/nowhere/absent.mkv".into())).await;
 
     assert_eq!(first, None);
     assert_eq!(again, None);
@@ -173,11 +176,60 @@ async fn a_re_anchor_into_a_session_already_running_is_answered_out_of_it() {
     finished_playlist(&engine).await;
 
     let (playlist, start) = engine
-        .master(asked(&input, 2))
+        .master(asked(&MediaInput::Local(input.clone()), 2))
         .await
         .expect("the anchor sits inside what the running session has produced");
 
     assert_eq!(session_dirs(dir.path()), 1, "no second ffmpeg was started");
     assert_eq!(start, 0.0, "the client is told where the stream it gets begins");
     assert!(playlist.contains("seg_00000.m4s"));
+}
+
+#[tokio::test]
+async fn a_title_behind_a_url_is_remuxed_from_the_network() {
+    let dir = kroma_testing::temp_dir("hls-remote");
+    let clip = kroma_testing::clip(dir.path());
+    let server = kroma_testing::RangedServer::serve(&clip);
+    let input = crate::input::relayed_at(server.port());
+    let engine = engine(dir.path());
+
+    let (playlist, start) = engine
+        .master(asked(&input, 0))
+        .await
+        .expect("a playlist out of a URL ffmpeg can read");
+
+    assert!(playlist.contains("#EXT-X-TARGETDURATION"));
+    assert_eq!(start, 0.0);
+    assert!(server.heard().iter().any(|r| r.range.is_some()), "{:?}", server.heard());
+    let session = dir.path().join("hls").read_dir().unwrap().next().unwrap().unwrap().path();
+    assert!(!session.join("ffmpeg.log").exists(), "a URL's errors are not kept on disk");
+}
+
+#[tokio::test]
+async fn a_seek_into_a_url_starts_on_a_keyframe_read_over_the_network() {
+    let dir = kroma_testing::temp_dir("hls-remote-seek");
+    let clip = kroma_testing::clip(dir.path());
+    let server = kroma_testing::RangedServer::serve(&clip);
+    let input = crate::input::relayed_at(server.port());
+
+    let start = super::ffmpeg::keyframe_before(&input, 3.2).await;
+
+    assert!((start - 3.0).abs() < 0.1, "{start}");
+}
+
+#[tokio::test]
+async fn a_session_keeps_the_grant_of_its_input_for_as_long_as_ffmpeg_reads_it() {
+    let dir = kroma_testing::temp_dir("hls-grant-held");
+    let clip = kroma_testing::clip(dir.path());
+    let server = kroma_testing::RangedServer::serve(&clip);
+    let grant = std::sync::Arc::new(());
+    let relayed = kroma_primitives::input::Relayed::new(server.port(), "secret", "grant", "mp4", grant.clone())
+        .expect("plain tokens");
+    let input = MediaInput::Remote(relayed);
+    let engine = engine(dir.path());
+    engine.master(asked(&input, 0)).await.expect("a playlist");
+
+    drop(input);
+
+    assert_eq!(std::sync::Arc::strong_count(&grant), 2, "the running session still holds the grant");
 }

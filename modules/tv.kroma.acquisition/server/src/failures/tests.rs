@@ -3,7 +3,7 @@ use kroma_module_sdk::host::testing::StubHost;
 
 use super::*;
 
-fn host() -> StubHost {
+pub(super) fn host() -> StubHost {
     let host = StubHost::with_core(db::testing::temp_pool("acq-failures"))
         .with_setting("acqStallHours", serde_json::json!(0));
     crate::rules::schema::install(host.store());

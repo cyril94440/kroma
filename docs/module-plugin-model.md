@@ -56,7 +56,7 @@ tv.kroma.torrents/client
 tv.kroma.indexer/engine
 ```
 
-The handful the CORE calls are bare — `acquisition`, `transcriber`, `embedder`, `trailer` —
+The handful the CORE calls are bare — `acquisition`, `transcriber`, `embedder`, `network`, `trailer`, `source` —
 because the core has no manifest to define one in and nothing else may define
 one. A bare name is the core's; a name with a `/` belongs to the module before
 it.
@@ -67,7 +67,7 @@ Three manifest verbs, and every module may use all three:
 // tv.kroma.torrents — defines a point, and answers it itself
 "definesPoints": [
   { "name": "client",
-    "methods": ["test", "add", "status", "pause", "resume", "reannounce", "remove"] }
+    "methods": ["test", "add", "status", "pause", "resume", "reannounce", "remove", "instant"] }
 ],
 "contributes": [
   { "point": "tv.kroma.torrents/client", "id": "rqbit" }
@@ -137,6 +137,39 @@ rather than failing a request an hour later. Within a major, evolution is additi
 a new field must default, because the two ends were built at different times from
 different sources and the operator installed whichever pair they installed.
 
+## `source`: a library file whose bytes live elsewhere
+
+A library file with the extension `.kremote` is a stub: a few lines of JSON
+naming a `source` (the `id` a module gave its `source` contribution), a `ref`
+only that module understands, the original `name` and the real `size`. The core
+indexes it as the video it stands for and, whenever it must read the bytes, asks
+the module `POST /_port/source/locate` with `{ "ref", "warm" }`. The answer is a
+local `path` to a complete copy, or a short-lived `https` `url`. The core never
+learns what the module is or where the bytes come from; it vets the answer (an
+`https` URL on a public host the module declared, a path inside the module's own
+data directories and as long as the stub says).
+
+Only an **official** module (one the official registry shipped, see
+[`module-registries.md`](module-registries.md)) is asked: a module installed from
+anywhere else that contributes `source` is never called, so it cannot capture the
+stubs of another source by contributing the same instance id. Two official
+modules naming one instance id are both refused, with a log line, rather than
+one of them winning. A stub is untrusted text too: it can name any contribution,
+so it is only ever resolved by that rule.
+
+The core reads a URL answer itself, over its own relay, and never hands the URL
+to ffmpeg: direct play (`GET /items/{id}/stream`) relays ranges, and ffmpeg and
+ffprobe read the title from a loopback address of this server (`127.0.0.1`, a
+separate listener, `http` and `tcp` only) that serves the stub through the same
+relay, with the same network policy, address checks and journal. The address
+carries a per-process secret and a grant for that one stub that lasts as long as
+the session reading it. An ffmpeg built without the `http` protocol (the
+Synology and Docker builds enable `http` and `tcp` only, never `https`) reads a
+title only once its local copy exists; until then direct play works, and a probe
+asks the source to cache the title (a few at a time) and runs once the copy
+lands.
+for the contract and the rules a module must meet.
+
 ## The rule that keeps the core ignorant
 
 The core does define a few points, because a host with no hooks cannot be
@@ -151,7 +184,9 @@ search pipeline genuinely needs embeddings and the subtitle service genuinely
 needs transcription, and neither word names who provides it. `trailer` passes
 for the same reason: the catalog needs a title's trailer as one playable file,
 and the word names neither the site it comes from nor the module that fetches
-it. `pipeline-stage` passes. `metadata-provider` passes. `search-ranker` passes.
+it. `source` passes too: a library file may stand for a video whose bytes
+live elsewhere, and the core needs one question answered about it, where those
+bytes are right now, without learning who keeps them. `pipeline-stage` passes. `metadata-provider` passes. `search-ranker` passes.
 
 An earlier draft of this rule failed `embedder` and `transcriber` too, on the
 grounds that they exist because a vector module and a whisper module exist. That
@@ -466,7 +501,7 @@ under a new id is picked up by the download module at runtime, and neither the
 core nor the download module is edited to accept it.
 
 Mechanically, today: `server/Cargo.toml` deps no crate under `modules/`; no crate
-under `server/` names a module's domain in a type, trait or function; the five
-point names the core holds, `acquisition`, `transcriber`, `embedder`, `network`
-and `trailer`, are bare capability names in its own route table and composition root. The remaining
+under `server/` names a module's domain in a type, trait or function; the six
+point names the core holds, `acquisition`, `transcriber`, `embedder`, `network`,
+`trailer` and `source`, are bare capability names in its own route table and composition root. The remaining
 `tv.kroma.*` and point-name hits under `server/` are test fixtures and prose.

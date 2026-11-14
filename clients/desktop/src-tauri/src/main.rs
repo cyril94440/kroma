@@ -16,6 +16,8 @@
 ))]
 #[allow(dead_code)]
 mod libmpv_shared;
+#[allow(dead_code)]
+mod mpv_options;
 mod device_name;
 mod engine_flags;
 mod updater;

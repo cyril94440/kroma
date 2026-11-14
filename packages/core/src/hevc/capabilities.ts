@@ -2,6 +2,7 @@
 
 import { Platform } from 'react-native';
 import { isTizenRuntime, isWebOsRuntime } from '../platform';
+import { ANDROID_TV_CAPS, APPLE_TV_CAPS, TIZEN_CAPS, WEBOS_CAPS } from './runtime-caps';
 
 // `hvc1`/`hev1` are the two HEVC sample entry fourCCs; both are probed because
 // platforms disagree on which they accept.
@@ -17,10 +18,14 @@ const PROBE = {
   h264High444: 'video/mp4; codecs="avc1.F40028"',
   av1Main: 'video/mp4; codecs="av01.0.05M.08"',
   vp9: 'video/webm; codecs="vp09.00.10.08"',
-  // `dvh1` profile 5 level 6: the dual-layer-free Dolby Vision a browser either
-  // has a decoder for or has not.
-  dolbyVision: 'video/mp4; codecs="dvh1.05.06"',
 } as const;
+
+const DOLBY_VISION_PROBES: ReadonlyArray<readonly [number, readonly string[]]> = [
+  [5, ['video/mp4; codecs="dvh1.05.06"', 'video/mp4; codecs="dvhe.05.06"']],
+  [7, ['video/mp4; codecs="dvhe.07.06"', 'video/mp4; codecs="dvh1.07.06"']],
+  [8, ['video/mp4; codecs="dvh1.08.06"', 'video/mp4; codecs="dvhe.08.06"']],
+  [10, ['video/mp4; codecs="dav1.10.06"']],
+];
 
 // AC3/EAC3/DTS/TrueHD are not decodable by Chrome/Firefox (licensing); only
 // Safari (macOS) and TVs handle AC3/EAC3.
@@ -64,6 +69,9 @@ export interface HdrCapabilities {
   hdr10Plus: boolean;
   dolbyVision: boolean;
   hlg: boolean;
+  /** The Dolby Vision profiles the decoder takes, where the runtime says which.
+   * Absent means `dolbyVision` holds for every profile. */
+  dolbyVisionProfiles?: readonly number[];
 }
 
 export interface PlaybackCapabilities {
@@ -74,6 +82,9 @@ export interface PlaybackCapabilities {
   av1: boolean;
   vp9: boolean;
   hdr: HdrCapabilities;
+  /** True where `hdr` is a statement about this device and its display, so it
+   * can be declared to the server; absent where it is a guess. */
+  hdrDeclared?: boolean;
   /** Absent where the runtime will not say, which gates nothing. */
   frameLimits?: DecoderFrameLimits;
   audio: AudioCapabilities;
@@ -101,16 +112,20 @@ function detectHdr(): boolean {
 }
 
 // What the panel reports covers HDR10 and HLG, which need nothing but a wide
-// display. Dolby Vision needs a decoder, so it is probed like a codec. HDR10+ is
-// `false` everywhere in a browser: none of them apply its dynamic metadata, and
-// the HDR10 base layer is what actually gets drawn.
+// display. Dolby Vision needs a decoder, so it is probed per profile like a codec.
+// HDR10+ is `false` everywhere in a browser: none of them apply its dynamic
+// metadata, and the HDR10 base layer is what actually gets drawn.
 function detectHdrFormats(): HdrCapabilities {
   const panel = detectHdr();
+  const dolbyVisionProfiles = DOLBY_VISION_PROBES.filter(([, types]) =>
+    types.some(supportsType),
+  ).map(([profile]) => profile);
   return {
     hdr10: panel,
     hdr10Plus: false,
-    dolbyVision: supportsType(PROBE.dolbyVision),
+    dolbyVision: dolbyVisionProfiles.length > 0,
     hlg: panel,
+    ...(dolbyVisionProfiles.length > 0 ? { dolbyVisionProfiles } : {}),
   };
 }
 
@@ -126,43 +141,32 @@ function isReactNative(): boolean {
   );
 }
 
+function platformTable(isTizen: boolean, isWebOS: boolean): PlaybackCapabilities {
+  if (isTizen) return tizenCaps();
+  if (isWebOS) return WEBOS_CAPS;
+  return Platform.OS === 'ios' ? APPLE_TV_CAPS : ANDROID_TV_CAPS;
+}
+
+function tizenCaps(): PlaybackCapabilities {
+  const avinfo = (globalThis as { webapis?: { avinfo?: { isHdrTvSupport?: () => boolean } } })
+    .webapis?.avinfo;
+  if (typeof avinfo?.isHdrTvSupport !== 'function') return TIZEN_CAPS;
+  try {
+    return avinfo.isHdrTvSupport()
+      ? TIZEN_CAPS
+      : { ...TIZEN_CAPS, hdr: { ...TIZEN_CAPS.hdr, hdr10: false, hdr10Plus: false, hlg: false } };
+  } catch {
+    return TIZEN_CAPS;
+  }
+}
+
 export function detectCapabilities(frameLimits?: DecoderFrameLimits): PlaybackCapabilities {
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   const isTizen = isTizenRuntime(ua);
   const isWebOS = isWebOsRuntime(ua);
   const isNative = isReactNative();
   if (isTizen || isWebOS || isNative) {
-    const apple = isNative && Platform.OS === 'ios';
-    const tvAudio: AudioCapabilities = {
-      aac: true,
-      ac3: true,
-      eac3: true,
-      dts: !apple,
-      truehd: !apple,
-      flac: true,
-      opus: true,
-      mp3: true,
-      vorbis: true,
-    };
-    return {
-      hevc: true,
-      hevc10bit: true,
-      h264: true,
-      // No platform here reports its H.264 profiles, and unlike the HDR claim
-      // below a wrong yes draws nothing at all, so this claims only the 8-bit
-      // 4:2:0 every decoder implements.
-      h26410bit: false,
-      av1: false,
-      vp9: true,
-      // No platform here reports its HDR systems, and a panel that cannot draw a
-      // variant still draws its base layer, so this claims all four rather than
-      // refusing a title a set would have played. Which set actually does what is
-      // the device matrix's job, not this table's.
-      hdr: { hdr10: true, hdr10Plus: true, dolbyVision: true, hlg: true },
-      frameLimits,
-      audio: tvAudio,
-      source: 'platform-tv',
-    };
+    return { ...platformTable(isTizen, isWebOS), frameLimits };
   }
 
   const hevc = supportsType(PROBE.hevcMain) || supportsType(PROBE.hevcMainAlt);
@@ -178,6 +182,7 @@ export function detectCapabilities(frameLimits?: DecoderFrameLimits): PlaybackCa
     mp3: supportsType(AUDIO_PROBE.mp3),
     vorbis: supportsType(AUDIO_PROBE.vorbis),
   };
+  const hdr = detectHdrFormats();
   return {
     hevc,
     hevc10bit: supportsType(PROBE.hevcMain10),
@@ -185,7 +190,8 @@ export function detectCapabilities(frameLimits?: DecoderFrameLimits): PlaybackCa
     h26410bit: supportsType(PROBE.h264High10) && supportsType(PROBE.h264High444),
     av1: supportsType(PROBE.av1Main),
     vp9: supportsType(PROBE.vp9),
-    hdr: detectHdrFormats(),
+    hdr,
+    hdrDeclared: hdr.hdr10,
     frameLimits,
     audio,
     source: usingMse ? 'mediaSource' : 'videoElement',
@@ -208,15 +214,29 @@ export function capabilities(): PlaybackCapabilities {
  * The audio codecs this device can decode, named the way the server names them
  * (ffprobe's `codec_name`, which is what an item's audio tracks carry).
  *
- * This is what a player sends as `copyCodecs`: the server stream-copies audio by
- * default and only re-encodes what this list leaves out, so a device that never
- * declares anything is served a copy of everything and plays whatever it cannot
- * decode as silence.
+ * A device that never declares anything is served a copy of everything and plays
+ * whatever it cannot decode as silence, which is why a player sends
+ * {@link copyableAudioCodecs}, drawn from this list, as `copyCodecs`.
  */
 export function decodableAudioCodecs(caps: PlaybackCapabilities = capabilities()): string[] {
   return Object.entries(caps.audio)
     .filter(([, decodable]) => decodable)
     .map(([codec]) => codec);
+}
+
+/** Audio codecs ffmpeg can stream-copy into the fMP4 HLS variant, preserving
+ * surround; others (DTS/TrueHD/FLAC/Opus) fall back to a stereo-AAC transcode. */
+export const FMP4_COPY_CODECS = new Set<string>(['aac', 'ac3', 'eac3']);
+
+/**
+ * What a master or a download may stream-copy: the codecs this device decodes
+ * that an fMP4 can also carry. A master declares this rather than
+ * {@link decodableAudioCodecs}, because the server copies whatever the declaration
+ * names, so a device that decodes TrueHD would be served TrueHD in a container
+ * that cannot hold it instead of the 5.1 E-AC-3 its `eac3` earns.
+ */
+export function copyableAudioCodecs(caps: PlaybackCapabilities = capabilities()): string[] {
+  return decodableAudioCodecs(caps).filter((codec) => FMP4_COPY_CODECS.has(codec));
 }
 
 /**
@@ -234,4 +254,38 @@ export function decodableAudioCodecs(caps: PlaybackCapabilities = capabilities()
 export function decodableVideoCodecs(caps: PlaybackCapabilities = capabilities()): string[] {
   const declared: PlaybackCapabilities = { ...caps, hevc: caps.hevc && caps.hevc10bit };
   return (['hevc', 'h264', 'h26410bit', 'av1', 'vp9'] as const).filter((codec) => declared[codec]);
+}
+
+function decodesHevcDolbyVision(hdr: HdrCapabilities): boolean {
+  if (!hdr.dolbyVision) return false;
+  return hdr.dolbyVisionProfiles === undefined || hdr.dolbyVisionProfiles.some((p) => p !== 10);
+}
+
+/**
+ * The HDR systems this device displays, in the words the server's `hdr` query
+ * token takes (`hdr10`, `hdr10plus`, `hlg`, `dv`, where `dv` is HEVC Dolby Vision: an AV1-only
+ * Dolby Vision decoder does not earn it). Undefined where the table is a
+ * guess rather than a statement about the device, which leaves the server to behave
+ * as it did before the token existed; an empty list is a declared SDR display.
+ */
+export function hdrDeclaration(caps: PlaybackCapabilities = capabilities()): string[] | undefined {
+  if (!caps.hdrDeclared) return undefined;
+  const { hdr10, hdr10Plus, hlg } = caps.hdr;
+  const dolbyVision = decodesHevcDolbyVision(caps.hdr);
+  return [
+    hdr10 ? 'hdr10' : null,
+    hdr10Plus ? 'hdr10plus' : null,
+    hlg ? 'hlg' : null,
+    dolbyVision ? 'dv' : null,
+  ].filter((name): name is string => name !== null);
+}
+
+/** Everything a stream request declares about this device, from one table: the
+ * audio it decodes, the video it draws, and the HDR it displays. */
+export function deviceDeclaration(caps: PlaybackCapabilities = capabilities()) {
+  return {
+    copyCodecs: copyableAudioCodecs(caps),
+    videoCodecs: decodableVideoCodecs(caps),
+    hdr: hdrDeclaration(caps),
+  };
 }

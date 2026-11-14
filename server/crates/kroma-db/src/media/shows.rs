@@ -48,7 +48,8 @@ pub(super) fn row_to_show_bare(r: &Row) -> rusqlite::Result<Show> {
 // The stream columns a representative-video SELECT projects, in order and under
 // the `files` alias both callers below give it.
 const VIDEO_COLS: &str = "f.v_codec,f.v_width,f.v_height,f.v_hdr,f.v_bit_depth,\
-    f.v_hdr_format,f.v_dv_profile,f.v_color_primaries,f.v_color_transfer,f.v_color_matrix";
+    f.v_hdr_format,f.v_dv_profile,f.v_color_primaries,f.v_color_transfer,f.v_color_matrix,\
+    f.v_dv_level,f.v_dv_compat,f.v_dv_el";
 
 // `base` is the index of `v_codec`; [`VIDEO_COLS`] follows it in order.
 fn row_to_video_at(r: &Row, base: usize) -> rusqlite::Result<VideoStream> {
@@ -68,6 +69,9 @@ fn row_to_video_at(r: &Row, base: usize) -> rusqlite::Result<VideoStream> {
             .as_deref()
             .and_then(HdrFormat::parse),
         dolby_vision_profile: r.get(base + 6)?,
+        dolby_vision_level: r.get(base + 10)?,
+        dolby_vision_compatibility: r.get(base + 11)?,
+        dolby_vision_enhancement_layer: r.get::<_, Option<i64>>(base + 12)? == Some(1),
         color: (!color.is_empty()).then_some(color),
     })
 }

@@ -8,7 +8,7 @@
 //! takes them away again, and [`super::live`] is what the admin sees of them.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -21,12 +21,13 @@ use tracing::{info, warn};
 use super::admission::{max_live_transcodes, Refusal};
 use super::Asked;
 use super::covered::Serving;
+use super::args::Spec;
 use super::ffmpeg::{detect_burst, keyframe_before, spawn_stream};
 use super::hwaccel::Pipeline;
 use super::live::Plan;
 use super::naming::{contains, content_type, is_safe_name, seg_index, session_dir};
+use super::tonemap::ToneMap;
 use super::window::Window;
-use super::{StreamMode, VideoMode};
 use crate::ffmpeg_gate;
 
 const FILE_WAIT: Duration = Duration::from_secs(20);
@@ -48,6 +49,7 @@ pub(super) struct Session {
     // session: for as long as it lives, background media passes are held to one
     // at a time (see [`crate::ffmpeg_gate`]).
     _cpu: Option<ffmpeg_gate::Reservation>,
+    _input: crate::input::MediaInput,
 }
 
 impl Session {
@@ -186,7 +188,7 @@ impl Sessions {
     }
 
     async fn ensure(self: &Arc<Self>, key: &str, asked: &Asked<'_>) -> Result<Arc<Session>, Refusal> {
-        let (input, mode, source) = (Path::new(asked.input), asked.mode, asked.source);
+        let (input, mode, source) = (asked.input, asked.mode, asked.source);
         let (audio, start_secs) = (asked.audio, asked.anchor as f64);
         // The anchor is part of the key, so an existing session is always the right one.
         {
@@ -201,15 +203,13 @@ impl Sessions {
         }
         // Both shell out on their first call: must not run under the lock.
         let start = keyframe_before(input, start_secs).await;
-        // Off the reactor: the first call makes every candidate device encode a
-        // test frame, and this one runs inside the request that starts a session.
         let target = mode.video.box_size();
-        let pipeline = tokio::task::spawn_blocking(move || Pipeline::choose(source, target))
-            .await
-            .unwrap_or_else(|_| Pipeline::choose(source, target));
-        // The one case worth taking the box away from background work: no device,
-        // and a picture that has to be rebuilt frame by frame while someone waits.
-        let on_the_cpu = pipeline.on_the_cpu() && !matches!(mode.video, VideoMode::Copy);
+        let tonemap = asked
+            .video
+            .filter(|_| !mode.video.copies())
+            .and_then(ToneMap::for_video);
+        let pipeline = Pipeline::choose(source, target, tonemap);
+        let on_the_cpu = pipeline.on_the_cpu() && !mode.video.copies();
 
         let mut map = self.inner.lock().await;
         if let Some(s) = map.get(key) {
@@ -217,14 +217,24 @@ impl Sessions {
             return Ok(s.clone());
         }
         self.make_room(&mut map).await;
-        if !matches!(mode.video, VideoMode::Copy) && !self.admits_transcode(&mut map).await {
+        if !mode.video.copies() && !self.admits_transcode(&mut map, pipeline.slots()).await {
             warn!(session = %key, cap = self.transcode_cap, "refused a re-encode: every slot is taken");
             return Err(Refusal::Busy);
         }
         let dir = self.root.join(session_dir(key));
         super::reclaim::discard_dir(&dir);
         let child = match self
-            .spawn_into(&dir, input, audio, mode, start_secs, pipeline)
+            .spawn_into(Spec {
+                input,
+                dir: &dir,
+                audio,
+                mode,
+                start_secs,
+                burst: self.burst,
+                pipeline,
+                video: asked.video,
+                track: asked.track,
+            })
             .await
         {
             Ok(child) => child,
@@ -233,7 +243,7 @@ impl Sessions {
                 return Err(Refusal::Unavailable);
             }
         };
-        info!(session = %key, audio, mode = ?mode, anchor = start_secs, start, accel = pipeline.accel.label(), effort = pipeline.effort.label(), "started HLS remux");
+        info!(session = %key, audio, mode = ?mode, anchor = start_secs, start, accel = pipeline.accel.label(), effort = pipeline.effort.label(), tonemap = ?pipeline.tonemap.map(ToneMap::route), "started HLS remux");
         let session = Arc::new(Session {
             plan: Plan::new(key, audio, mode, pipeline, source, child.id(), start_secs),
             dir,
@@ -244,22 +254,15 @@ impl Sessions {
             opener: asked.opener.map(str::to_owned),
             superseded: AtomicBool::new(false),
             _cpu: on_the_cpu.then(ffmpeg_gate::reserve),
+            _input: input.clone(),
         });
         map.insert(key.to_string(), session.clone());
         Ok(session)
     }
 
-    async fn spawn_into(
-        &self,
-        dir: &Path,
-        input: &Path,
-        audio: u32,
-        mode: StreamMode,
-        start_secs: f64,
-        pipeline: Pipeline,
-    ) -> std::io::Result<Child> {
-        tokio::fs::create_dir_all(dir).await?;
-        spawn_stream(input, dir, audio, mode, start_secs, self.burst, pipeline)
+    async fn spawn_into(&self, spec: Spec<'_>) -> std::io::Result<Child> {
+        tokio::fs::create_dir_all(spec.dir).await?;
+        spawn_stream(&spec)
     }
 
     async fn retire_superseded(&self, key: &str, opener: Option<&str>) -> bool {

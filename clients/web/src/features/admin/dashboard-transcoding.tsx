@@ -52,9 +52,15 @@ function pictureLabel(s: LiveTranscode, t: ReturnType<typeof useT>) {
   return to ?? t('admin.tcVideoReencode');
 }
 
+const SURROUND_LABELS: Readonly<Record<string, string>> = {
+  eac3: 'E-AC-3 5.1',
+  ac3: 'AC-3 5.1',
+};
+
 function soundLabel(s: LiveTranscode, t: ReturnType<typeof useT>) {
   if (!s.transcodesAudio) return t('admin.tcAudioCopy');
-  return s.audio === 'aac' ? 'AAC' : `AAC · ${s.audio.replace('aac-', '')}`;
+  if (s.audio === 'aac') return 'AAC';
+  return SURROUND_LABELS[s.audio] ?? `AAC · ${s.audio.replace('aac-', '')}`;
 }
 
 function title(s: LiveTranscode, t: ReturnType<typeof useT>) {

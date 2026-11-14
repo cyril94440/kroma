@@ -57,8 +57,14 @@ fn a_direct_call_opens_on_the_direct_route_with_the_rule_that_let_it() {
 fn a_blocked_call_is_refused_with_the_gate_reason() {
     let ruling = ruled(Decision::Block("off hours".into()));
 
-    let (exchange, refusal) =
-        Exchange::direct_only("test", "GET", "example.test".into(), 443, ruling, "no proxy");
+    let (exchange, refusal) = Exchange::direct_only(
+        "test",
+        "GET",
+        "example.test".into(),
+        443,
+        ruling,
+        "no proxy",
+    );
 
     assert_eq!(refusal, Some(format!("{BLOCKED}: off hours")));
     assert_eq!(exchange.route, Route::Blocked);
@@ -68,8 +74,14 @@ fn a_blocked_call_is_refused_with_the_gate_reason() {
 fn a_call_sent_to_a_proxy_is_refused_with_the_client_reason() {
     let ruling = ruled(Decision::Proxy("socks5://127.0.0.1:9".into()));
 
-    let (exchange, refusal) =
-        Exchange::direct_only("test", "GET", "example.test".into(), 443, ruling, "no proxy");
+    let (exchange, refusal) = Exchange::direct_only(
+        "test",
+        "GET",
+        "example.test".into(),
+        443,
+        ruling,
+        "no proxy",
+    );
 
     assert_eq!(refusal, Some(format!("{BLOCKED}: no proxy")));
     assert_eq!(exchange.route, Route::Blocked);

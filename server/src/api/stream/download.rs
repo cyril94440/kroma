@@ -7,6 +7,7 @@ use axum::body::Body;
 use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
+use kroma_media::download;
 use kroma_media::input;
 use serde::Deserialize;
 
@@ -18,18 +19,18 @@ use crate::db;
 use crate::state::SharedState;
 use tokio::io::AsyncReadExt;
 
-mod audio_args;
-
 use super::byte_sink;
-use audio_args::download_audio_args;
 
-/// `?copy=` and `?video=` name codecs the client decodes natively. Absent means
+/// `?hdr=` names the HDR systems the display shows (`hdr10`, `hdr10plus`, `hlg`, `dv`);
+/// absent is undeclared, empty is SDR only, and a source it cannot show is re-encoded
+/// tone-mapped. `?copy=` and `?video=` name codecs the client decodes natively. Absent means
 /// the default (`copy` → `aac,ac3,eac3`; `video` → stream-copy the source);
 /// present but empty (`?copy=`) means none, so transcode every track.
 #[derive(Debug, Deserialize)]
 pub struct DownloadQuery {
     pub copy: Option<String>,
     pub video: Option<String>,
+    pub hdr: Option<String>,
 }
 
 /// `GET /api/items/:id/download` (optional `?copy=aac,ac3`, `?video=hevc,h264`)
@@ -58,55 +59,19 @@ pub async fn download_item(
         .abs_path
         .clone()
         .ok_or_else(|| json_error(StatusCode::NOT_FOUND, "no file for item"))?;
-    if !std::path::Path::new(&abs).exists() {
-        return Err(json_error(
-            StatusCode::NOT_FOUND,
-            "media file unavailable (mount offline?)",
-        ));
-    }
+    let input = super::remote::playable(&state, &user, &abs, true).await?.input;
 
-    let source_video = item.video.as_ref().map(|v| v.codec.as_str());
-    let video_copy = match (q.video.as_deref(), source_video) {
-        (None, _) => true,
-        (Some(set), Some(codec)) => set.split(',').any(|c| c.trim().eq_ignore_ascii_case(codec)),
-        (Some(_), None) => false,
-    };
     let mut cmd = tokio::process::Command::new("ffmpeg");
-    cmd.args(["-v", "error", "-nostdin"])
-        .args(input::file(&abs))
-        .args(["-map", "0:v:0"]);
-    if video_copy {
-        cmd.args(["-c:v", "copy"]);
-        if source_video == Some("hevc") {
-            // Apple decoders require the `hvc1` sample-entry tag; stream-copied
-            // HEVC defaults to `hev1`, which plays AUDIO ONLY on iOS local files.
-            cmd.args(["-tag:v", "hvc1"]);
-        }
-    } else {
-        // H.264 8-bit because every download target decodes it; offline has no
-        // fallback. HDR sources are not tone-mapped (no zimg) and read washed-out.
-        cmd.args([
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
-        ]);
-    }
-    cmd.args(download_audio_args(
-        &item.audio_tracks,
-        item.audio.as_ref().map(|a| a.codec.as_str()),
-        q.copy.as_deref(),
-    ));
-    // NO `empty_moov`: the muxer cannot write an upfront moov for EAC3 (codec params
-    // are only known after parsing packets); `frag_keyframe` emits it with the first
-    // fragment instead, which a pipe handles fine.
-    cmd.args([
-        "-dn",
-        "-map_chapters",
-        "-1",
-        "-movflags",
-        "frag_keyframe+default_base_moof",
-        "-f",
-        "mp4",
-        "pipe:1",
-    ]);
+    input::without_proxies(cmd.as_std_mut());
+    cmd.kill_on_drop(true).args(download::args(&download::Request {
+        input: &input,
+        video: item.video.as_ref(),
+        audio: item.audio.as_ref(),
+        audio_tracks: &item.audio_tracks,
+        client_video: q.video.as_deref(),
+        client_copy: q.copy.as_deref(),
+        client_hdr: q.hdr.as_deref(),
+    }));
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -136,7 +101,7 @@ pub async fn download_item(
             Some(e) => {
                 let mut buf = String::new();
                 let _ = e.read_to_string(&mut buf).await;
-                buf.lines().last().unwrap_or_default().trim().to_string()
+                input.redact(buf.lines().last().unwrap_or_default().trim())
             }
             None => String::new(),
         };
@@ -157,6 +122,7 @@ pub async fn download_item(
     // on a full pipe. The permit rides along so the slot returns when the process is
     // gone, not when the handler returns.
     let item_id = item.id.clone();
+    let redacting = input.clone();
     tokio::spawn(async move {
         let mut detail = String::new();
         if let Some(mut e) = stderr {
@@ -164,7 +130,7 @@ pub async fn download_item(
         }
         match child.wait().await {
             Ok(status) if !status.success() => {
-                tracing::warn!(item = %item_id, %status, error = %detail.trim(), "download remux exited non-zero");
+                tracing::warn!(item = %item_id, %status, error = %redacting.redact(detail.trim()), "download remux exited non-zero");
             }
             _ => {}
         }

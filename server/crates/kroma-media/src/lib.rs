@@ -6,6 +6,8 @@
 //! never comes with it.
 
 pub mod audio;
+pub mod capabilities;
+pub mod download;
 pub mod external_subtitles;
 pub mod ffmpeg_gate;
 pub mod ffmpeg_run;
@@ -16,6 +18,7 @@ pub mod probe;
 pub mod program;
 pub mod storyboard;
 pub mod stream;
+pub mod stream_copy;
 pub mod subtitles;
 pub mod tmp_file;
 pub mod video;

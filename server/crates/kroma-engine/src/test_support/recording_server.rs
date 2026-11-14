@@ -21,6 +21,7 @@ impl RecordedRequest {
 pub(crate) struct RecordingServer {
     base: String,
     seen: Arc<Mutex<Vec<RecordedRequest>>>,
+    answer: Arc<Mutex<(u16, String)>>,
 }
 
 impl RecordingServer {
@@ -37,7 +38,8 @@ impl RecordingServer {
         let port = listener.local_addr().unwrap().port();
         let seen = Arc::new(Mutex::new(Vec::new()));
         let log = Arc::clone(&seen);
-        let body = body.to_string();
+        let answer = Arc::new(Mutex::new((status, body.to_string())));
+        let current = Arc::clone(&answer);
 
         std::thread::spawn(move || {
             for stream in listener.incoming() {
@@ -46,6 +48,7 @@ impl RecordingServer {
                     continue;
                 };
                 log.lock().unwrap().push(request);
+                let (status, body) = current.lock().unwrap().clone();
                 write_reply(&mut stream, status, location.as_deref(), &body);
             }
         });
@@ -53,7 +56,12 @@ impl RecordingServer {
         Self {
             base: format!("http://127.0.0.1:{port}"),
             seen,
+            answer,
         }
+    }
+
+    pub(crate) fn answer_from_now_on(&self, status: u16, body: &str) {
+        *self.answer.lock().unwrap() = (status, body.to_string());
     }
 
     pub(crate) fn base(&self) -> &str {

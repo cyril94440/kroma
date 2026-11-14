@@ -23,7 +23,7 @@ LogBox.ignoreAllLogs(true);
 
 import { lanBeacon } from '@kromatv/lan-beacon';
 import { useEffect, useState } from 'react';
-import { decoderFrameLimits } from '../modules/device-hardware';
+import { decoderFrameLimits, hdrSupport } from '../modules/device-hardware';
 import { browseForServers } from '../modules/server-discovery';
 import { startLauncherLinks } from './lib/launcher-links';
 import { nativeLauncher } from './lib/native-launcher';
@@ -69,6 +69,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 export function App() {
   const [frameLimits] = useState(decoderFrameLimits);
+  const [hdr] = useState(hdrSupport);
   const [deepLinks] = useState(createDeepLinks);
   const [searchRequests] = useState(createSearchRequests);
   useVoiceKey(searchRequests.requestListening);
@@ -111,6 +112,7 @@ export function App() {
           admin dashboard and the About screen alike. */}
         <TvApp
           decoderFrameLimits={frameLimits ?? undefined}
+          hdrSupport={hdr ?? undefined}
           deepLinks={deepLinks}
           searchRequests={searchRequests}
           voiceSearch={nativeVoiceSearch}

@@ -75,8 +75,40 @@ pub struct VideoStream {
         skip_serializing_if = "Option::is_none"
     )]
     pub dolby_vision_profile: Option<u32>,
+    #[serde(
+        rename = "dolbyVisionLevel",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub dolby_vision_level: Option<u8>,
+    /// Dolby Vision's `bl_signal_compatibility_id`: 0 none (profile 5), 1 HDR10,
+    /// 2 SDR, 4 HLG, 6 UHD Blu-ray HDR10.
+    #[serde(
+        rename = "dolbyVisionCompatibility",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub dolby_vision_compatibility: Option<u8>,
+    #[serde(
+        rename = "dolbyVisionEnhancementLayer",
+        default,
+        skip_serializing_if = "is_false"
+    )]
+    pub dolby_vision_enhancement_layer: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<ColorInfo>,
+}
+
+fn is_false(flag: &bool) -> bool {
+    !*flag
+}
+
+/// The object-based layer an audio stream carries on top of its channel bed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SpatialAudio {
+    Atmos,
+    Dtsx,
 }
 
 /// One audio stream/track. An item can carry several (e.g. EN + FR, or a
@@ -96,6 +128,12 @@ pub struct AudioStream {
     pub default: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spatial: Option<SpatialAudio>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +178,90 @@ mod tests {
 
         assert!(said_nothing.is_empty());
         assert!(!said_something.is_empty());
+    }
+
+    #[test]
+    fn a_stream_with_no_new_facts_serialises_exactly_as_before() {
+        let video = VideoStream {
+            codec: "hevc".into(),
+            width: Some(3840),
+            height: Some(2160),
+            hdr: true,
+            bit_depth: Some(10),
+            hdr_format: Some(HdrFormat::Hdr10),
+            dolby_vision_profile: None,
+            dolby_vision_level: None,
+            dolby_vision_compatibility: None,
+            dolby_vision_enhancement_layer: false,
+            color: None,
+        };
+        let audio = AudioStream {
+            index: 0,
+            codec: "eac3".into(),
+            channels: Some(6),
+            language: None,
+            title: None,
+            default: true,
+            region: None,
+            profile: None,
+            layout: None,
+            spatial: None,
+        };
+
+        let video = serde_json::to_string(&video).unwrap();
+        let audio = serde_json::to_string(&audio).unwrap();
+
+        assert!(!video.contains("dolbyVision"), "{video}");
+        assert!(!audio.contains("profile") && !audio.contains("spatial"), "{audio}");
+    }
+
+    #[test]
+    fn the_new_facts_travel_under_the_names_clients_read() {
+        let video = VideoStream {
+            codec: "hevc".into(),
+            width: None,
+            height: None,
+            hdr: true,
+            bit_depth: None,
+            hdr_format: Some(HdrFormat::DolbyVision),
+            dolby_vision_profile: Some(8),
+            dolby_vision_level: Some(6),
+            dolby_vision_compatibility: Some(1),
+            dolby_vision_enhancement_layer: true,
+            color: None,
+        };
+        let audio = AudioStream {
+            index: 1,
+            codec: "truehd".into(),
+            channels: Some(8),
+            language: None,
+            title: None,
+            default: false,
+            region: None,
+            profile: Some("Dolby TrueHD + Dolby Atmos".into()),
+            layout: Some("7.1".into()),
+            spatial: Some(SpatialAudio::Atmos),
+        };
+
+        let video = serde_json::to_value(&video).unwrap();
+        let audio = serde_json::to_value(&audio).unwrap();
+
+        assert_eq!(video["dolbyVisionLevel"], 6);
+        assert_eq!(video["dolbyVisionCompatibility"], 1);
+        assert_eq!(video["dolbyVisionEnhancementLayer"], true);
+        assert_eq!(audio["profile"], "Dolby TrueHD + Dolby Atmos");
+        assert_eq!(audio["layout"], "7.1");
+        assert_eq!(audio["spatial"], "atmos");
+        assert_eq!(serde_json::to_value(SpatialAudio::Dtsx).unwrap(), "dtsx");
+    }
+
+    #[test]
+    fn a_track_stored_before_the_audio_facts_still_reads() {
+        let track: AudioStream =
+            serde_json::from_str(r#"{"index":0,"codec":"dts","channels":6,"language":null,"default":true}"#)
+                .unwrap();
+
+        assert!(track.profile.is_none() && track.layout.is_none() && track.spatial.is_none());
     }
 
     #[test]

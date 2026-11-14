@@ -30,12 +30,17 @@ import { type HlsAudioFilter, StoryboardManifest } from './tracks';
  *
  * `videoCodecs` carries ffprobe's codec names plus `h26410bit`, which is not a
  * codec: it says the decoder takes H.264 above 8 bits, since `h264` on its own
- * is read as the 8-bit 4:2:0 profile. */
+ * is read as the 8-bit 4:2:0 profile.
+ *
+ * `hdr` names the HDR systems the display shows (`hdr10`, `hdr10plus`, `hlg`,
+ * `dv`): omitted means unknown and changes nothing, an empty array is an SDR
+ * display the server tone-maps for. */
 export interface HlsMasterDeclaration {
   filter?: HlsAudioFilter;
   subtitle?: string;
   copyCodecs?: string[];
   videoCodecs?: string[];
+  hdr?: string[];
   maxFrame?: { width: number; height: number };
 }
 
@@ -44,11 +49,16 @@ const frame = (maxFrame?: { width: number; height: number }) =>
     ? { maxw: Math.round(maxFrame.width), maxh: Math.round(maxFrame.height) }
     : {};
 
-/** The `?copy=&video=&maxw=&maxh=` a stream request carries: what this device can
- * decode, and the largest picture it accepts. An EMPTY codec list is itself a
- * declaration ("decode none"), which is why it is not the same as no list. */
-export function streamQuery({ copyCodecs, videoCodecs, maxFrame }: HlsMasterDeclaration): Query {
-  return { copy: copyCodecs, video: videoCodecs, ...frame(maxFrame) };
+/** The `?copy=&video=&hdr=&maxw=&maxh=` a stream request carries: what this device
+ * can decode and display, and the largest picture it accepts. An EMPTY list is
+ * itself a declaration ("decode none"), which is why it is not the same as no list. */
+export function streamQuery({
+  copyCodecs,
+  videoCodecs,
+  hdr,
+  maxFrame,
+}: HlsMasterDeclaration): Query {
+  return { copy: copyCodecs, video: videoCodecs, hdr, ...frame(maxFrame) };
 }
 
 const forMode = (mode: string, declaration: HlsMasterDeclaration) =>
@@ -179,10 +189,10 @@ export default function mediaApi(ctx: RequestContext) {
      * omitted (no preference, full copy set) from an empty array (decode none,
      * transcode everything) - collapsing the two would hand a device Dolby/AV1
      * tracks it can't decode with no fallback once offline. */
-    downloadUrl: (id: ItemId, copyCodecs?: string[], videoCodecs?: string[]) =>
+    downloadUrl: (id: ItemId, copyCodecs?: string[], videoCodecs?: string[], hdr?: string[]) =>
       ctx.url('/items/:id/download', {
         params: { id },
-        query: streamQuery({ copyCodecs, videoCodecs }),
+        query: streamQuery({ copyCodecs, videoCodecs, hdr }),
       }),
 
     /** HLS master playlist for one continuous remux, with the `audio` track muxed

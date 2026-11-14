@@ -25,6 +25,7 @@ mod engine;
 mod fetch;
 mod gate;
 mod grab;
+mod instant;
 mod ledger;
 pub mod matching;
 mod reseed;
@@ -35,6 +36,9 @@ mod throughput;
 
 pub use engine::LiveStat;
 pub use gate::active_proxy_url;
+pub use instant::{
+    Begun, InstantOutcome, InstantRelease, InstantStatus, Pending, Settle, MAX_INSTANT_CANDIDATES,
+};
 pub use throughput::{bps_setting, DOWN_KBPS_KEY, MAX_ACTIVE_KEY, UP_KBPS_KEY};
 
 use fetch::fetch_torrent_file;
@@ -58,6 +62,7 @@ pub struct DownloadManager {
     start_failures: AtomicU32,
     start_deferred: AtomicBool,
     announced: Mutex<HashMap<String, Instant>>,
+    unanswered: Mutex<HashMap<String, Instant>>,
     helper: String,
     state_dir: PathBuf,
     downloads_dir: PathBuf,
@@ -100,6 +105,7 @@ impl DownloadManager {
             start_failures: AtomicU32::new(0),
             start_deferred: AtomicBool::new(false),
             announced: Mutex::new(HashMap::new()),
+            unanswered: Mutex::new(HashMap::new()),
             helper,
             downloads_dir: state_dir.join("downloads"),
             state_dir,

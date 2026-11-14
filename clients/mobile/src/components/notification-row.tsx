@@ -170,6 +170,7 @@ const EVENT_GLYPH: Record<string, { name: IconName; color: string }> = {
   'request.approved': { name: 'circle-check', color: 'success' },
   'request.denied': { name: 'circle-x', color: DANGER_INK },
   'request.available': { name: 'sparkles', color: 'accentText' },
+  'request.failed': { name: 'alert-triangle', color: DANGER_INK },
   'media.added': { name: 'player-play-filled', color: 'info' },
   'media.episode': { name: 'device-tv', color: 'info' },
   'report.submitted': { name: 'flag-3', color: 'hdr' },

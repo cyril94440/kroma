@@ -110,7 +110,7 @@ export type TranscodeHardware = z.infer<typeof TranscodeHardware>;
 /** One live remux. `speed` is the figure to read first: under 1.0 the encoder is
  *  producing less than a second of film per second and the player will run dry.
  *  `video` is `copy` | `h264` | `h264-1080` | `h264-720`, `audio` is `copy` |
- *  `aac` | `aac-standard` | `aac-night`, `accel` is `videotoolbox` | `qsv` |
+ *  `aac` | `aac-standard` | `aac-night` | `eac3` | `ac3`, `accel` is `videotoolbox` | `qsv` |
  *  `vaapi` | `nvenc` | `software`, and `effort` (`quality` | `realtime`) only
  *  means anything on the software path. */
 export const LiveTranscode = z.object({

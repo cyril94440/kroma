@@ -81,6 +81,7 @@ mod tests {
 
     fn file() -> MediaFile {
         MediaFile {
+            remote: false,
             id: "f1".into(),
             rel_path: Some("Show/Season 01/Show - S01E01 - 1080p.mkv".into()),
             container: "mkv".into(),
@@ -98,6 +99,9 @@ mod tests {
                 bit_depth: Some(10),
                 hdr_format: Some(ProbedHdr::DolbyVision),
                 dolby_vision_profile: Some(8),
+                dolby_vision_level: None,
+                dolby_vision_compatibility: None,
+                dolby_vision_enhancement_layer: false,
                 color: None,
             }),
             audio: None,
@@ -110,6 +114,9 @@ mod tests {
                     title: None,
                     default: true,
                     region: None,
+                    profile: None,
+                    layout: None,
+                    spatial: None,
                 },
                 AudioStream {
                     index: 1,
@@ -119,6 +126,9 @@ mod tests {
                     title: Some("VFQ".into()),
                     default: false,
                     region: Some("CA".into()),
+                    profile: None,
+                    layout: None,
+                    spatial: None,
                 },
             ],
             subtitles: Vec::new(),

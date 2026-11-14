@@ -1,4 +1,6 @@
-use super::builders::{audio, episode, movie, show_id, sub, video};
+use super::builders::{
+    audio, dolby_vision, episode, movie, show_id, sub, video, with_profile,
+};
 use crate::model::{HdrFormat, Library, LibraryKind, Show};
 use crate::services::scan::{now_iso8601, short_hash, ScanData};
 
@@ -20,8 +22,16 @@ pub fn demo_data() -> ScanData {
             "mkv",
             video("hevc", 3840, 2160, Some(HdrFormat::Hdr10), 10),
             vec![
-                audio("truehd", 8, Some("eng")),
-                audio("eac3", 6, Some("fra")),
+                with_profile(
+                    audio("truehd", 8, Some("eng")),
+                    "Dolby TrueHD + Dolby Atmos",
+                    "7.1",
+                ),
+                with_profile(
+                    audio("eac3", 6, Some("fra")),
+                    "Dolby Digital Plus",
+                    "5.1(side)",
+                ),
                 audio("aac", 2, Some("eng")),
             ],
             vec![sub(Some("eng"), "subrip"), sub(Some("fra"), "subrip")],
@@ -34,7 +44,7 @@ pub fn demo_data() -> ScanData {
             Some(2024),
             Some(9_960_000),
             "mkv",
-            video("hevc", 3840, 2160, Some(HdrFormat::Hdr10), 10),
+            dolby_vision(video("hevc", 3840, 2160, Some(HdrFormat::Hdr10), 10), 8, 6, 1),
             vec![audio("eac3", 6, Some("eng")), audio("ac3", 6, Some("fra"))],
             vec![sub(Some("eng"), "subrip")],
             &movies_lib,

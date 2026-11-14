@@ -161,6 +161,9 @@ mod tests {
             bit_depth: Some(10),
             hdr_format: hdr.then_some(HdrFormat::Hdr10),
             dolby_vision_profile: None,
+            dolby_vision_level: None,
+            dolby_vision_compatibility: None,
+            dolby_vision_enhancement_layer: false,
             color: None,
         }
     }
@@ -174,6 +177,9 @@ mod tests {
             title: None,
             default: true,
             region: None,
+            profile: None,
+            layout: None,
+            spatial: None,
         }
     }
 
@@ -257,6 +263,7 @@ mod tests {
         let mut it = base_item();
         it.duration_ms = Some(1000); // 1 second
         it.files = vec![MediaFile {
+            remote: false,
             id: "f1".into(),
             rel_path: None,
             container: "mkv".into(),

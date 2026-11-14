@@ -53,9 +53,14 @@ impl Rung {
 /// decoder accepts. A picture is orders of magnitude dearer to re-encode than a
 /// soundtrack, so [`StreamMode::for_client_video`] is the only thing that ever
 /// reaches past `Copy`.
+///
+/// `CopyDolby` is a copy that also signals Dolby Vision profile 5 as `dvh1`,
+/// which only a decoder that declared `dv` can read: a plain `Copy` of that
+/// stream is tagged as the HEVC it is, so every other client still opens it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum VideoMode {
     Copy,
+    CopyDolby,
     H264,
     H264At(Rung),
 }
@@ -65,13 +70,19 @@ impl VideoMode {
     pub const fn box_size(self) -> Option<(u32, u32)> {
         match self {
             Self::H264At(rung) => Some(rung.box_size()),
-            Self::Copy | Self::H264 => None,
+            Self::Copy | Self::CopyDolby | Self::H264 => None,
         }
+    }
+
+    /// Whether the picture is passed through rather than re-encoded.
+    pub const fn copies(self) -> bool {
+        matches!(self, Self::Copy | Self::CopyDolby)
     }
 
     const fn token(self) -> &'static str {
         match self {
             Self::Copy => "",
+            Self::CopyDolby => DOLBY_PREFIX,
             Self::H264 => H264_PREFIX,
             Self::H264At(rung) => rung.token(),
         }
@@ -82,13 +93,25 @@ impl VideoMode {
 /// AAC transcode with a loudness filter (night-mode volume leveling for clients
 /// with no local audio DSP, e.g. Tizen AVPlay). A filter always transcodes - a
 /// stream copy cannot be filtered - so the filtered variants subsume `Aac`.
+///
+/// `Eac3` and `Ac3` keep the 5.1 bed of a surround source a client cannot decode
+/// as it is: 640 kbps E-AC-3 or AC-3, for a client that declared the codec. A
+/// source with fewer than five channels is still encoded as stereo AAC, so the
+/// mode is safe to ask for on any track. The loudness variants stay stereo AAC:
+/// their compressor is tuned for a downmix, and they exist for clients that
+/// cannot run one themselves.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AudioMode {
     Copy,
     Aac,
     AacStandard,
     AacNight,
+    Eac3,
+    Ac3,
 }
+
+/// The fewest channels a source has for its surround bed to be worth keeping.
+pub const SURROUND_MIN_CHANNELS: u32 = 5;
 
 impl AudioMode {
     const fn token(self) -> &'static str {
@@ -97,7 +120,13 @@ impl AudioMode {
             Self::Aac => "aac",
             Self::AacStandard => "aac-standard",
             Self::AacNight => "aac-night",
+            Self::Eac3 => "eac3",
+            Self::Ac3 => "ac3",
         }
+    }
+
+    pub(super) const fn label(self) -> &'static str {
+        self.token()
     }
 
     pub(super) fn transcode(self) -> bool {
@@ -108,7 +137,7 @@ impl AudioMode {
     // `audio-filter.ts`) so every engine sounds the same.
     pub(super) fn filter_chain(self) -> Option<&'static str> {
         match self {
-            Self::Copy | Self::Aac => None,
+            Self::Copy | Self::Aac | Self::Eac3 | Self::Ac3 => None,
             Self::AacStandard => {
                 Some("acompressor=threshold=0.063:ratio=4:attack=10:release=250:knee=6:makeup=1.4")
             }
@@ -130,6 +159,7 @@ pub struct StreamMode {
 // The video axis is spelled as a prefix on the audio token, so every URL minted
 // before the axis existed still parses - and still means a video stream copy.
 const H264_PREFIX: &str = "h264-";
+const DOLBY_PREFIX: &str = "dv-";
 
 impl StreamMode {
     pub const fn new(video: VideoMode, audio: AudioMode) -> Self {
@@ -145,6 +175,8 @@ impl StreamMode {
             (VideoMode::H264At(Rung::P720), rest)
         } else if let Some(rest) = s.strip_prefix(H264_PREFIX) {
             (VideoMode::H264, rest)
+        } else if let Some(rest) = s.strip_prefix(DOLBY_PREFIX) {
+            (VideoMode::CopyDolby, rest)
         } else {
             (VideoMode::Copy, s)
         };
@@ -153,6 +185,8 @@ impl StreamMode {
             "aac" => AudioMode::Aac,
             "aac-standard" => AudioMode::AacStandard,
             "aac-night" => AudioMode::AacNight,
+            "eac3" => AudioMode::Eac3,
+            "ac3" => AudioMode::Ac3,
             _ => return None,
         };
         Some(Self::new(video, audio))
@@ -165,75 +199,4 @@ impl StreamMode {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const VIDEO_MODES: [VideoMode; 4] = [
-        VideoMode::Copy,
-        VideoMode::H264,
-        VideoMode::H264At(Rung::P1080),
-        VideoMode::H264At(Rung::P720),
-    ];
-    const AUDIO_MODES: [AudioMode; 4] = [
-        AudioMode::Copy,
-        AudioMode::Aac,
-        AudioMode::AacStandard,
-        AudioMode::AacNight,
-    ];
-
-    #[test]
-    fn mode_tokens_round_trip() {
-        for video in VIDEO_MODES {
-            for audio in AUDIO_MODES {
-                let mode = StreamMode::new(video, audio);
-                assert_eq!(StreamMode::parse(&mode.token()), Some(mode));
-            }
-        }
-        assert_eq!(StreamMode::parse("bogus"), None);
-        assert_eq!(StreamMode::parse("h264-"), None);
-        assert_eq!(StreamMode::parse("h264-bogus"), None);
-    }
-
-    #[test]
-    fn a_token_with_no_video_prefix_still_means_a_video_copy() {
-        for (token, audio) in [
-            ("copy", AudioMode::Copy),
-            ("aac", AudioMode::Aac),
-            ("aac-standard", AudioMode::AacStandard),
-            ("aac-night", AudioMode::AacNight),
-        ] {
-            assert_eq!(
-                StreamMode::parse(token),
-                Some(StreamMode::new(VideoMode::Copy, audio))
-            );
-        }
-    }
-
-    #[test]
-    fn the_video_axis_is_a_prefix_on_the_audio_token() {
-        assert_eq!(
-            StreamMode::new(VideoMode::H264, AudioMode::Copy).token(),
-            "h264-copy"
-        );
-        assert_eq!(
-            StreamMode::new(VideoMode::H264, AudioMode::AacNight).token(),
-            "h264-aac-night"
-        );
-    }
-
-    #[test]
-    fn filtered_modes_transcode_with_a_chain() {
-        assert!(!AudioMode::Copy.transcode());
-        assert!(AudioMode::Aac.transcode());
-        assert!(AudioMode::Aac.filter_chain().is_none());
-        assert!(AudioMode::AacStandard.transcode());
-        assert!(AudioMode::AacStandard
-            .filter_chain()
-            .unwrap()
-            .contains("ratio=4"));
-        assert!(AudioMode::AacNight
-            .filter_chain()
-            .unwrap()
-            .contains("ratio=8"));
-    }
-}
+mod tests;

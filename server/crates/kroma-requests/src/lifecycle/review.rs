@@ -37,7 +37,6 @@ pub fn approve_request<S: HostStorage>(
     publish(state, id, status);
     settle_review(state, id, reviewer);
     notify_transition(state, id, status);
-    // A no-op until the downloads milestone registers this job key.
     state.trigger_job("acquisition.search", "request-approved");
     let conn = state.db().get()?;
     db::get_request(&conn, id)?.ok_or_else(|| anyhow!("request vanished after approve"))

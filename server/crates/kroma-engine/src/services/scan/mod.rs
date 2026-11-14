@@ -13,6 +13,7 @@
 mod changed_shows;
 mod ids;
 mod index;
+mod ingest;
 pub mod walk;
 
 use std::collections::{HashMap, HashSet};
@@ -26,6 +27,7 @@ use crate::services::settings::LibraryDef;
 use walk::scan_root;
 
 pub use changed_shows::note_changed_shows;
+pub use ingest::{forget_files, ingest_files, Ingested};
 pub use ids::{movie_logical_id, short_hash};
 
 /// Everything a phase-1 scan produces, ready to hand to [`crate::db::sync_all`].
@@ -206,6 +208,7 @@ pub fn spawn_follow_ups(state: &crate::state::SharedState, data: &ScanData) {
         state.ffprobe_available,
         state.events.clone(),
         state.activity.clone(),
+        state.sources.clone(),
     );
     crate::services::search::spawn_reindex(state.clone());
     crate::services::enrich::maybe_spawn(state, &data.changed_shows);

@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 
 use axum::body::Body;
 use axum::extract::{ConnectInfo, Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, Method, StatusCode};
 use axum::response::Response;
 use serde::Deserialize;
 
@@ -17,6 +17,7 @@ use crate::infra::subtitles;
 use crate::model::{MediaItem, User};
 use crate::services::playback;
 use crate::services::settings;
+use crate::services::source::Resolved;
 use crate::state::SharedState;
 use axum::routing::get;
 use axum::Router;
@@ -28,6 +29,8 @@ mod external_subtitles;
 mod hls;
 mod hls_query;
 mod native_subtitles;
+mod relay;
+pub(crate) mod remote;
 
 use download::download_item;
 use external_subtitles::nth_beside;
@@ -87,16 +90,21 @@ pub async fn stream_item(
     Path(id): Path<String>,
     Query(q): Query<StreamQuery>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    method: Method,
     headers: HeaderMap,
 ) -> Result<Response, Response> {
     let item = load_item(&state, &viewer, id)
         .await
         .ok_or_else(visibility::out_of_scope)?;
     let sink = byte_sink(&state, &headers, &addr);
-    Ok(match pick_file_path(&item, q.file.as_deref()) {
-        Some(path) => stream_file(std::path::Path::new(&path), &headers, sink).await,
-        None => json_error(StatusCode::NOT_FOUND, "demo item has no media"),
-    })
+    let Some(path) = pick_file_path(&item, q.file.as_deref()) else {
+        return Ok(json_error(StatusCode::NOT_FOUND, "demo item has no media"));
+    };
+    if crate::services::source::is_stub(std::path::Path::new(&path)) {
+        return relay::stream_stub(&state, &viewer, &path, method == Method::HEAD, &headers, sink)
+            .await;
+    }
+    Ok(stream_file(std::path::Path::new(&path), &headers, sink).await)
 }
 
 fn pick_file_path(item: &MediaItem, file_id: Option<&str>) -> Option<String> {
@@ -123,7 +131,10 @@ pub async fn storyboard(
         return visibility::out_of_scope();
     };
     use crate::infra::storyboard::Status;
-    match state.storyboard.get(&item).await {
+    let Some(source) = whole_file_of(&state, &item).await else {
+        return json_error(StatusCode::NOT_FOUND, "storyboard unavailable");
+    };
+    match state.storyboard.get(&item, &source).await {
         Status::Ready(m) => {
             json_no_store(StatusCode::OK, serde_json::to_vec(&m).unwrap_or_default())
         }
@@ -150,6 +161,15 @@ pub async fn storyboard_image(
             .unwrap(),
         None => json_error(StatusCode::NOT_FOUND, "storyboard not generated"),
     }
+}
+
+async fn whole_file_of(state: &SharedState, item: &MediaItem) -> Option<std::path::PathBuf> {
+    let abs = item.abs_path.clone()?;
+    let held = state.clone();
+    tokio::task::spawn_blocking(move || held.sources.local(&abs).ok().flatten())
+        .await
+        .ok()
+        .flatten()
 }
 
 fn json_no_store(status: StatusCode, body: Vec<u8>) -> Response {
@@ -188,9 +208,6 @@ pub async fn subtitles(
         }
     }
 
-    // Extracting a text subtitle reads the whole file (cues are interleaved), so
-    // cache per (file, mtime, track). Computing the key stats the file, which on a
-    // slow mount would block the tokio worker.
     let data_dir = state.config.data_dir.clone();
     let cache = {
         let (abs, data_dir) = (abs.clone(), data_dir.clone());
@@ -204,12 +221,14 @@ pub async fn subtitles(
     if let Ok(bytes) = tokio::fs::read(&cache).await {
         return vtt_response(bytes);
     }
-    // Cache miss: demux once and warm every text track. The per-file lock joins an
-    // extraction already in flight instead of demuxing in parallel.
+    let resolved = match remote::embedded(&state, &viewer, &abs).await {
+        Ok(resolved) => resolved,
+        Err(refused) => return refused,
+    };
     let subs = item.subtitles.clone();
-    let (abs2, data_dir2) = (abs.clone(), data_dir.clone());
+    let (abs2, data_dir2, held) = (abs.clone(), data_dir.clone(), resolved.clone());
     let _ = tokio::task::spawn_blocking(move || {
-        subtitles::extract_pending_locked(&data_dir2, &abs2, &subs, &|| false)
+        subtitles::extract_pending_locked(&data_dir2, &abs2, &held, &subs, &|| false)
     })
     .await;
     if let Ok(bytes) = tokio::fs::read(&cache).await {
@@ -217,7 +236,7 @@ pub async fn subtitles(
     }
     // `item.subtitles` metadata can be empty or stale, so the batch pass may not have
     // covered this index; extract it alone, codec-agnostically.
-    if let Some(bytes) = extract_webvtt(&abs, index).await {
+    if let Some(bytes) = extract_webvtt(&resolved, index).await {
         if let Some(dir) = cache.parent() {
             let _ = tokio::fs::create_dir_all(dir).await;
         }
@@ -241,10 +260,12 @@ fn vtt_response(bytes: Vec<u8>) -> Response {
 /// Transcodes one text subtitle stream to WebVTT, bounded by a timeout. This
 /// single-track variant backs subtitle translation; playback extraction goes
 /// through [`subtitles::extract_batch_blocking`].
-pub(crate) async fn extract_webvtt(path: &str, index: usize) -> Option<Vec<u8>> {
-    let child = tokio::process::Command::new("ffmpeg")
+pub(crate) async fn extract_webvtt(resolved: &Resolved, index: usize) -> Option<Vec<u8>> {
+    let mut command = tokio::process::Command::new("ffmpeg");
+    input::without_proxies(command.as_std_mut());
+    let child = command
         .args(["-v", "error", "-nostdin"])
-        .args(input::file(path))
+        .args(input::media(&resolved.input))
         .args(["-map", &format!("0:s:{index}"), "-f", "webvtt", "pipe:1"])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -254,7 +275,8 @@ pub(crate) async fn extract_webvtt(path: &str, index: usize) -> Option<Vec<u8>> 
         .ok()?;
 
     // On timeout the future is dropped, which via kill_on_drop kills ffmpeg.
-    let budget = kroma_media::subtitles::timeout_for(path);
+    let size = resolved.stub.as_ref().map_or(0, |stub| stub.size);
+    let budget = kroma_media::subtitles::timeout_for_input(&resolved.input, size);
     let out = tokio::time::timeout(budget, child.wait_with_output())
         .await
         .ok()?

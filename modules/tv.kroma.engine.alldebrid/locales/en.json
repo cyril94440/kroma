@@ -1,0 +1,4 @@
+{
+  "config.cacheMaxDays": "Delete cached files unused for this many days (0 = never)",
+  "config.cacheMaxGb": "Cache size limit in GB (0 = no cache)"
+}

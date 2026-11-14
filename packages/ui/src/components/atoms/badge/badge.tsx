@@ -42,11 +42,15 @@ const badgeVariants = sv({
   defaults: { tone: '4K', size: 'sm' },
 });
 
-/** Maps the catalogue's quality strings ("4K", "HDR", "H.265", ...) to a
+const HDR_BADGES: ReadonlySet<string> = new Set(['HDR', 'HDR10', 'HDR10+', 'HLG', 'Dolby Vision']);
+const AUDIO_BADGES: ReadonlySet<string> = new Set(['Dolby Atmos', 'DTS:X']);
+
+/** Maps the catalogue's quality strings ("4K", "HDR10+", "Dolby Vision", "Dolby Atmos", ...) to a
  * tone. Anything unrecognised gets the amber treatment. */
 function qualityTone(badge: string): BadgeTone {
-  if (badge === 'HDR') return 'HDR';
+  if (HDR_BADGES.has(badge)) return 'HDR';
   if (badge === 'H.265') return 'H.265';
+  if (AUDIO_BADGES.has(badge)) return 'info';
   return '4K';
 }
 

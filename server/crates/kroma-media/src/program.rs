@@ -7,7 +7,8 @@ use axum::response::Response;
 use kroma_module_wire::{AudioStream, VideoStream};
 use serde::Deserialize;
 
-use crate::hls::{Asked, HlsEngine, Refusal, StreamMode};
+use crate::hls::{Asked, HlsEngine, Refusal, StreamMode, ToneMap};
+use crate::input::MediaInput;
 use crate::json_error::json_error;
 use crate::stream::metered_body;
 use crate::{playlist, ByteMeter, Credential};
@@ -19,11 +20,26 @@ use crate::{playlist, ByteMeter, Credential};
 /// Absent means no declared capability (the requested mode is trusted); present
 /// but empty means the client decodes none, so any copied stream is transcoded.
 /// `maxw` / `maxh` are the largest picture its decoder accepts, both axes, and
-/// absent leaves the source's own size standing.
+/// absent leaves the source's own size standing. `hdr` names the dynamic-range
+/// formats its display shows, from `hdr10`, `hdr10plus`, `hlg` and `dv`: absent
+/// means undeclared (the requested mode is trusted), present but empty means
+/// SDR only, so an HDR source is tone-mapped down to a picture of at most 1080p
+/// where this host can map it.
+///
+/// A Dolby Vision profile 5 stream has no picture a non-Dolby decoder can read
+/// as it is. Where the host can tone-map, a client that declared `hdr` without
+/// `dv` gets the mapped re-encode. Where it cannot (no libplacebo,
+/// `KROMA_TONEMAP=off`, a build without the filters), and for a client that
+/// declared no `hdr` at all, the stream is copied tagged as plain HEVC with no
+/// Dolby Vision box, as it was before the box existed: it opens everywhere and
+/// shows the base layer's own colours. Only a client that declared `dv` gets
+/// `dvh1` and the box, which is what the Apple HLS authoring rules ask of
+/// profile 5 and what no other decoder can open.
 #[derive(Debug, Default, Deserialize)]
 pub struct ClientDecoders {
     pub copy: Option<String>,
     pub video: Option<String>,
+    pub hdr: Option<String>,
     pub maxw: Option<u32>,
     pub maxh: Option<u32>,
 }
@@ -52,6 +68,10 @@ impl Program<'_> {
         self.video.and_then(|v| v.width.zip(v.height))
     }
 
+    fn track(&self, audio: u32) -> Option<&AudioStream> {
+        self.audio_tracks.iter().find(|t| t.index == audio)
+    }
+
     /// The mode whose picture and sound will actually play on the client, for the
     /// `audio`-th track. Both axes are resolved before a caller compares it with
     /// the asked mode, so one answer settles them together.
@@ -61,18 +81,27 @@ impl Program<'_> {
         audio: u32,
         declared: &ClientDecoders,
     ) -> StreamMode {
-        let selected_codec = self
-            .audio_tracks
-            .iter()
-            .find(|t| t.index == audio)
-            .map(|t| t.codec.as_str());
-        mode.for_client_audio(selected_codec, declared.copy.as_deref())
+        let selected = self.track(audio);
+        let (codec, channels) = (
+            selected.map(|t| t.codec.as_str()),
+            selected.and_then(|t| t.channels),
+        );
+        let tone_map = self.video.and_then(ToneMap::for_video);
+        mode.for_client_track(codec, channels, declared.copy.as_deref())
             .for_client_video(
                 self.video.map(|v| v.codec.as_str()),
                 self.video.and_then(|v| v.bit_depth),
                 declared.video.as_deref(),
             )
+            .for_client_hdr(
+                self.video,
+                declared.hdr.as_deref(),
+                declared.hdr.is_some() && tone_map.is_some(),
+            )
+            .within_tone_map_box(tone_map.is_some())
             .for_client_frame(self.frame(), declared.maxw.zip(declared.maxh))
+            .for_tone_map_cost(self.frame(), tone_map.map(ToneMap::route))
+            .for_copied_picture(self.video, codec, channels, declared.copy.as_deref())
     }
 
     /// The media playlist of `session`, starting it over the file when none
@@ -84,7 +113,7 @@ impl Program<'_> {
     pub async fn master<M: ByteMeter>(
         &self,
         engine: &HlsEngine,
-        input: &str,
+        input: &MediaInput,
         session: Session,
         opener: Option<&str>,
         credential: &Credential,
@@ -104,6 +133,8 @@ impl Program<'_> {
                 mode,
                 anchor,
                 source: self.frame(),
+                video: self.video,
+                track: self.track(audio),
             })
             .await?;
         let body = playlist::with_credential(&body, credential);

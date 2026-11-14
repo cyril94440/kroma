@@ -95,6 +95,7 @@ qui téléchargent et rangent des fichiers pour vous.
 | Parcourir et lire vos fichiers | Lecture |
 | Sous-titres et illustrations | Lecture : KROMA les garde dans son propre dossier de données |
 | Le module **Acquisition**, qui télécharge les titres demandés, les déplace dans vos bibliothèques et les renomme | Lecture et écriture |
+| **Regarder maintenant** avec un service de débrid comme AllDebrid, qui lance en quelques secondes un titre que vous n'avez pas | Lecture et écriture : il dépose dans votre bibliothèque de petits fichiers de remplacement, pas des vidéos |
 
 Les données propres à KROMA, comme sa base de données, les affiches et les
 téléchargements en cours, se trouvent dans son dossier de données. Ce dossier a
@@ -136,6 +137,26 @@ bibliothèque. Sur un partage réseau :
   périodique, toutes les cinq minutes par défaut (voir `KROMA_WATCH_INTERVAL`
   dans la [référence de configuration](configuration.md)), ou quand vous
   sélectionnez **Analyser** sous **Sources**.
+
+## Titres en streaming
+
+Un module qui récupère des titres via un service, comme un service debrid, peut
+laisser dans votre bibliothèque un petit fichier en `.kremote` à la place de la
+vidéo. KROMA le liste comme n'importe quel titre et le lit en allant chercher
+les octets auprès du service pendant que vous regardez. Rien n'est stocké, à
+part une copie que le module peut garder dans son propre dossier, sous le
+dossier de données du serveur.
+
+- Le titre affiche la vraie taille du fichier et une ligne **En streaming**
+  sous **Détails du média**.
+- Les fichiers de sous-titres placés à côté, comme `Film (2020).fr.srt`,
+  fonctionnent comme pour une vidéo.
+- Les vignettes de la barre de lecture, la détection des génériques et l'analyse
+  du volume ont besoin du fichier entier : elles n'apparaissent qu'une fois que
+  le module a mis une copie en cache. D'ici là, elles sont ignorées, sans être
+  signalées comme des erreurs.
+- Si le service est désactivé ou ne répond pas, la lecture s'arrête avec un
+  message qui le dit. Réactivez le module, ou réessayez dans un instant.
 
 ## Téléchargements et imports rapides
 

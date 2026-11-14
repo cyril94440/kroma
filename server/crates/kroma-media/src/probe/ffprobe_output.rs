@@ -37,8 +37,11 @@ pub(super) struct FfChapterTags {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct FfStream {
+    pub(super) index: Option<u32>,
     pub(super) codec_type: Option<String>,
     pub(super) codec_name: Option<String>,
+    pub(super) profile: Option<String>,
+    pub(super) channel_layout: Option<String>,
     pub(super) width: Option<u32>,
     pub(super) height: Option<u32>,
     pub(super) channels: Option<u32>,
@@ -60,6 +63,21 @@ pub(super) struct FfStream {
 pub(super) struct FfSideData {
     pub(super) side_data_type: Option<String>,
     pub(super) dv_profile: Option<u32>,
+    pub(super) dv_level: Option<u8>,
+    pub(super) el_present_flag: Option<u8>,
+    pub(super) dv_bl_signal_compatibility_id: Option<u8>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct FfFrames {
+    #[serde(default)]
+    pub(super) frames: Vec<FfFrame>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct FfFrame {
+    #[serde(default)]
+    pub(super) side_data_list: Vec<FfSideData>,
 }
 
 #[derive(Debug, Deserialize)]

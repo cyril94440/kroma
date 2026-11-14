@@ -6,9 +6,10 @@
 import type { KromaClient } from '@kromatv/client';
 import type { MediaItem } from '@kromatv/client/media';
 import {
-  decodableAudioCodecs,
+  copyableAudioCodecs,
   decodableVideoCodecs,
   decoderMaxFrame,
+  hdrDeclaration,
   type PlaybackCapabilities,
   STALL_NUDGE_SEC,
 } from '@kromatv/core';
@@ -84,6 +85,7 @@ export abstract class BaseTvEngine implements TvEngine {
           // nothing is served a codec it may only be able to play as silence.
           copyCodecs: this.declaredAudioCodecs(),
           videoCodecs: this.declaredVideoCodecs(),
+          hdr: this.declaredHdr(),
           maxFrame: decoderMaxFrame(this.item, this.capabilities),
         });
   }
@@ -93,7 +95,11 @@ export abstract class BaseTvEngine implements TvEngine {
   }
 
   protected declaredAudioCodecs(): string[] {
-    return decodableAudioCodecs(this.capabilities);
+    return copyableAudioCodecs(this.capabilities);
+  }
+
+  protected declaredHdr(): string[] | undefined {
+    return hdrDeclaration(this.capabilities);
   }
 
   // `audioUnsupported`: the device can't decode the source audio track, so

@@ -51,6 +51,9 @@ registrations are removed. VLC follows the same adapter selection through
 `@kromatv/tv/vlc-plane`; no `registerVlcPlane` call is needed. Native decoder
 ceilings are passed as `decoderFrameLimits` to `TvApp`, and follow that root into
 its engine choice and server master requests instead of changing core globals.
+The device's own HDR answer (Dolby Vision decoder profiles, display HDR types) is
+passed the same way as `hdrSupport`: Dolby Vision is claimed only when it says so,
+and an absent answer keeps the static table.
 Shared immutable helpers are available from
 `@kromatv/tv/build-info` and `@kromatv/tv/hardware`.
 

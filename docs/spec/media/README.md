@@ -101,25 +101,42 @@ silently flattens HDR to SDR, and a tone-mapped picture is surfaced as the compr
 by [`playback/`](../playback/).
 
 Matching a client against a variant is only a refusal where the variant has no picture of
-its own to fall back on. HDR10+ and HLG degrade cleanly, and so do Dolby Vision profiles 8
-and 9, whose base layer is a valid HDR10 or HLG picture: a device that cannot read the
-dynamic metadata still draws the film. Profiles 5 and 7 have no such base layer, so a device
-with no Dolby Vision decoder draws them in the wrong colours, and those are refused.
+its own to fall back on. HDR10+ and HLG degrade cleanly, and so does Dolby Vision whenever its
+base layer is a picture. What that base layer is comes from the stream's own
+`bl_signal_compatibility_id`, which the server sends as `dolbyVisionCompatibility`: 1 and 6 are
+an HDR10 picture, 4 is HLG, 2 is SDR, and 0 is none. A device with no Dolby Vision decoder
+draws the base layer, and a stream whose id is 0, profile 5 in practice, is refused, because
+its base layer is not a picture and the colours come out wrong. The profile number decides
+only where the probe carried no id: 5 has no base layer and 7 has an HDR10 one. Profile 7 is
+dual layer, an HDR10 base plus an enhancement layer: a device without a Dolby Vision decoder
+plays the base layer alone, and one with a decoder that takes profile 7 plays it as Dolby
+Vision. The enhancement layer is never required for a picture.
+
+A client declares the HDR systems its display shows (`hdr10`, `hdr10plus`, `hlg`, `dv`) on
+the stream request, so the server can tone-map for an SDR display and decline to copy a stream
+that has no base layer to a device with no Dolby Vision decoder. Omitting the declaration
+means the table is a guess, and the server behaves as before.
 
 - **MEDIA-19** (SHIPPED) - **Bit depth.** 8-bit and 10-bit are first-class, and 10-bit is
   retained as a property of the video stream rather than rounded away in the model.
-- **MEDIA-20** (AGREED) - KROMA distinguishes **HDR10**, **HDR10+**, **Dolby Vision** and
+- **MEDIA-20** (SHIPPED) - KROMA distinguishes **HDR10**, **HDR10+**, **Dolby Vision** and
   **HLG** as separate properties, because each has distinct client support, and it records
-  Dolby Vision's profile, because a profile a client cannot decode is not the same as one it
-  can. Three of the four are recorded, with the profile: **HDR10+ is the part not built**,
-  because its metadata is per-frame and a probe reads headers, so a file carrying it is
-  recorded as the HDR10 it also is.
+  Dolby Vision's profile, level, base-layer compatibility and enhancement layer, because a
+  profile a client cannot decode is not the same as one it can. HDR10+ is per-frame metadata,
+  so the probe reads the first frame of a stream that is already PQ; a read that fails or runs
+  long leaves the stream HDR10, and a Dolby Vision stream stays Dolby Vision whatever else it
+  carries.
 - **MEDIA-21** (SHIPPED) - Colour primaries, transfer characteristics and matrix coefficients
   travel with the video stream, and a client is matched against the exact HDR variant rather
   than a generic "HDR" flag.
 - **MEDIA-22** (AGREED) - Where dynamic metadata, HDR10+ or Dolby Vision, cannot be carried
-  to a client, the base HDR10 layer is preserved rather than HDR discarded entirely. It is a
-  fallback [`playback/`](../playback/) makes visible.
+  to a client, the base HDR10 layer is preserved rather than HDR discarded entirely, and the
+  player says so: Dolby Vision drawn as its HDR10, HLG or SDR layer, HDR10+ drawn as HDR10, and
+  HDR tone-mapped to an SDR display are each a notice, never a silent change. It is a fallback
+  [`playback/`](../playback/) makes visible. Dolby Vision profile 7 is always delivered over HLS as
+  its HDR10 base layer alone, so that notice holds for it even on a device that decodes Dolby
+  Vision; only the original file, played directly, keeps its enhancement layer. Its TrueHD is
+  re-encoded rather than copied beside it (MEDIA-48).
 
 ## Audio
 
@@ -127,21 +144,55 @@ Status: **SHIPPED** in part; each requirement carries its own.
 
 **MEDIA-23** (AGREED) - The first-class audio codecs are **AAC**, **AC-3** and **E-AC-3**
 (Dolby Digital and Plus), **TrueHD**, **DTS** and **DTS-HD**, **FLAC** and **Opus**. Only the
-first three and Opus are handled first-class today; the rest are the part still AGREED.
+first three and Opus are handled first-class today; the rest are the part still AGREED,
+though TrueHD and DTS are already probed with their profile and either copied or kept as a 5.1
+transcode (MEDIA-26).
 
-**MEDIA-24** (AGREED) - An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos
-objects, is a first-class property.
+**MEDIA-24** (SHIPPED) - An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos
+objects, is a first-class property: the probe keeps ffprobe's layout and profile, and a
+profile naming Dolby Atmos or DTS:X marks the stream `spatial`. DTS-HD Master Audio stays
+`dts` in the codec and shows in the profile.
 
 - **MEDIA-25** (SHIPPED) - **Passthrough** is the default for multichannel and lossless audio:
   the bitstream reaches a device or receiver that can decode it untouched. This is direct play
   for audio and is always preferred.
 - **MEDIA-26** (AGREED) - **Downmixing** to stereo happens only when the target cannot render
-  the source layout, only as an explicit fallback, and never silently. A downmix is a
+  the source layout, only as an explicit fallback, and never silently. A client that declares
+  E-AC-3 (or AC-3) is given a surround source as 5.1 at 640 kbps instead of a stereo downmix;
+  object audio (Atmos, DTS:X) survives only a copy, because no transcode here writes it. A downmix is a
   channel-count reduction and therefore a compromise; the original stream is retained
   unchanged as the source, and telling the person is [`playback/`](../playback/)'s job.
 - **MEDIA-27** (SHIPPED) - Multiple audio streams, languages and commentary alike, are all
   enumerated and selectable. The default follows the file's own disposition flags, then the
   profile's language preference.
+
+- **MEDIA-48** (SHIPPED) - A video copied into fragmented MP4 keeps what makes it HDR: HEVC is
+  tagged `hvc1`, profile 8 keeps `hvc1` with its `dvvC` box so a Dolby Vision decoder engages
+  and everything else draws the base layer, and a single-track profile 7 is cut down to its
+  HDR10 base layer and signalled as nothing else. Profile 5 has no base layer a plain decoder
+  can draw, so `dvh1` and the configuration box go only to a client that declared `dv`; any
+  other client, and any host that cannot tone-map it for one that declared `hdr` without `dv`,
+  gets plain `hvc1` with no box, which opens everywhere and draws the base layer's own
+  colours, as it did before the box existed. The Apple HLS rules ask `dvh1` of profile 5 and
+  nothing else can open it. TrueHD needs a muxer level that also writes the box from the
+  stream's own record, which ffmpeg 6.1 cannot drop, so it is never copied beside a profile 7
+  or a profile 5 not signalled as Dolby Vision: it is re-encoded like any soundtrack the
+  client cannot decode. `hvc1` rather than `hev1` is deliberate (Apple requires it, and
+  in-band parameter sets are the less compatible form for fragmented MP4 HLS); the residual
+  risk is a television whose decoder is not probed for it, and a browser only declares `hevc`
+  after probing `hvc1`.
+- **MEDIA-49** (SHIPPED) - A video re-encoded to 8-bit H.264 from an HDR source is tone-mapped
+  and tagged BT.709, on hosts whose ffmpeg has zimg (or libplacebo with a working Vulkan
+  device); elsewhere the re-encode is as before. A tone-mapped picture is never larger than
+  1080p: it is scaled down first, on the device that decodes it where there is one, and the
+  re-encode is a 1080p rung even for a client that sent no frame cap. At boot each device
+  route is proved on a small HDR10 clip through the same flags a session uses: the device's own
+  filter (`tonemap_vaapi`, `vpp_qsv`), else hardware decode and scale with a download of the
+  1080p picture and a mapping on the CPU, else the CPU for every step; one that fails is not
+  offered. A mapping on the CPU costs two re-encode slots and holds background work back, and
+  on a host with four cores or fewer a 4K source drops to a 720p rung. Dolby Vision profile 5
+  needs libplacebo and a software decoder, which is what hands over its reshaping.
+  `KROMA_TONEMAP=off` rules tone-mapping out and `KROMA_TONEMAP=cpu` rules out the device routes.
 
 **MEDIA-47** (AGREED) - An audio stream carries the region of its language when the file says
 so: from its language tag in any language (`fr-CA`, `pt-BR`), else from words of its title
@@ -213,6 +264,15 @@ extension stands in for the video codec until something can look properly.
   re-probe.
 - **MEDIA-40** (AGREED) - Trust is per-file and durable: a corrected probe is written back,
   not held in memory for one session.
+- **MEDIA-56** (SHIPPED) - A release that makes the probe learn something new (HDR format,
+  Dolby Vision detail, an audio profile) never unprobes a library. Each file carries the
+  version of the facts its probe wrote, and the files that could gain from the new version are
+  read again in the background, after every file never probed, one at a time, a batch of 200 a
+  pass (a boot, a scan) so a large library catches up over days of ordinary use. Until a file's
+  new facts land, in the one write that replaces the old ones, it is as probed as it was: it
+  keeps representing its item, counts as on disk and shows what it showed. A stub with no
+  local copy is left alone where this ffmpeg cannot read the network, and a re-read that
+  fails keeps the facts the file had.
 
 ## Files KROMA can read but not fully describe
 
@@ -243,3 +303,33 @@ metadata, is **partially known**. It is never hidden and never silently dropped.
 - **MEDIA-46** (AGREED) - Undescribed and unreadable are distinct states. The first is "we
   see it but cannot vouch for it", the second is "we cannot see it". Both are on record;
   neither is a blank.
+
+## Remote files
+
+Status: **SHIPPED**.
+
+A media file need not hold its bytes. A **remote file** is a media file whose bytes live
+with a module, kept in the library as a small stub, so a title fetched through a service is
+streamed instead of stored. Everything above holds for it: the title appears, is probed,
+plays, and carries the facts a client decides on.
+
+- **MEDIA-50** (SHIPPED) - A stub is a title like any other: it appears with the container
+  and byte size of the video it stands for and its title and episode as that video's name
+  would give them, and a stub that cannot be read, or names no video container, is skipped
+  with a warning rather than shown broken.
+- **MEDIA-51** (SHIPPED) - A media file whose bytes are streamed says so (`remote`), so a
+  client can label it. The wire carries it only when it is true.
+- **MEDIA-52** (SHIPPED) - Where a remote file's bytes are is answered by its source each
+  time they are needed, as a complete local copy or as a short-lived link, and never kept
+  past the read that asked.
+- **MEDIA-53** (SHIPPED) - A link is used only if it is `https`, carries no credentials, and
+  names a public host the source declared it connects to. A local copy is used only if it is
+  a regular file of the declared size inside the source's own folders. Anything else is
+  refused, and the link, a bearer, never appears in a log or an error.
+- **MEDIA-54** (SHIPPED) - A source that is off, gone or silent fails playback with a
+  translated message that says which, never a hang, and fails a probe in a way a later
+  attempt can recover from.
+- **MEDIA-55** (SHIPPED) - Work that reads a whole title (scrub thumbnails, intro and credits
+  detection, loudness, embedded-subtitle extraction, transcription) runs on a remote file only
+  once its source holds a complete local copy. Until then it is deferred, neither run over the
+  network nor recorded as failed, and it never asks the source to fetch the copy.

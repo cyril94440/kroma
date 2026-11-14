@@ -1,4 +1,4 @@
-//! TMDB discovery: search/trending/detail for titles the library may NOT have
+//! TMDB discovery: search, the browsable lists and genres, and detail for titles the library may NOT have
 //! yet the request flow's window onto the outside catalog. Same JSON transport
 //! as the core's library enrichment; returns plain adapter
 //! structs the services layer flags against the local catalog + open requests
@@ -11,12 +11,14 @@ use super::{api, tmdb_json, IMG};
 use super::common::{build_cast, build_crew};
 
 mod hits;
+mod lists;
 mod release;
 #[cfg(test)]
 mod tests;
 mod wire;
 
-pub use hits::{search, trending};
+pub use hits::search;
+pub use lists::{genres, list, list_by_genre, DiscoverList, Genre};
 use hits::hit_from;
 use release::movie_dates;
 use wire::DetailResp;
@@ -25,7 +27,7 @@ const MAX_CAST: usize = 12;
 const MAX_CREW: usize = 6;
 const MAX_SIMILAR: usize = 12;
 
-/// One search/trending hit, unflagged.
+/// One search or list hit, unflagged.
 #[derive(Debug, Clone)]
 pub struct DiscoverHit {
     pub kind: RequestKind,

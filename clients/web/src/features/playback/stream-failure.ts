@@ -1,9 +1,10 @@
-import type { StreamRefusal } from '@kromatv/core';
+import type { SourceFailure, StreamRefusal } from '@kromatv/core';
 import { z } from 'zod';
 
-/** Why a stream will not play: a refusal from the server, or `broken`, an
- * engine that failed past every recovery it has. */
-export type StreamFailure = StreamRefusal | 'broken';
+/** Why a stream will not play: a refusal from the server, the source of a title
+ * the server could not read, or `broken`, an engine that failed past every
+ * recovery it has. */
+export type StreamFailure = StreamRefusal | SourceFailure | 'broken';
 
 const BAD_HTTP_STATUS = 1001;
 

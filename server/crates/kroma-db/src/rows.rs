@@ -79,6 +79,9 @@ pub(crate) fn row_to_file(r: &Row) -> rusqlite::Result<MediaFile> {
             .as_deref()
             .and_then(HdrFormat::parse),
         dolby_vision_profile: r.get(20).ok().flatten(),
+        dolby_vision_level: r.get(24).ok().flatten(),
+        dolby_vision_compatibility: r.get(25).ok().flatten(),
+        dolby_vision_enhancement_layer: r.get::<_, Option<i64>>(26).ok().flatten() == Some(1),
         color: (!color.is_empty()).then_some(color),
     });
     let subs_json: String = r.get(15)?;
@@ -107,10 +110,17 @@ pub(crate) fn row_to_file(r: &Row) -> rusqlite::Result<MediaFile> {
                 title: None,
                 default: true,
                 region: None,
+                profile: None,
+                layout: None,
+                spatial: None,
             })
     });
 
+    let abs_path: Option<String> = r.get(16)?;
     Ok(MediaFile {
+        remote: abs_path
+            .as_deref()
+            .is_some_and(|abs| kroma_primitives::remote_file::is_remote_file(std::path::Path::new(abs))),
         id: r.get(0)?,
         rel_path: r.get(1)?,
         container: r.get(2)?,
@@ -122,7 +132,7 @@ pub(crate) fn row_to_file(r: &Row) -> rusqlite::Result<MediaFile> {
         audio,
         audio_tracks,
         subtitles,
-        abs_path: r.get(16)?,
+        abs_path,
         unreadable: r.get(18)?,
         edition_id: None,
     })

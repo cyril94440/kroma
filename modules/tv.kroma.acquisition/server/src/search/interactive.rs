@@ -22,6 +22,7 @@ use crate::search::targets::{targets_for_scope, SearchScope};
 mod grab;
 
 pub use grab::{grab_cached, replaces};
+pub(crate) use grab::resolve_grab_target;
 
 const BLOCKLIST: &str = "blocklist";
 

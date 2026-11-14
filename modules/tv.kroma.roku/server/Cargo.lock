@@ -549,6 +549,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "kroma-primitives",
  "serde",
  "serde_json",
  "tempfile",
@@ -652,6 +653,9 @@ version = "0.1.0"
 dependencies = [
  "getrandom 0.3.4",
  "hex",
+ "http",
+ "serde",
+ "serde_json",
  "sha2",
  "time",
 ]

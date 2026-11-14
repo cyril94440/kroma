@@ -126,6 +126,7 @@ pub async fn generate(
         quality,
         audio_track,
         handle,
+        locale: crate::api::stream::remote::locale_of(&user),
     }));
 
     (StatusCode::ACCEPTED, Json(GenStarted { gen_id })).into_response()
@@ -143,6 +144,7 @@ struct GenTask {
     quality: Quality,
     audio_track: u32,
     handle: subtitles::Handle,
+    locale: &'static str,
 }
 
 // Marks the registry entry done/failed with the real reason once the model
@@ -160,9 +162,10 @@ async fn run_generation(t: GenTask) {
         quality,
         audio_track,
         handle,
+        locale,
     } = t;
     let source_vtt = if mode == GenMode::Translate {
-        match resolve_source(&state, &item_id, &abs, &req).await {
+        match resolve_source(&state, &item_id, &abs, &req, locale).await {
             Ok(vtt) => Some(vtt),
             Err(reason) => {
                 handle.fail(&reason);
@@ -187,21 +190,28 @@ async fn run_generation(t: GenTask) {
     // service in the composition root); translate-only generations don't need
     // it, so a missing one only fails a transcribe.
     let transcriber = kroma_module_host::service::<TranscriberClient>(&state);
+    let sources = state.sources.clone();
     // The model (ffmpeg + Whisper / LLM) is blocking: run it on the blocking pool
     // and finalize the registry entry with its result.
     let _ = tokio::task::spawn_blocking(move || {
-        let result = match transcriber.as_ref() {
-            Some(transcriber) => subtitles::generate(
+        let whole = match sources.local(&abs) {
+            Ok(Some(path)) => Ok(path),
+            Ok(None) => Err(crate::i18n::t(locale, "error.subtitleNotCached", &[])),
+            Err(error) => Err(crate::i18n::t(locale, crate::api::stream::remote::failure_key(&error).1, &[])),
+        };
+        let result = match (whole, transcriber.as_ref()) {
+            (Err(reason), _) if spec.mode == GenMode::Transcribe => Err(reason),
+            (whole, Some(transcriber)) => subtitles::generate(
                 &settings,
                 &data_dir,
                 &pool,
                 &item_id,
-                std::path::Path::new(&abs),
+                whole.as_deref().unwrap_or(std::path::Path::new("")),
                 &spec,
                 &handle,
                 &transcriber.step(),
             ),
-            None => Err("no transcription module is installed".to_string()),
+            (_, None) => Err(crate::i18n::t(locale, "error.transcriberMissing", &[])),
         };
         match result {
             Ok(sub) => handle.done(&sub.id),
@@ -225,7 +235,9 @@ async fn resolve_source(
     item_id: &str,
     abs: &str,
     req: &GenerateReq,
+    locale: &'static str,
 ) -> Result<String, String> {
+    let said = |key: &str| crate::i18n::t(locale, key, &[]);
     if let Some(sub_id) = req
         .source_sub_id
         .as_deref()
@@ -238,22 +250,36 @@ async fn resolve_source(
             Ok(db::downloaded_sub(&conn, &item, &sub_id)?)
         })
         .await
-        .map_err(|_| "could not read the source subtitle from the database".to_string())?;
+        .map_err(|_| said("error.subtitleSourceUnreadable"))?;
         let Some(sub) = sub else {
-            return Err("source subtitle not found".to_string());
+            return Err(said("error.subtitleSourceMissing"));
         };
         return match tokio::fs::read_to_string(&sub.path).await {
             Ok(text) => Ok(subtitles::to_vtt(&text)),
-            Err(_) => Err("source subtitle file missing".to_string()),
+            Err(_) => Err(said("error.subtitleSourceMissing")),
         };
     }
     if let Some(track) = req.source_track {
-        return match crate::api::stream::extract_webvtt(abs, track).await {
+        let held = state.clone();
+        let path = abs.to_string();
+        let copy = tokio::task::spawn_blocking(move || held.sources.local_warming(&path))
+            .await
+            .map_err(|_| said("error.subtitleSourceUnreadable"))?;
+        let copy = match copy {
+            Ok(Some(copy)) => copy,
+            Ok(None) => return Err(said("error.subtitleNotCached")),
+            Err(error) => return Err(said(crate::api::stream::remote::failure_key(&error).1)),
+        };
+        let local = crate::services::source::Resolved {
+            input: kroma_media::input::MediaInput::Local(copy),
+            stub: None,
+        };
+        return match crate::api::stream::extract_webvtt(&local, track).await {
             Some(bytes) => Ok(subtitles::to_vtt(&String::from_utf8_lossy(&bytes))),
-            None => Err("could not read the source subtitle track".to_string()),
+            None => Err(said("error.subtitleSourceUnreadable")),
         };
     }
-    Err("translate needs a source subtitle (sourceTrack or sourceSubId)".to_string())
+    Err(said("error.subtitleSourceNeeded"))
 }
 
 /// `GET /api/items/:id/subtitles/generations` → live + recently-finished generations.

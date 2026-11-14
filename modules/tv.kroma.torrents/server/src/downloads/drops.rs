@@ -6,12 +6,12 @@ impl DownloadManager {
     /// Drops the engine torrent and its data but KEEPS the ledger row. A drop
     /// the engine refuses stays owed in this module's own database until it
     /// runs, so a restart does not lose it.
-    pub fn drop_data(&self, row: &DownloadRow) {
+    pub fn drop_data(&self, row: &DownloadRow, discard: bool) {
         if row.client_ref.is_empty() {
             self.forget_drop(&row.id);
             return;
         }
-        match self.drop_now(row) {
+        match self.drop_now(row, discard) {
             Ok(()) => self.forget_drop(&row.id),
             Err(why) => self.defer_drop(&row.id, why),
         }
@@ -24,7 +24,7 @@ impl DownloadManager {
                 .get()
                 .and_then(|c| Ok(db::get_download(&c, &id)?))
             {
-                Ok(Some(row)) => self.drop_data(&row),
+                Ok(Some(row)) => self.drop_data(&row, false),
                 Ok(None) => self.forget_drop(&id),
                 Err(e) => {
                     tracing::warn!(id, error = %format!("{e:#}"), "could not read the ledger for a deferred drop")
@@ -33,7 +33,7 @@ impl DownloadManager {
         }
     }
 
-    fn drop_now(&self, row: &DownloadRow) -> Result<(), &'static str> {
+    fn drop_now(&self, row: &DownloadRow, discard: bool) -> Result<(), &'static str> {
         let client = self
             .store()
             .get()
@@ -43,9 +43,12 @@ impl DownloadManager {
         let engine = self
             .engine_for(&client)
             .map_err(|_| "the engine is not up")?;
-        engine
-            .remove(&row.client_ref, true)
-            .map_err(|_| "the engine refused to remove it")?;
+        let removed = if discard {
+            engine.discard(&row.client_ref)
+        } else {
+            engine.remove(&row.client_ref, true)
+        };
+        removed.map_err(|_| "the engine refused to remove it")?;
         let _ = db::set_download_ref(self.core(), &row.id, "");
         tracing::info!(release = %row.release_title, "deleted torrent + data after import");
         Ok(())
@@ -98,7 +101,7 @@ mod tests {
     #[test]
     fn a_deferred_drop_survives_the_module_restarting() {
         let (host, manager) = manager_over("torrents-drops-restart", &[added("d1")]);
-        manager.drop_data(&added("d1"));
+        manager.drop_data(&added("d1"), false);
 
         let after_restart = restarted(&host);
 
@@ -108,7 +111,7 @@ mod tests {
     #[test]
     fn a_drop_the_engine_could_not_take_is_still_owed_after_a_retry() {
         let (_host, manager) = manager_over("torrents-drops-engineless", &[added("d1")]);
-        manager.drop_data(&added("d1"));
+        manager.drop_data(&added("d1"), false);
 
         manager.retry_deferred_drops();
 
@@ -118,7 +121,7 @@ mod tests {
     #[test]
     fn a_drop_stops_being_owed_once_the_torrent_has_left_the_engine() {
         let (_host, manager) = manager_over("torrents-drops-settled", &[added("d1")]);
-        manager.drop_data(&added("d1"));
+        manager.drop_data(&added("d1"), false);
 
         crate::db::set_download_ref(manager.core(), "d1", "").unwrap();
         manager.retry_deferred_drops();
@@ -129,7 +132,7 @@ mod tests {
     #[test]
     fn a_drop_owed_for_a_row_that_left_the_ledger_is_forgotten() {
         let (_host, manager) = manager_over("torrents-drops-erased", &[added("d1")]);
-        manager.drop_data(&added("d1"));
+        manager.drop_data(&added("d1"), false);
 
         manager.remove("d1", false).unwrap();
         manager.retry_deferred_drops();

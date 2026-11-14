@@ -1,11 +1,12 @@
 import {
   audioTrackLabel,
+  capabilities,
   declaredAspect,
+  deliveredVideo,
   pictureBadge,
   refineTrackLang,
-  streamNotice,
+  streamNotices,
 } from '@kromatv/core';
-import type { Translate } from '@kromatv/i18n';
 import {
   type PlayerController,
   type PlayerStats,
@@ -17,7 +18,7 @@ import {
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isWebEnginePref } from '#web/features/playback/engine-pref';
 import { makeFpsSampler, readEngineStats } from '#web/features/playback/engine-stats';
-import type { StreamFailure } from '#web/features/playback/stream-failure';
+import { failureCopy } from '#web/features/playback/failure-copy';
 import { useVideoPlayback } from '#web/features/playback/use-video-playback';
 import { useVolumeBoost, VOLUME_BOOST_MAX } from '#web/features/playback/use-volume-boost';
 import { useWebSubtitles } from '#web/features/playback/use-web-subtitles';
@@ -25,16 +26,6 @@ import { buildWebStats } from '#web/features/playback/web-stats';
 import type { MovieView } from '#web/shared/lib/api';
 import { useLangPrefs } from '#web/shared/lib/lang-pref';
 import { useWebRuntime } from '#web/shared/lib/web-runtime';
-
-function failureCopy(t: Translate, failure: StreamFailure): { error: string; hint: string } {
-  if (failure === 'denied') {
-    return { error: t('player.streamDenied'), hint: t('player.streamDeniedHint') };
-  }
-  if (failure === 'missing') {
-    return { error: t('player.streamMissing'), hint: t('player.streamMissingHint') };
-  }
-  return { error: t('player.cantPlay'), hint: t('player.cantPlayHint') };
-}
 
 export interface WebController {
   controller: PlayerController;
@@ -148,6 +139,12 @@ export function useWebController(item: MovieView): WebController {
     return () => v.removeEventListener('ended', onEnded);
   }, [pb.anchor, pb.audioIndex, pb.videoRef]);
 
+  const delivery = pb.mode === 'direct' ? 'file' : 'stream';
+  const delivered = useMemo(
+    () => ({ ...item, video: deliveredVideo(item.video, capabilities(), delivery) }),
+    [item, delivery],
+  );
+
   const [bytes, setBytes] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -169,7 +166,7 @@ export function useWebController(item: MovieView): WebController {
     statsRef.current = () =>
       buildWebStats({
         v: pb.videoRef.current,
-        item,
+        item: delivered,
         cur: pb.cur,
         dur: pb.dur,
         bufEnd: pb.bufEnd,
@@ -189,17 +186,22 @@ export function useWebController(item: MovieView): WebController {
   const getStats = useCallback(() => statsRef.current(), []);
 
   const qualities = useMemo(() => {
-    const badge = pictureBadge(item.video);
+    const badge = pictureBadge(delivered.video);
     const badgeSuffix = badge ? ` · ${badge}` : '';
-    const notice = streamNotice(item, pb.mode);
+    const note = streamNotices(item, pb.mode, capabilities(), {
+      audioIndex: pb.audioIndex,
+      observed: pb.delivered,
+    })
+      .map((n) => t(n.messageKey, n.messageVars))
+      .join(' · ');
     return [
       {
         id: 'auto',
         label: `${t('player.qualityAuto')}${badgeSuffix}`,
-        note: notice ? t(notice.messageKey, notice.messageVars) : undefined,
+        note: note || undefined,
       },
     ];
-  }, [item, pb.mode, t]);
+  }, [item, delivered, pb.mode, pb.audioIndex, pb.delivered, t]);
 
   const failure = pb.failure ? failureCopy(t, pb.failure) : null;
 

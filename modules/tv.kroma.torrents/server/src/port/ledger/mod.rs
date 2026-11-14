@@ -7,11 +7,16 @@ use axum::routing::post;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
-use kroma_module_sdk::host::{HostStorage, port_reply};
+use std::time::Duration;
+
+use kroma_module_sdk::host::{port_reply, run_blocking, HostStorage};
 
 use super::manager;
 use crate::db::DownloadRow;
-use crate::{DownloadDb, GrabSpec, TorrentFileEntry};
+use crate::{Begun, DownloadDb, GrabSpec, InstantOutcome, InstantRelease, Settle, TorrentFileEntry};
+
+const DEFAULT_INSTANT_BUDGET_MS: u64 = 20_000;
+const SETTLE_EVERY: Duration = Duration::from_millis(250);
 
 pub const DOWNLOAD_GRAB: &str = "tv.kroma.torrents/grab";
 
@@ -35,6 +40,14 @@ pub fn routes<S: HostStorage + Clone + Send + Sync + 'static>() -> Router<S> {
         .route(
             "/_port/tv.kroma.torrents/grab/drop-data",
             post(drop_data::<S>),
+        )
+        .route(
+            "/_port/tv.kroma.torrents/grab/grab-instant",
+            post(grab_instant::<S>),
+        )
+        .route(
+            "/_port/tv.kroma.torrents/grab/instant-capable",
+            post(instant_capable::<S>),
         )
         .route(
             "/_port/tv.kroma.torrents/db/completed",
@@ -62,6 +75,79 @@ async fn grab<S: HostStorage + Clone + Send + Sync + 'static>(
 }
 
 #[derive(Deserialize)]
+struct InstantReq {
+    releases: Vec<InstantRelease>,
+    #[serde(default)]
+    budget_ms: Option<u64>,
+}
+
+async fn grab_instant<S: HostStorage + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+    Json(req): Json<InstantReq>,
+) -> Json<Result<InstantOutcome, String>> {
+    let budget = Duration::from_millis(req.budget_ms.unwrap_or(DEFAULT_INSTANT_BUDGET_MS));
+    Json(
+        instant_flow(host, req.releases, budget)
+            .await
+            .map_err(|error| format!("{error:#}")),
+    )
+}
+
+async fn instant_flow<S: HostStorage + Clone + Send + Sync + 'static>(
+    host: S,
+    releases: Vec<InstantRelease>,
+    budget: Duration,
+) -> anyhow::Result<InstantOutcome> {
+    let began = {
+        let host = host.clone();
+        run_blocking(move || manager(&host)?.instant_begin(&host, releases, budget))
+            .await
+            .map_err(|error| anyhow::anyhow!("{error}"))??
+    };
+    let pending = match began {
+        Begun::Done(outcome) => return Ok(outcome),
+        Begun::Settling(pending) => pending,
+    };
+    let mut pending = Some(pending);
+    loop {
+        let (asking, held) = (host.clone(), pending.take().expect("a pending release"));
+        let (held, step) = run_blocking(move || {
+            let manager = manager(&asking)?;
+            let step = manager.settle_step(&asking, &held);
+            Ok::<_, anyhow::Error>((held, step))
+        })
+        .await
+        .map_err(|error| anyhow::anyhow!("{error}"))??;
+        match step {
+            Settle::Waiting(last) if !held.expired() => {
+                let _ = last;
+                pending = Some(held);
+                tokio::time::sleep(SETTLE_EVERY).await;
+            }
+            step => {
+                let host = host.clone();
+                return run_blocking(move || manager(&host)?.instant_finish(&host, held, step))
+                    .await
+                    .map_err(|error| anyhow::anyhow!("{error}"))?;
+            }
+        }
+    }
+}
+
+// Not fallible: an absent manager is a client that cannot do it.
+async fn instant_capable<S: HostStorage + Clone + Send + Sync + 'static>(
+    State(host): State<S>,
+) -> Json<bool> {
+    Json(
+        kroma_module_sdk::host::run_blocking(move || {
+            manager(&host).map(|m| m.instant_capable()).unwrap_or(false)
+        })
+        .await
+        .unwrap_or(false),
+    )
+}
+
+#[derive(Deserialize)]
 struct MagnetReq {
     magnet_or_url: String,
 }
@@ -83,6 +169,8 @@ async fn gate_open<S: HostStorage + Clone + Send + Sync + 'static>(
 #[derive(Deserialize)]
 struct IdReq {
     id: String,
+    #[serde(default)]
+    discard: bool,
 }
 
 async fn activate<S: HostStorage + Clone + Send + Sync + 'static>(
@@ -109,7 +197,7 @@ async fn drop_data<S: HostStorage + Clone + Send + Sync + 'static>(
         let Some(row) = ledger(&host).get(&req.id)? else {
             return Ok(false);
         };
-        manager.drop_data(&row);
+        manager.drop_data(&row, req.discard);
         Ok(true)
     })
     .await

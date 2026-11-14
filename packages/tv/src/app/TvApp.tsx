@@ -1,4 +1,4 @@
-import type { DecoderFrameLimits, LanDiscoveryBridge } from '@kromatv/core';
+import type { DecoderFrameLimits, HdrSupport, LanDiscoveryBridge } from '@kromatv/core';
 import { useDeviceStore } from '@kromatv/ui/device-store';
 import {
   configureKit,
@@ -74,6 +74,7 @@ export interface TvAppProps {
   searchRequests?: SearchRequests;
   deepLinks?: DeepLinks;
   decoderFrameLimits?: DecoderFrameLimits;
+  hdrSupport?: HdrSupport;
   platform?: string;
   capabilities?: TvEnvOverrides;
   introVideoSrc?: string;
@@ -127,6 +128,7 @@ export function TvApp({
   searchRequests: suppliedSearchRequests,
   deepLinks,
   decoderFrameLimits,
+  hdrSupport,
   lan,
   deviceName,
   playback,
@@ -165,7 +167,7 @@ export function TvApp({
       <ArtworkPrefProvider value={artworkPref}>
         <EnginePrefProvider value={enginePref}>
           <KitProvider config={kitConfig}>
-            <PlaybackCapabilitiesProvider limits={decoderFrameLimits}>
+            <PlaybackCapabilitiesProvider limits={decoderFrameLimits} hdrSupport={hdrSupport}>
               <SearchRequestsProvider value={searchRequests}>
                 <PerfProvider debug>
                   <LauncherProvider value={launcher}>

@@ -38,11 +38,14 @@ pub(crate) fn notify_requester<S: HostStorage>(
         RequestStatus::Available | RequestStatus::PartiallyAvailable => {
             (NotificationEvent::RequestAvailable, "available")
         }
+        RequestStatus::Failed => {
+            notify_failure(state, req, user_id, link);
+            return;
+        }
         RequestStatus::Pending
         | RequestStatus::Searching
         | RequestStatus::Downloading
-        | RequestStatus::Importing
-        | RequestStatus::Failed => return,
+        | RequestStatus::Importing => return,
     };
     let available = matches!(
         status,
@@ -82,6 +85,30 @@ pub(crate) fn notify_requester<S: HostStorage>(
             });
     }
     state.notify(&Audience::user(user_id), &spec);
+}
+
+fn notify_failure<S: HostStorage>(state: &S, req: &MediaRequest, requester: &str, link: &str) {
+    let event = NotificationEvent::RequestFailed;
+    let failed = |body_key: &str, link: String| {
+        NotificationSpec::new(event, "notifications.request.failed.title", body_key)
+            .param("title", req.title.clone())
+            .subject(NotificationSubject::request(&req.id))
+            .dedupe_key(transition_key(event, &req.id, RequestStatus::Failed))
+            .data(&facts(req, RequestStatus::Failed))
+            .image(req.poster_url.clone())
+            .link(link)
+    };
+    state.notify(
+        &Audience::user(requester),
+        &failed("notifications.request.failed.body", link.to_string()),
+    );
+    state.notify(
+        &Audience::permission(Permission::RequestsManage),
+        &failed(
+            "notifications.request.failed.managerBody",
+            format!("/admin/requests/{}", req.id),
+        ),
+    );
 }
 
 pub(super) fn notify_moderators<S: HostStorage>(state: &S, req: &MediaRequest, requester: &User) {

@@ -13,6 +13,7 @@ export const KnownNotificationEvent = z.enum([
   'request.approved',
   'request.denied',
   'request.available',
+  'request.failed',
   'media.added',
   'media.episode',
   'report.submitted',

@@ -1,5 +1,5 @@
-// The discovery page: browse trending titles or search across the local
-// library + TMDB (Overseerr-style). A prominent search hero, trending rails as
+// The discovery page: browse TMDB lists and genres or search across the local
+// library + TMDB (Overseerr-style). A prominent search hero, list rails as
 // the empty state, and counted result grids. TMDB is gated on requests.create.
 
 import { hasPermission } from '@kromatv/client/accounts';
@@ -18,8 +18,8 @@ import {
 } from '@kromatv/ui/kit';
 import type { ReactNode } from 'react';
 import { SearchResults } from '#web/features/requests/search-results';
-import { TrendingBrowse } from '#web/features/requests/trending';
-import { useDiscoverSearch, useTrending } from '#web/features/requests/use-discover-search';
+import { DiscoverBrowse } from '#web/features/requests/discover-browse';
+import { useDiscoverSearch } from '#web/features/requests/use-discover-search';
 import { useAuth } from '#web/shared/lib/auth';
 
 const TYPES: {
@@ -77,16 +77,15 @@ export function SearchPage({
   const { user } = useAuth();
   const canDiscover = !!user && hasPermission(user, 'requests.create');
   const state = useDiscoverSearch(query, type);
-  const trending = useTrending(canDiscover);
   const searching = query.trim().length > 0;
 
-  // Page body: search results while searching, else the trending browse (when
+  // Page body: search results while searching, else the list browse (when
   // discovery is available) or a local-only empty state.
   let body: ReactNode;
   if (searching) {
     body = <SearchResults state={state} />;
   } else if (canDiscover) {
-    body = <TrendingBrowse entries={trending.entries} loading={trending.loading} type={type} />;
+    body = <DiscoverBrowse type={type} />;
   } else {
     body = (
       <EmptyState.Root icon="mood-empty">

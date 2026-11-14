@@ -121,8 +121,10 @@ what enforces it. See
 | `run` | `process` starts only what `run` names, for a first-party module |
 | `env` | only the declared variables exist |
 | `media` | `media.decode-audio` checks both paths against the module's folders, then runs the core's ffmpeg |
+| `source` (a point, not a permission) | only an official module is asked where a stub's bytes are, and two official modules with one instance id are both refused; a path answer must sit in the module's own data folders and be opened without following a link, and a URL answer must be `https` on a host the module declared, and is fetched by the core's relay (network policy, public addresses only, no redirect, journaled), never by ffmpeg: ffmpeg reads a title from the loopback relay behind a per-process secret and a grant for that one stub, with the proxy variables removed |
 | `storage` | the host holds both databases, the module's own in a folder no module holds; the component has no SQLite |
 | `settings` | the host API answers only a declared key, and never one the core keeps |
+| `config` | the host API answers only the caller's own declared `config` fields |
 | CPU, memory | a ceiling per instance |
 
 **Network.** A component that declares no `permissions` has no network. The
@@ -149,6 +151,18 @@ naming templates, the download limits, the VPN config, the recycle bin), so a
 module that changes one does it in the open: the key is on its manifest, and an
 update that adds one to `settings.write` waits for the operator. The component's
 `settings` import answers nothing; it is not a second way in.
+
+**Config.** The values the operator saves for a module's `config` fields are the
+module's own, and `GET /_host/config?key=` hands them back to it and to nobody
+else. The module is the one the token names, never one the request names: there is
+no parameter that selects another module, so a peer's config is not reachable by
+any key. The key must be a `config` field of the caller's manifest, else a `403`
+(`config: "region" is not declared; add it to config in module.json`) on the
+module's log; the answer is the saved value, else the field's `default`, else
+`null`. A secret field comes back to the module that declared it, and the
+refusal line carries the key, never a value. A caller holding only the fabric
+token, which names no module, has no config. The core's `moduleStates` setting
+that stores them stays core-only, so `settings.read` cannot reach it.
 
 **Database.** The component has no SQLite. `kroma-sqlite-guest` gives it
 rusqlite's API and sends every statement to the `sql` import. The host holds the

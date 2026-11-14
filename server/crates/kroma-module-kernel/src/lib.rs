@@ -301,6 +301,7 @@ mod gate_tests {
                 permissions: Arc::new(|_| None),
                 network_providers: Arc::new(Vec::new),
                 network_listeners: Arc::new(Vec::new),
+                source_roots: std::sync::Arc::new(|_| Vec::new()),
             },
         );
         (state, dir)

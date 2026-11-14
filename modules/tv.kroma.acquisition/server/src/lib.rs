@@ -23,6 +23,7 @@ pub mod search;
 mod serve;
 pub mod titles;
 pub mod upgrades;
+pub mod watch_now;
 
 pub use dtos::*;
 pub use serve::acqsearch_routes;
@@ -198,6 +199,7 @@ fn run_rss<S: HostStorage>(host: &S) -> anyhow::Result<()> {
 fn run_import<S: HostStorage>(host: &S) -> anyhow::Result<()> {
     let log = |l: String| tracing::info!(target: "acquisition", "{l}");
     import::import_pass(host, &log)?;
+    watch_now::reconcile(host, &log)?;
     failures::failure_pass(host, &log)?;
     Ok(())
 }

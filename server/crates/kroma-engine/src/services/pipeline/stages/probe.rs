@@ -39,6 +39,7 @@ fn process(ctx: &JobContext, file_id: &str) -> Result<()> {
     crate::infra::probe::probe_one(
         &ctx.state.db,
         ctx.state.ffprobe_available,
+        &ctx.state.sources,
         &ctx.state.events,
         file_id,
         &target.abs_path,

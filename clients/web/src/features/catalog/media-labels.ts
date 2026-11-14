@@ -1,14 +1,14 @@
 import type { MediaItem } from '@kromatv/client/media';
-import { channelLabel, codecLabel, langName } from '@kromatv/core';
+import { audioFormatName, channelLabel, langName } from '@kromatv/core';
 import type { Translate } from '@kromatv/i18n';
 
 export { langName };
 
-/** "Français · AAC 5.1" language then codec/channels. */
+/** "Français · Dolby Digital+ 5.1" language then codec/channels. */
 export function audioString(t: Translate, item: Pick<MediaItem, 'audio'>): string {
   const a = item.audio;
   if (!a) return '-';
-  const tech = [codecLabel(a.codec), channelLabel(a.channels)].filter(Boolean).join(' ');
+  const tech = [audioFormatName(a), channelLabel(a.channels)].filter(Boolean).join(' ');
   return [langName(t, a.language), tech].filter(Boolean).join(' · ') || '-';
 }
 

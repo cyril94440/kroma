@@ -1,7 +1,9 @@
 //! Map ffprobe's output onto our best-effort [`ProbeResult`]: stream selection,
 //! codec normalization, bit-depth and HDR-variant heuristics.
 
-use kroma_module_wire::{AudioStream, ColorInfo, HdrFormat, SubtitleTrack, VideoStream};
+use kroma_module_wire::{
+    AudioStream, ColorInfo, HdrFormat, SpatialAudio, SubtitleTrack, VideoStream,
+};
 
 use super::ffprobe_output::{FfChapter, FfStream, FfprobeOutput};
 use super::{Chapter, ProbeResult};
@@ -24,13 +26,7 @@ pub(super) fn build_result(raw: FfprobeOutput) -> ProbeResult {
                 .and_then(|d| d.parse::<f64>().ok())
                 .map(|secs| (secs * 1000.0) as u64)
         }),
-        // The cover-art test must stay inside the predicate, or a leading mjpeg
-        // poster stream wins and nulls out the actual video.
-        video: raw
-            .streams
-            .iter()
-            .find(|&s| s.codec_type.as_deref() == Some("video") && !is_probably_cover_art(s))
-            .map(build_video),
+        video: video_stream(&raw).map(build_video),
         audio,
         audio_tracks,
         subtitles: raw
@@ -47,6 +43,18 @@ pub(super) fn build_result(raw: FfprobeOutput) -> ProbeResult {
         chapters: raw.chapters.iter().filter_map(build_chapter).collect(),
         unreadable: None,
     }
+}
+
+// The cover-art test must stay inside the predicate, or a leading mjpeg poster
+// stream wins and nulls out the actual video.
+fn video_stream(raw: &FfprobeOutput) -> Option<&FfStream> {
+    raw.streams
+        .iter()
+        .find(|&s| s.codec_type.as_deref() == Some("video") && !is_probably_cover_art(s))
+}
+
+pub(super) fn video_index(raw: &FfprobeOutput) -> Option<u32> {
+    video_stream(raw).and_then(|s| s.index)
 }
 
 fn build_chapter(c: &FfChapter) -> Option<Chapter> {
@@ -98,6 +106,9 @@ fn build_video(stream: &FfStream) -> VideoStream {
         bit_depth,
         hdr_format,
         dolby_vision_profile: dovi.and_then(|d| d.dv_profile),
+        dolby_vision_level: dovi.and_then(|d| d.dv_level),
+        dolby_vision_compatibility: dovi.and_then(|d| d.dv_bl_signal_compatibility_id),
+        dolby_vision_enhancement_layer: dovi.is_some_and(|d| d.el_present_flag == Some(1)),
         color: (!color.is_empty()).then_some(color),
     }
 }
@@ -115,13 +126,31 @@ fn build_audio(stream: &FfStream, index: u32) -> AudioStream {
             .disposition
             .as_ref()
             .is_some_and(|d| d.default == Some(1)),
+        spatial: stream.profile.as_deref().and_then(spatial_of),
+        profile: stream.profile.clone().filter(|p| !p.is_empty()),
+        layout: stream.channel_layout.clone().filter(|l| !l.is_empty()),
+    }
+}
+
+/// The object layer ffprobe names in a stream's profile: `Dolby TrueHD + Dolby
+/// Atmos` and `Dolby Digital Plus + Dolby Atmos` for Atmos, `DTS-HD MA + DTS:X`
+/// (and its IMAX variant) for DTS:X.
+pub fn spatial_of(profile: &str) -> Option<SpatialAudio> {
+    let profile = profile.to_ascii_lowercase();
+    if profile.contains("atmos") {
+        Some(SpatialAudio::Atmos)
+    } else if profile.contains("dts:x") {
+        Some(SpatialAudio::Dtsx)
+    } else {
+        None
     }
 }
 
 // The DOVI record outranks the transfer function, because a Dolby Vision stream
-// can signal any transfer or none at all. HDR10+ is absent on purpose: its
-// metadata is per-frame SEI that a header read cannot see, so a file carrying it
-// is recorded as the HDR10 it also is.
+// can signal any transfer or none at all. HDR10+ is per-frame SEI that a header
+// read cannot see, so it is added afterwards by `run`. Wide gamut at 10 bits only
+// reads as HDR10 where the transfer is left unstated: one stated as anything else
+// (`bt709`, `bt2020-10`) is an SDR picture in a wide container.
 fn hdr_format(stream: &FfStream, bit_depth: Option<u32>, dolby_vision: bool) -> Option<HdrFormat> {
     if dolby_vision {
         return Some(HdrFormat::DolbyVision);
@@ -131,9 +160,13 @@ fn hdr_format(stream: &FfStream, bit_depth: Option<u32>, dolby_vision: bool) -> 
         "arib-std-b67" => return Some(HdrFormat::Hlg),
         _ => {}
     }
+    let transfer_unstated = matches!(
+        stream.color_transfer.as_deref().unwrap_or(""),
+        "" | "unknown" | "unspecified"
+    );
     let wide_gamut = matches!(stream.color_primaries.as_deref().unwrap_or(""), "bt2020");
     let deep = bit_depth.is_some_and(|b| b >= 10);
-    (deep && wide_gamut).then_some(HdrFormat::Hdr10)
+    (transfer_unstated && deep && wide_gamut).then_some(HdrFormat::Hdr10)
 }
 
 fn pixel_format_bit_depth(pix_fmt: Option<&str>) -> Option<u32> {
@@ -179,94 +212,4 @@ pub fn normalize_codec(name: Option<&str>) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn video_of(stream_json: &str) -> VideoStream {
-        let raw: FfprobeOutput =
-            serde_json::from_str(&format!(r#"{{"streams":[{stream_json}]}}"#)).unwrap();
-        build_result(raw)
-            .video
-            .expect("the fixture describes one video stream")
-    }
-
-    #[test]
-    fn a_dolby_vision_record_outranks_the_transfer_and_keeps_its_profile() {
-        let video = video_of(
-            r#"{"codec_type":"video","codec_name":"hevc","pix_fmt":"yuv420p10le",
-                "color_transfer":"smpte2084","color_primaries":"bt2020","color_space":"bt2020nc",
-                "side_data_list":[{"side_data_type":"DOVI configuration record","dv_profile":5}]}"#,
-        );
-
-        assert_eq!(video.hdr_format, Some(HdrFormat::DolbyVision));
-        assert_eq!(video.dolby_vision_profile, Some(5));
-        assert!(video.hdr);
-    }
-
-    #[test]
-    fn pq_reads_as_hdr10_and_the_arib_transfer_as_hlg() {
-        let pq =
-            video_of(r#"{"codec_type":"video","codec_name":"hevc","color_transfer":"smpte2084"}"#);
-        let hlg = video_of(
-            r#"{"codec_type":"video","codec_name":"hevc","color_transfer":"arib-std-b67"}"#,
-        );
-
-        assert_eq!(pq.hdr_format, Some(HdrFormat::Hdr10));
-        assert_eq!(hlg.hdr_format, Some(HdrFormat::Hlg));
-        assert!(pq.dolby_vision_profile.is_none());
-    }
-
-    #[test]
-    fn ten_bit_bt2020_with_no_transfer_stated_still_reads_as_hdr10() {
-        let video = video_of(
-            r#"{"codec_type":"video","codec_name":"hevc","pix_fmt":"yuv420p10le",
-                "color_primaries":"bt2020"}"#,
-        );
-
-        assert_eq!(video.hdr_format, Some(HdrFormat::Hdr10));
-        assert_eq!(video.bit_depth, Some(10));
-    }
-
-    #[test]
-    fn an_sdr_stream_names_no_variant_and_its_colour_still_travels() {
-        let video = video_of(
-            r#"{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p",
-                "color_transfer":"bt709","color_primaries":"bt709","color_space":"bt709"}"#,
-        );
-
-        assert!(video.hdr_format.is_none());
-        assert!(!video.hdr);
-        let color = video
-            .color
-            .expect("bt709 is colour metadata like any other");
-        assert_eq!(color.primaries.as_deref(), Some("bt709"));
-        assert_eq!(color.transfer.as_deref(), Some("bt709"));
-        assert_eq!(color.matrix.as_deref(), Some("bt709"));
-    }
-
-    #[test]
-    fn a_stream_that_states_no_colour_at_all_carries_none() {
-        let video = video_of(r#"{"codec_type":"video","codec_name":"h264"}"#);
-
-        assert!(video.color.is_none());
-        assert!(video.hdr_format.is_none());
-    }
-
-    #[test]
-    fn a_subtitle_track_keeps_its_title_and_forced_flag() {
-        let raw: FfprobeOutput = serde_json::from_str(
-            r#"{"streams":[
-                {"codec_type":"subtitle","codec_name":"subrip",
-                 "tags":{"language":"fre","title":"Forcés"},"disposition":{"default":0,"forced":1}},
-                {"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"fre"}}]}"#,
-        )
-        .unwrap();
-
-        let subs = build_result(raw).subtitles;
-
-        assert_eq!(subs[0].title.as_deref(), Some("Forcés"));
-        assert!(subs[0].forced);
-        assert!(subs[1].title.is_none());
-        assert!(!subs[1].forced);
-    }
-}
+mod tests;

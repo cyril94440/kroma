@@ -186,6 +186,7 @@ pub fn search_all(host: &dyn HostCtx, asks: &[(&str, &Query)]) -> Vec<anyhow::Re
         .map(|(indexer_id, query)| (url.clone(), search_body(indexer_id, query)))
         .collect();
     Loopback::new()
+        .max_time(super::deadline::call_secs())
         .header("authorization", format!("Bearer {token}"))
         .post_json_all(&calls)
         .into_iter()

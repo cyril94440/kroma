@@ -13,6 +13,7 @@ use rusqlite::params;
 use crate::auto::title_kind;
 use crate::rules::blocklist::{self, Blocked};
 
+mod give_up;
 mod progress;
 
 const HOUR_MS: i64 = 60 * 60 * 1000;
@@ -22,20 +23,21 @@ pub struct FailureSummary {
     pub stalled: usize,
     pub blocklisted: usize,
     pub missing_again: usize,
+    pub requests_failed: usize,
 }
 
 /// One download as this pass reads it from the shared ledger.
 #[derive(Debug, Clone)]
-struct Download {
-    id: String,
-    kind: String,
-    tmdb_id: u64,
-    season: Option<u32>,
-    episodes: Option<Vec<u32>>,
-    release_title: String,
+pub(crate) struct Download {
+    pub(crate) id: String,
+    pub(crate) kind: String,
+    pub(crate) tmdb_id: u64,
+    pub(crate) season: Option<u32>,
+    pub(crate) episodes: Option<Vec<u32>>,
+    pub(crate) release_title: String,
     info_hash: Option<String>,
     indexer_id: Option<String>,
-    status: String,
+    pub(crate) status: String,
     error: Option<String>,
     progress: f64,
     grabbed_at: i64,
@@ -50,7 +52,7 @@ impl Download {
         !matches!(self.status.as_str(), "failed" | "error" | "removed")
     }
 
-    fn unfinished(&self) -> bool {
+    pub(crate) fn unfinished(&self) -> bool {
         matches!(self.status.as_str(), "queued" | "downloading" | "paused")
     }
 
@@ -101,6 +103,7 @@ pub fn failure_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<F
             summary.blocklisted += 1;
         }
     }
+    summary.requests_failed = give_up::fail_exhausted_requests(state, log)?;
     let conn = state.db().get()?;
     let grabbed = kroma_module_sdk::db::wanted_in_status(&conn, "grabbed")?;
     drop(conn);
@@ -170,7 +173,7 @@ fn blocklist_once<S: HostStorage>(state: &S, d: &Download, now: i64) -> Result<b
     Ok(true)
 }
 
-fn read_downloads<S: HostStorage>(state: &S) -> Result<Vec<Download>> {
+pub(crate) fn read_downloads<S: HostStorage>(state: &S) -> Result<Vec<Download>> {
     let conn = state.db().get()?;
     let mut stmt = conn.prepare(
         "SELECT id, kind, tmdb_id, season, episodes, release_title, info_hash, indexer_id, \
@@ -198,3 +201,5 @@ fn read_downloads<S: HostStorage>(state: &S) -> Result<Vec<Download>> {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_give_up;

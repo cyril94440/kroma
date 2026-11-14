@@ -3,10 +3,13 @@
 //! `services::{jobs::now_ms, scan::{now_iso8601, short_hash}, auth::random_*}`
 //! re-export these for backwards compatibility.
 
+pub mod address;
 pub mod external_subtitles;
 pub mod input;
 pub mod language;
 pub mod pcm;
+pub mod remote_file;
+pub mod remote_url;
 pub mod video;
 
 use std::fs::File;

@@ -10,6 +10,10 @@ mod native;
 mod render;
 #[cfg(not(target_family = "wasm"))]
 mod send;
+#[cfg(not(target_family = "wasm"))]
+mod stream;
+#[cfg(not(target_family = "wasm"))]
+pub use stream::Streamed;
 
 /// A prepared request: builder-style options, then one of the executors
 /// ([`Fetch::get`], [`Fetch::post_json`], [`Fetch::post_form`]). Every executor
@@ -29,6 +33,7 @@ pub struct Fetch {
     follow_redirects: bool,
     public_only: bool,
     https_only: bool,
+    stall_seconds: Option<u32>,
 }
 
 impl Default for Fetch {
@@ -47,6 +52,7 @@ impl Default for Fetch {
             follow_redirects: true,
             public_only: false,
             https_only: false,
+            stall_seconds: None,
         }
     }
 }
@@ -100,6 +106,14 @@ impl Fetch {
         self
     }
 
+    /// Abort a [`Fetch::stream`] whose upstream sends nothing for `seconds`
+    /// (default 30). A reader that stops polling does not count: curl is then
+    /// blocked writing, not waiting on the host.
+    pub fn stall_seconds(mut self, seconds: u32) -> Self {
+        self.stall_seconds = Some(seconds);
+        self
+    }
+
     /// Refuse a response body larger than `bytes`, so a third-party answer is
     /// bounded before anything parses it.
     pub fn max_bytes(mut self, bytes: u64) -> Self {
@@ -130,7 +144,6 @@ impl Fetch {
         self.http2 = true;
         self
     }
-
 }
 
 pub(crate) fn bare_proxy(proxy: &str) -> Option<String> {

@@ -321,7 +321,7 @@ or not.
 | WireGuard tunnels in the gateway | not done: `wireproxy` stands in for it (#512) |
 | Network middleware | planned (#493) |
 | A network that carries UDP | planned (#512) |
-| ffmpeg and ffprobe open local inputs only | on `main` (#515) |
+| ffmpeg and ffprobe open local files, or a title through the core's loopback relay (`http` and `tcp` only, no proxy variables, never a module's URL) | on `main` (#515) |
 | A call that skips the gate fails CI, and SMTP mail asks the gate as `email` | on `main` (#541) |
 | A call made before boot installs the gate is refused, and journaled once the journal starts | on `main` (#545) |
 | Every first-party module declares its permissions, and the core enforces `net.connect` on the calls it is asked about | on `main` (#546) |

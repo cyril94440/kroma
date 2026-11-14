@@ -60,6 +60,8 @@ pub enum NotificationEvent {
     RequestDenied,
     #[serde(rename = "request.available")]
     RequestAvailable,
+    #[serde(rename = "request.failed")]
+    RequestFailed,
     #[serde(rename = "media.added")]
     MediaAdded,
     #[serde(rename = "media.episode")]
@@ -92,6 +94,7 @@ impl NotificationEvent {
             NotificationEvent::RequestApproved => "request.approved",
             NotificationEvent::RequestDenied => "request.denied",
             NotificationEvent::RequestAvailable => "request.available",
+            NotificationEvent::RequestFailed => "request.failed",
             NotificationEvent::MediaAdded => "media.added",
             NotificationEvent::MediaEpisode => "media.episode",
             NotificationEvent::ReportSubmitted => "report.submitted",
@@ -112,6 +115,7 @@ impl NotificationEvent {
             "request.approved" => Some(NotificationEvent::RequestApproved),
             "request.denied" => Some(NotificationEvent::RequestDenied),
             "request.available" => Some(NotificationEvent::RequestAvailable),
+            "request.failed" => Some(NotificationEvent::RequestFailed),
             "media.added" => Some(NotificationEvent::MediaAdded),
             "media.episode" => Some(NotificationEvent::MediaEpisode),
             "report.submitted" => Some(NotificationEvent::ReportSubmitted),
@@ -129,11 +133,12 @@ impl NotificationEvent {
 
     /// The admin console's test bench walks this, so an event missing here is
     /// an event nobody can preview.
-    pub const ALL: [NotificationEvent; 14] = [
+    pub const ALL: [NotificationEvent; 15] = [
         NotificationEvent::RequestSubmitted,
         NotificationEvent::RequestApproved,
         NotificationEvent::RequestDenied,
         NotificationEvent::RequestAvailable,
+        NotificationEvent::RequestFailed,
         NotificationEvent::MediaAdded,
         NotificationEvent::MediaEpisode,
         NotificationEvent::ReportSubmitted,
@@ -151,7 +156,8 @@ impl NotificationEvent {
             NotificationEvent::RequestSubmitted
             | NotificationEvent::RequestApproved
             | NotificationEvent::RequestDenied
-            | NotificationEvent::RequestAvailable => NotificationCategory::Requests,
+            | NotificationEvent::RequestAvailable
+            | NotificationEvent::RequestFailed => NotificationCategory::Requests,
             NotificationEvent::MediaAdded | NotificationEvent::MediaEpisode => {
                 NotificationCategory::Media
             }

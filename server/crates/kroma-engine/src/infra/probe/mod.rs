@@ -1,5 +1,6 @@
 mod markers;
 mod pass;
+mod refresh;
 
 pub use kroma_media::probe::*;
 

@@ -11,7 +11,7 @@ use crate::vectors::prune_orphan_vectors;
 use crate::{now_or_blank, Pool};
 
 use super::probe_result::recompute_all_representatives;
-use super::scanned_files::sync_files;
+use super::scanned_files::{sync_files, upsert_files};
 
 /// The episode ids each show holds right now, for a scan that wants to know
 /// which shows its walk changed. Read BEFORE [`sync_all`] writes over them.
@@ -54,9 +54,50 @@ pub fn sync_all(
     Ok(())
 }
 
+/// Adds scanned shows, items and files without touching anything else: the
+/// write behind a scan of a few files, where [`sync_all`] would read every row
+/// the walk did not see as gone.
+pub fn sync_added(
+    pool: &Pool,
+    libraries: &[Library],
+    shows: &[Show],
+    items: &[MediaItem],
+    mtimes: &HashMap<String, Option<i64>>,
+) -> Result<()> {
+    let mut conn = pool.get()?;
+    let tx = conn.transaction()?;
+    upsert_libraries(&tx, libraries)?;
+    sync_shows(&tx, shows)?;
+    sync_items(&tx, items)?;
+    upsert_files(&tx, items, mtimes)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Forgets these files and whatever item or show they alone held up.
+pub fn forget_files(pool: &Pool, abs_paths: &[String]) -> Result<()> {
+    let mut conn = pool.get()?;
+    let tx = conn.transaction()?;
+    {
+        let mut delete = tx.prepare("DELETE FROM files WHERE abs_path = ?1")?;
+        for path in abs_paths {
+            delete.execute(params![path])?;
+        }
+    }
+    prune_orphans(&tx)?;
+    tx.commit()?;
+    Ok(())
+}
+
 // Upserts by id, then deletes only libraries no longer scanned: a wholesale
 // DELETE FROM libraries would cascade to items/files and wipe what this sync preserves.
 fn sync_libraries(tx: &rusqlite::Transaction, libraries: &[Library]) -> Result<()> {
+    upsert_libraries(tx, libraries)?;
+    let keep: Vec<String> = libraries.iter().map(|l| l.id.clone()).collect();
+    prune_libraries(tx, &keep)
+}
+
+fn upsert_libraries(tx: &rusqlite::Transaction, libraries: &[Library]) -> Result<()> {
     let mut lib_stmt = tx.prepare(
         "INSERT INTO libraries (id,name,kind,path,added_at) VALUES (?1,?2,?3,?4,?5) \
          ON CONFLICT(id) DO UPDATE SET name=excluded.name, kind=excluded.kind, path=excluded.path",
@@ -70,7 +111,10 @@ fn sync_libraries(tx: &rusqlite::Transaction, libraries: &[Library]) -> Result<(
             now_or_blank()
         ])?;
     }
-    let keep: Vec<String> = libraries.iter().map(|l| l.id.clone()).collect();
+    Ok(())
+}
+
+fn prune_libraries(tx: &rusqlite::Transaction, keep: &[String]) -> Result<()> {
     let mut existing: Vec<String> = Vec::new();
     {
         let mut q = tx.prepare("SELECT id FROM libraries")?;
@@ -190,127 +234,4 @@ fn library_kind_str(k: &LibraryKind) -> &'static str {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ingest::test_support::*;
-    use crate::{
-        item_has_probed_file, item_probed, set_file_probe, set_item_metadata, unprobed_files,
-        FileProbe,
-    };
-
-    #[test]
-    fn sync_all_creates_updates_and_prunes() {
-        let p = pool();
-        let items = vec![
-            movie(
-                "m1",
-                "Dune",
-                "lib",
-                vec![file("f1", "/media/m1.mkv", false)],
-            ),
-            movie(
-                "m2",
-                "Arrival",
-                "lib",
-                vec![file("f2", "/media/m2.mkv", false)],
-            ),
-        ];
-        sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 100)).unwrap();
-        assert_eq!(crate::counts(&p).unwrap(), (1, 2, 0));
-        let got = crate::get_item(&p, "m1").unwrap().unwrap();
-        assert_eq!(got.files.len(), 1);
-        assert_eq!(got.container, "mkv"); // seeded from the file until a probe recomputes
-
-        let mut unprobed = unprobed_files(&p).unwrap();
-        unprobed.sort();
-        assert_eq!(unprobed.len(), 2);
-        assert!(unprobed
-            .iter()
-            .any(|(id, abs, item)| id == "f1" && abs == "/media/m1.mkv" && item == "m1"));
-
-        let items = vec![movie(
-            "m1",
-            "Dune",
-            "lib",
-            vec![file("f1", "/media/m1.mkv", false)],
-        )];
-        sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 100)).unwrap();
-        assert_eq!(crate::counts(&p).unwrap(), (1, 1, 0));
-        assert!(crate::get_item(&p, "m2").unwrap().is_none());
-    }
-
-    #[test]
-    fn sync_preserves_metadata_and_probe_across_rescans() {
-        let p = pool();
-        let items = vec![movie(
-            "m1",
-            "Dune",
-            "lib",
-            vec![file("f1", "/media/m1.mkv", false)],
-        )];
-        sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 100)).unwrap();
-
-        set_file_probe(
-            &p,
-            "f1",
-            &FileProbe {
-                duration_ms: Some(7_200_000),
-                video: Some(&video()),
-                ..FileProbe::default()
-            },
-        )
-        .unwrap();
-        set_item_metadata(&p, "m1", &meta(603, "Dune")).unwrap();
-        assert!(item_has_probed_file(&p, "m1").unwrap());
-
-        sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 100)).unwrap();
-        assert!(
-            item_probed(&p, "m1").unwrap(),
-            "unchanged file keeps probed=1"
-        );
-        let got = crate::get_item(&p, "m1").unwrap().unwrap();
-        assert_eq!(got.metadata.as_ref().map(|m| m.tmdb_id), Some(603));
-
-        sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 999)).unwrap();
-        assert!(
-            !item_probed(&p, "m1").unwrap(),
-            "changed file resets probed=0"
-        );
-        assert!(crate::get_item(&p, "m1")
-            .unwrap()
-            .unwrap()
-            .metadata
-            .is_some());
-    }
-
-    #[test]
-    fn a_scan_that_cannot_write_an_item_fails_whole_rather_than_half() {
-        let p = pool();
-        p.get()
-            .unwrap()
-            .execute_batch(
-                "CREATE TRIGGER no_item_insert BEFORE INSERT ON items \
-                 BEGIN SELECT RAISE(ABORT, 'refused'); END",
-            )
-            .unwrap();
-
-        let items = vec![movie(
-            "m1",
-            "Dune",
-            "lib",
-            vec![file("f1", "/media/m1.mkv", false)],
-        )];
-        assert!(sync_all(&p, &[lib("lib")], &[], &items, &HashMap::new()).is_err());
-    }
-
-    #[test]
-    fn every_kind_is_stored_under_the_spelling_the_queries_filter_on() {
-        assert_eq!(kind_str(&Kind::Movie), "movie");
-        assert_eq!(kind_str(&Kind::Episode), "episode");
-        assert_eq!(kind_str(&Kind::Video), "video");
-
-        assert_eq!(library_kind_str(&LibraryKind::Movies), "movies");
-        assert_eq!(library_kind_str(&LibraryKind::Shows), "shows");
-        assert_eq!(library_kind_str(&LibraryKind::Mixed), "mixed");
-    }
-}
+mod tests;

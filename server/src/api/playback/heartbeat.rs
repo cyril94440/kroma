@@ -85,10 +85,19 @@ pub async fn ping(
         if let Some(abs) = item.abs_path.clone() {
             let subs = item.subtitles.clone();
             let data_dir = state.config.data_dir.clone();
+            let sources = state.sources.clone();
             tokio::task::spawn_blocking(move || {
+                let Ok(Some(local)) = sources.local(&abs) else {
+                    return;
+                };
+                let resolved = crate::services::source::Resolved {
+                    input: kroma_media::input::MediaInput::Local(local),
+                    stub: None,
+                };
                 let _ = crate::infra::subtitles::extract_pending_locked(
                     &data_dir,
                     &abs,
+                    &resolved,
                     &subs,
                     &|| false,
                 );

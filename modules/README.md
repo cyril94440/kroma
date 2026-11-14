@@ -181,7 +181,7 @@ Three manifest verbs, and any module may use all three:
 - **`definesPoints: [{ name, version?, methods? }]`** invents a point. `name` is
   local: the full name is `<this module's id>/<name>`, so ownership reads off the
   name and two authors cannot collide. The handful the CORE calls (`acquisition`,
-  `transcriber`, `embedder`, `network`, `trailer`) are bare, and nothing but the core may define one.
+  `transcriber`, `embedder`, `network`, `trailer`, `source`) are bare, and nothing but the core may define one.
 - **`contributes: [{ point, version?, id?, label?, fields?, flow? }]`** answers a
   point, its own included. `id` is the instance name for a point several modules
   answer at once, the way a download client is picked, and absent for a point
@@ -203,6 +203,66 @@ Two rules make this hold together across independently released modules:
   unknown fields ignored, and a test on each side asserting the exact JSON it
   sends or expects. That test is the contract. Without it a rename fails in
   someone's install rather than in CI.
+
+### Holding a title for the core: `source`
+
+A module that keeps a title's bytes itself, a debrid service for one, can leave
+the library holding a stub instead of the video. The stub is a small JSON file
+named like the video it stands for, with the extension `.kremote`
+(`Movie (2020).kremote`), written with `kroma_primitives::remote_file::write`:
+
+```json
+{ "source": "alldebrid", "ref": "7:Movie.2020.2160p.mkv", "name": "Movie.2020.2160p.mkv", "size": 42000000000 }
+```
+
+`source` is the `id` of the module's `source` contribution, `ref` means something
+only to that module, `name` is the original file name (its extension is the
+container the library shows) and `size` the real byte size. The core scans a
+stub as a title, with that container and size, probes it, plays it and relays it;
+sidecar subtitles named after it (`Movie (2020).fr.srt`) work as for a video.
+
+```jsonc
+// module.json
+"contributes": [{ "point": "source", "id": "alldebrid" }]
+```
+
+Answer `POST /_port/source/locate`. The body is `{ "ref": string, "warm": bool }`
+and the reply `{ "Ok": { "path": string|null, "url": string|null, "size": u64 } }`
+or `{ "Err": "message" }`. `path` is the absolute path of a COMPLETE local copy;
+otherwise `url` is a short-lived `https` URL of the whole file that honours
+`Range`. `warm: true` asks you to start filling a local copy in the background
+and to answer at once; the core sends it only when someone is playing the title.
+Declare the fields you read and ignore the rest.
+
+The core does not take your word for the answer:
+
+- A `url` must be `https`, carry no credentials and name a public host. A host
+  that resolves to a private, loopback or link-local address is refused, and so is
+  one your `net.connect` does not declare. The URL is a bearer link, so the core
+  logs its host only, and a redirect from it is not followed.
+- A `path` must resolve, symlinks followed, under a data directory your manifest
+  declares in `dataDirs`, be a regular file, and be exactly `size` bytes long.
+- Heavy background work (scrub thumbnails, intro and credits detection, loudness,
+  embedded-subtitle pre-extraction, transcription) reads a stub only once you
+  answer a `path`, and never asks with `warm`. Playback, probing and the
+  `/download` remux read the URL or the path as you answered it.
+- An `Err`, a slow answer or a missing module is a localized error on playback,
+  never a hang, and a probe that failed that way is retried later.
+
+Only an **official** module (one the official registry shipped) is asked for the
+`source` point: one installed from anywhere else that contributes it is never
+called, and two official modules naming one instance id are both refused with a
+log line. A stub's `name` must be a bare file name (no path separator, not `.`
+or `..`, no control character, nothing empty or oversized) and its size at most
+2^50, or `remote_file::read` refuses the stub.
+
+While a title is not on this machine and the host's ffmpeg cannot read it over
+the network, the host asks you to cache it (`warm`) and answers the player with
+`error.sourcePreparing` instead of an error: the probe is deferred, nothing is
+recorded against the file, and it is read once your copy lands. A module should
+therefore answer `locate` quickly with a `url` and fill the copy in the
+background. The core remembers a resolved link for 30 s per stub, warms at most
+once per window, and on a 401, 403, 404 or 410 from your URL asks you once more.
 
 ### Reacting to what happens
 
@@ -336,6 +396,39 @@ session user's `language`, which is what every other surface reads.
 A module whose strings also have to reach something that is not the web
 frontend or the server crate, a device channel it installs, ships the same JSON
 there rather than restating it in that language.
+
+### Module config
+
+A value the operator should be able to change in Admin (a cache size, a region)
+is a `config` field in `module.json`, which the module page renders as a form:
+
+```jsonc
+"config": [
+  { "key": "cacheMaxGb", "label": "config.cacheMaxGb", "type": "number", "default": "50" }
+]
+```
+
+`label`, each `options` entry and `placeholder` are keys of the module's own
+`locales/{en,fr}.json`, and a string no catalog has renders as written. The
+bundle's catalogs reach the form even when the module has no frontend. Read the
+value where it is used, never at start, so a change applies without a restart:
+
+```rust
+let max_gb = host.config_i64("cacheMaxGb", 50);
+```
+
+`config_value` answers the saved value, else the field's `default`, else `None`,
+and `config_i64`, `config_bool` and `config_str` take a fallback for a missing or
+mistyped one (a manifest default is text, and `"50"` reads as 50). It is the
+module's own config only: a key its manifest does not declare is a `403`, and no
+call reaches another module's. A secret field is returned to its module, and
+never logged. In a test, `StubHost::with_config` seeds a value and `set_config`
+changes it between two calls.
+
+A module built against an SDK before `config_value` exists on a server that
+lacks the route gets `None` for every key, so it runs on its defaults; raise
+`engines.server` to the first server with the route when the defaults would be
+wrong.
 
 ### Notifications
 

@@ -6,19 +6,18 @@ import type { MediaItem } from '@kromatv/client/media';
 import { resolveMasterStart } from '@kromatv/core';
 import { type AudioTrack, useVideoPlayer, type VideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { decideSource, downloadCopyCodecs, mobileVideoCodecs } from '#mobile/player/caps';
+import {
+  decideSource,
+  downloadCopyCodecs,
+  mobileHdr,
+  mobileVideoCodecs,
+} from '#mobile/player/caps';
 import { usePlaybackOwner } from '#mobile/player/playback-owner';
 import { useEngineControls } from './controls';
 import { useEngineFailure } from './failure';
+import { useEngineListeners } from './listeners';
 import { stopNativePlayer } from './shutdown';
-import {
-  type AudioFilterMode,
-  type Engine,
-  type EngineCore,
-  nativeTrackKey,
-  nextLoadId,
-  patchCore,
-} from './types';
+import { type AudioFilterMode, type Engine, type EngineCore, nextLoadId, patchCore } from './types';
 
 export type { AudioFilterMode, Engine, EngineState, Transport } from './types';
 
@@ -95,6 +94,7 @@ export function useKromaEngine(
       return client.media.hlsMasterUrl(item.id, core.forceAac, anchor, core.audioIndex, {
         filter: f,
         videoCodecs: mobileVideoCodecs(),
+        hdr: mobileHdr(),
         copyCodecs: downloadCopyCodecs(),
         subtitle: core.subtitle ?? undefined,
       });
@@ -175,79 +175,22 @@ export function useKromaEngine(
     [core, load, localUri, failTerminal, sourceUrl],
   );
 
-  useEffect(() => {
-    const subs = [
-      player.addListener('statusChange', ({ status, error }) => {
-        if (!core.active || core.terminal) return;
-        if (status === 'error') {
-          fail(error);
-          return;
-        }
-        if (status === 'loading') setWaiting(true);
-        if (status === 'readyToPlay') {
-          setReady(true);
-          setWaiting(false);
-          clearFailure();
-          // Local files: surface the tracks actually in the file (iOS often
-          // has them ready here without ever firing the change event).
-          if (localUri) setLocalAudio(player.availableAudioTracks);
-          if (core.pendingSeek != null) {
-            player.currentTime = core.pendingSeek;
-            patchCore(core, { elSec: core.pendingSeek, pendingSeek: null });
-          }
-          if (core.mode === 'direct' && player.duration > 0) setDur(player.duration);
-          if (core.resumeOnLoad) {
-            patchCore(core, { resumeOnLoad: false });
-            player.play();
-          }
-        }
-      }),
-      player.addListener('timeUpdate', ({ currentTime, bufferedPosition }) => {
-        if (!core.active || core.terminal) return;
-        const advanced = currentTime - core.elSec;
-        if (player.playing && advanced > 0 && advanced < 2) setWaiting(false);
-        if (currentTime > 0.5) patchCore(core, { started: true });
-        patchCore(core, { elSec: currentTime, bufSec: Math.max(0, bufferedPosition) });
-        setCur(core.baseSec + currentTime);
-        setBuffered(core.baseSec + Math.max(currentTime, core.bufSec));
-      }),
-      player.addListener('playingChange', ({ isPlaying }) => {
-        if (!core.active || core.terminal) return;
-        setPlaying(isPlaying);
-      }),
-      // ExoPlayer reports ENDED for the empty initial source and again on
-      // every source swap: a bare event is not proof playback reached the
-      // end. Only trust it once this source has produced playback time and
-      // the clock sits near the actual end.
-      player.addListener('playToEnd', () => {
-        if (!core.active || core.terminal) return;
-        if (!core.started) return;
-        const end = Math.max(player.duration, 0);
-        if (end > 0 && player.currentTime < end - 5) return;
-        setEndedNonce((n) => n + 1);
-      }),
-      player.addListener('availableAudioTracksChange', ({ availableAudioTracks }) => {
-        if (!core.active || core.terminal) return;
-        if (localUri) setLocalAudio(availableAudioTracks);
-      }),
-      // Keep the selected ordinal honest whichever side initiated the switch
-      // (our setter, the system Now Playing UI, or the platform's default pick).
-      player.addListener('audioTrackChange', ({ audioTrack }) => {
-        if (!core.active || core.terminal) return;
-        if (!localUri || !audioTrack) return;
-        const i = player.availableAudioTracks.findIndex(
-          (t) => nativeTrackKey(t) === nativeTrackKey(audioTrack),
-        );
-        if (i >= 0) {
-          patchCore(core, { audioIndex: i });
-          setAudioIndex(i);
-        }
-      }),
-    ];
-    return () => {
-      for (const s of subs) s.remove();
-    };
-  }, [player, core, fail, localUri, clearFailure]);
+  useEngineListeners({
+    player,
+    core,
+    fail,
+    localUri,
+    clearFailure,
+    setCur,
+    setBuffered,
+    setDur,
+    setPlaying,
+    setWaiting,
+    setReady,
+    setEndedNonce,
+    setLocalAudio,
+    setAudioIndex,
+  });
 
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- open once per item; startSec/load must not re-trigger a reload mid-playback
   useEffect(() => {

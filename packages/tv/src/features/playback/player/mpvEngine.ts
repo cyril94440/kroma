@@ -12,8 +12,9 @@
 // media element (surface: 'mpv').
 
 import {
-  decodableAudioCodecs,
+  copyableAudioCodecs,
   decodableVideoCodecs,
+  hdrDeclaration,
   MPV_CAPS,
   resolveMasterStart,
 } from '@kromatv/core';
@@ -76,11 +77,15 @@ export class MpvEngine extends BaseTvEngine {
   }
 
   protected override declaredAudioCodecs(): string[] {
-    return decodableAudioCodecs(MPV_CAPS);
+    return copyableAudioCodecs(MPV_CAPS);
   }
 
   protected override declaredVideoCodecs(): string[] {
     return decodableVideoCodecs(MPV_CAPS);
+  }
+
+  protected override declaredHdr(): string[] | undefined {
+    return hdrDeclaration(MPV_CAPS);
   }
 
   // Kept out of the constructor so it holds no async work; called once right after.

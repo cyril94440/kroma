@@ -1,3 +1,4 @@
+import AVFoundation
 import ExpoModulesCore
 import Foundation
 
@@ -30,7 +31,20 @@ public class DeviceHardwareModule: Module {
     Function("decoderFrameLimits") {
       [String: [String: Int]]()
     }
+
+    Function("hdrSupport") {
+      hdrSupport()
+    }
   }
+}
+
+private func hdrSupport() -> [String: [String]] {
+  let modes = AVPlayer.availableHDRModes
+  var types = [String]()
+  if modes.contains(.dolbyVision) { types.append("dolbyVision") }
+  if modes.contains(.hdr10) { types.append("hdr10") }
+  if modes.contains(.hlg) { types.append("hlg") }
+  return ["displayHdrTypes": types]
 }
 
 // Darwin has no equivalent of Android's `availMem`, so the free pages are read

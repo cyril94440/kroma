@@ -48,6 +48,13 @@ if [ "$ARCH" = x86_64 ]; then
   run hwaccels sh -c "$F/ffmpeg -hide_banner -hwaccels | grep -q vaapi"
   run libva-api sh -c "grep -q vaMapBuffer2 $F/../lib/libva.so.2 && grep -q vaGetDisplayDRM $F/../lib/libva-drm.so.2"
 fi
-run no-network sh -c "! $F/ffmpeg -hide_banner -protocols | grep -qw https"
+run protocol-http sh -c "$F/ffmpeg -hide_banner -protocols | grep -qw http"
+run protocol-tcp sh -c "$F/ffmpeg -hide_banner -protocols | grep -qw tcp"
+for p in https tls crypto udp rtp rtmp; do
+  run "no-$p" sh -c "! $F/ffmpeg -hide_banner -protocols | grep -qw $p"
+done
+run encode-eac3 $F/ffmpeg -y -hide_banner -f lavfi -i sine=d=1 -c:a eac3 -b:a 384k e.mka
+run encode-ac3 $F/ffmpeg -y -hide_banner -f lavfi -i sine=d=1 -c:a ac3 -b:a 384k a.mka
+run file-whitelist-refuses-http sh -c "$F/ffmpeg -hide_banner -protocol_whitelist file -i http://127.0.0.1:9/a.mkv -f null - 2>&1 | grep -q 'not on whitelist'"
 echo "ok=$ok bad=$bad"
 [ "$bad" -eq 0 ]

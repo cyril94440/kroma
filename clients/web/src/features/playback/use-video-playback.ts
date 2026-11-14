@@ -1,5 +1,10 @@
 import type { PlaybackMode } from '@kromatv/client/playback';
-import { audioTracksOf, type EngineDecision, preferredAudioIndex } from '@kromatv/core';
+import {
+  audioTracksOf,
+  type EngineDecision,
+  preferredAudioIndex,
+  streamRefusal,
+} from '@kromatv/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { setWebEnginePref, type WebEnginePref } from '#web/features/playback/engine-pref';
 import { useFullscreenFrame } from '#web/features/playback/fullscreen-frame';
@@ -68,7 +73,7 @@ export function useVideoPlayback(item: MovieView): VideoPlayback {
   );
 
   const restartAt = useCallback((absSec: number) => setAnchor(Math.max(0, absSec)), [setAnchor]);
-  const { baseSec, srcReady, serverDurSec, failure, refused, fail } = useStreamProbe({
+  const { baseSec, srcReady, serverDurSec, delivered, failure, refused, fail } = useStreamProbe({
     itemId: item.id,
     decision,
     anchor,
@@ -117,12 +122,15 @@ export function useVideoPlayback(item: MovieView): VideoPlayback {
   }, [item, anchor, audioIndex, baseSec, knownDurationMs]);
 
   const absNow = useCallback(() => baseSec + (videoRef.current?.currentTime ?? 0), [baseSec]);
-  const onRefused = useCallback((status: number) => refused(status, absNow()), [refused, absNow]);
   const giveUp = useCallback(() => {
     giveUps.current += 1;
     if (giveUps.current > MAX_GIVE_UPS) fail('broken');
     else restartAt(absNow());
   }, [absNow, restartAt, fail]);
+  const onRefused = useCallback(
+    (status: number) => (streamRefusal(status) ? refused(status, absNow()) : giveUp()),
+    [refused, absNow, giveUp],
+  );
 
   // The chosen audio is muxed into the stream URL, so a language change remounts
   // the element rather than switching renditions in place.
@@ -247,6 +255,7 @@ export function useVideoPlayback(item: MovieView): VideoPlayback {
     waitReason: healthy ? reason : null,
     failure,
     mode: modeOf(decision),
+    delivered,
     ready,
     cur,
     dur,

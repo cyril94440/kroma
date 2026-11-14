@@ -73,6 +73,7 @@ mod tests {
 
     fn file(id: &str, edition: Option<&str>, width: u32, duration_ms: u64) -> MediaFile {
         MediaFile {
+            remote: false,
             id: id.into(),
             rel_path: None,
             container: "mkv".into(),
@@ -85,6 +86,9 @@ mod tests {
                 bit_depth: Some(8),
                 hdr_format: None,
                 dolby_vision_profile: None,
+                dolby_vision_level: None,
+                dolby_vision_compatibility: None,
+                dolby_vision_enhancement_layer: false,
                 color: None,
             }),
             audio: None,

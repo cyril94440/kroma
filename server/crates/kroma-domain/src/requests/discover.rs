@@ -31,13 +31,22 @@ pub struct DiscoverEntry {
     pub request_progress: Option<f64>,
 }
 
-/// `GET /api/discover/search` / `GET /api/discover/trending`.
+/// `GET /api/discover/search`, and every browsable list under `/api/discover`
+/// (`trending`, `popular`, `upcoming`, `top-rated`, `genre/:id`).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscoverResponse {
     pub results: Vec<DiscoverEntry>,
     pub page: u32,
     pub total_pages: u32,
+}
+
+/// One TMDB genre of `GET /api/discover/genres`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoverGenre {
+    pub id: u32,
+    pub name: String,
 }
 
 /// One season row in a show's discovery detail (drives the season picker).
@@ -109,4 +118,8 @@ pub struct DiscoverDetail {
     // Next air date (`YYYY-MM-DD`): a show's next episode, or a movie's soonest
     // availability. `None` when nothing is upcoming.
     pub next_air_date: Option<String>,
+    // True only for a viewer who may skip the queue, on a server whose download
+    // client can fetch at once, for a title the library does not hold.
+    #[serde(default)]
+    pub watch_now: bool,
 }

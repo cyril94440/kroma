@@ -9,6 +9,7 @@ mod direct;
 mod media;
 mod modules;
 mod requests;
+mod source;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -28,8 +29,9 @@ pub use direct::{offer, offer_through_the_tunnel, proof_of, HOUSEHOLD_PUBLIC_IP,
 pub use media::{
     byte_routes, device_of, household_where_the_viewer_only_sees_films, ticketed, FILM,
 };
+pub use source::{probe, stubbed_movie, test_app_with_source, FakeSource, Stubbed};
 pub use modules::{installed_module, read_setting, store_settings, write_settings};
-pub use requests::{get, get_from, raw, send, text};
+pub use requests::{get, get_from, raw, raw_bytes, send, text};
 
 static SEQ: AtomicU32 = AtomicU32::new(0);
 
@@ -130,6 +132,12 @@ pub fn test_app_with_tmdb() -> TestApp {
     build_app(Some("test-tmdb-key"), &[], None)
 }
 
+/// Like [`test_app_with_tmdb`] but with `contributions` answering the points a
+/// test stands modules up behind.
+pub fn test_app_with_contributions(contributions: kroma_engine::state::Contributions) -> TestApp {
+    build_app_wired(Some("test-tmdb-key"), &[], |_| (), contributions)
+}
+
 /// Like [`test_app`] but with a built web SPA on the same origin, as the
 /// single-binary deploy has. `files` are written verbatim under the served
 /// directory; `_shell.html` is the client-side-routing fallback.
@@ -150,6 +158,28 @@ fn build_app_with(
     web: &[(&str, &str)],
     configure: impl FnOnce(&mut Config),
 ) -> TestApp {
+    build_app_wired(tmdb_api_key, web, configure, Arc::new(|_| Vec::new()))
+}
+
+fn build_app_wired(
+    tmdb_api_key: Option<&str>,
+    web: &[(&str, &str)],
+    configure: impl FnOnce(&mut Config),
+    contributions: kroma_engine::state::Contributions,
+) -> TestApp {
+    static PRIMED: std::sync::Once = std::sync::Once::new();
+    PRIMED.call_once(kroma_media::hls::prime_hwaccel);
+    build_app_official(tmdb_api_key, web, configure, contributions, &[])
+}
+
+fn build_app_official(
+    tmdb_api_key: Option<&str>,
+    web: &[(&str, &str)],
+    configure: impl FnOnce(&mut Config),
+    contributions: kroma_engine::state::Contributions,
+    official: &[&str],
+) -> TestApp {
+    let official: Vec<String> = official.iter().map(ToString::to_string).collect();
     let tmp = unique_data_dir();
     let data_dir = tmp.path().to_path_buf();
     let db = db::init(&data_dir.join("kroma.db")).expect("init db");
@@ -201,11 +231,15 @@ fn build_app_with(
         kroma_engine::state::ModuleWiring {
             services,
             jobs: &[],
-            contributions: std::sync::Arc::new(|_| Vec::new()),
-            official_modules: std::sync::Arc::new(Vec::new),
+            contributions,
+            official_modules: std::sync::Arc::new(move || official.clone()),
             permissions: std::sync::Arc::new(|_| None),
             network_providers: std::sync::Arc::new(Vec::new),
             network_listeners: std::sync::Arc::new(Vec::new),
+            source_roots: {
+                let root = data_dir.join("sources");
+                std::sync::Arc::new(move |module: &str| vec![root.join(module)])
+            },
         },
     );
 

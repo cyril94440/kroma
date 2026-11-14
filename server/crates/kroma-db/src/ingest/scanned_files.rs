@@ -7,6 +7,8 @@ use rusqlite::params;
 
 use kroma_domain::{HdrFormat, MediaFile, MediaItem};
 
+use super::probe::PROBE_SCHEMA;
+
 pub(super) fn sync_files(
     tx: &rusqlite::Transaction,
     items: &[MediaItem],
@@ -19,6 +21,14 @@ pub(super) fn sync_files(
         .collect();
 
     delete_gone_files(tx, &scanned)?;
+    upsert_files(tx, items, mtimes)
+}
+
+pub(super) fn upsert_files(
+    tx: &rusqlite::Transaction,
+    items: &[MediaItem],
+    mtimes: &HashMap<String, Option<i64>>,
+) -> Result<()> {
     let prev = existing_file_sigs(tx)?;
 
     let mut keep_stmt = tx.prepare(
@@ -40,14 +50,16 @@ pub(super) fn sync_files(
              v_height=NULL, v_hdr=NULL, v_bit_depth=NULL, a_codec=NULL, a_channels=NULL, \
              a_language=NULL, subtitles='[]', audio_tracks='[]', unreadable=NULL, \
              v_hdr_format=NULL, v_dv_profile=NULL, v_color_primaries=NULL, \
-             v_color_transfer=NULL, v_color_matrix=NULL",
+             v_color_transfer=NULL, v_color_matrix=NULL, v_dv_level=NULL, v_dv_compat=NULL, \
+             v_dv_el=NULL",
     )?;
     // Pre-probed files (demo/seed content) skip the phase-2 probe pass.
-    let mut preprobed_stmt = tx.prepare(
+    let mut preprobed_stmt = tx.prepare(&format!(
         "INSERT INTO files (id,item_id,abs_path,rel_path,container,size,mtime,edition,probed,\
              duration_ms,v_codec,v_width,v_height,v_hdr,v_bit_depth,a_codec,a_channels,a_language,subtitles,audio_tracks,\
-             v_hdr_format,v_dv_profile,v_color_primaries,v_color_transfer,v_color_matrix) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24) \
+             v_hdr_format,v_dv_profile,v_color_primaries,v_color_transfer,v_color_matrix,\
+             v_dv_level,v_dv_compat,v_dv_el,probe_schema) \
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,{PROBE_SCHEMA}) \
          ON CONFLICT(abs_path) DO UPDATE SET \
              id=excluded.id, item_id=excluded.item_id, rel_path=excluded.rel_path, \
              container=excluded.container, size=excluded.size, mtime=excluded.mtime, \
@@ -58,8 +70,10 @@ pub(super) fn sync_files(
              audio_tracks=excluded.audio_tracks, unreadable=NULL, \
              v_hdr_format=excluded.v_hdr_format, v_dv_profile=excluded.v_dv_profile, \
              v_color_primaries=excluded.v_color_primaries, v_color_transfer=excluded.v_color_transfer, \
-             v_color_matrix=excluded.v_color_matrix",
-    )?;
+             v_color_matrix=excluded.v_color_matrix, v_dv_level=excluded.v_dv_level, \
+             v_dv_compat=excluded.v_dv_compat, v_dv_el=excluded.v_dv_el, \
+             probe_schema={PROBE_SCHEMA}"
+    ))?;
 
     for i in items {
         for f in &i.files {
@@ -171,6 +185,9 @@ fn upsert_scanned_file<'a>(
             color.and_then(|c| c.primaries.clone()),
             color.and_then(|c| c.transfer.clone()),
             color.and_then(|c| c.matrix.clone()),
+            v.and_then(|v| v.dolby_vision_level),
+            v.and_then(|v| v.dolby_vision_compatibility),
+            v.and_then(|v| v.dolby_vision_enhancement_layer.then_some(1)),
         ])?;
         return Ok(());
     }
@@ -218,6 +235,43 @@ mod tests {
         assert_eq!(got.video.map(|v| v.codec), Some("hevc".to_string()));
         // demo:// paths are not streamable, so abs_path stays cleared.
         assert!(got.abs_path.is_none());
+    }
+
+    #[test]
+    fn a_preprobed_file_keeps_its_dolby_vision_detail_and_its_audio_profile() {
+        use kroma_domain::{AudioStream, HdrFormat, SpatialAudio, VideoStream};
+
+        let p = pool();
+        let mut seeded = file("f1", "demo://m1", true);
+        seeded.video = Some(VideoStream {
+            hdr: true,
+            hdr_format: Some(HdrFormat::DolbyVision),
+            dolby_vision_profile: Some(8),
+            dolby_vision_level: Some(6),
+            dolby_vision_compatibility: Some(1),
+            ..video()
+        });
+        seeded.audio_tracks = vec![AudioStream {
+            index: 0,
+            codec: "truehd".into(),
+            channels: Some(8),
+            language: None,
+            title: None,
+            default: true,
+            region: None,
+            profile: Some("Dolby TrueHD + Dolby Atmos".into()),
+            layout: Some("7.1".into()),
+            spatial: Some(SpatialAudio::Atmos),
+        }];
+        let items = vec![movie("m1", "Demo", "lib", vec![seeded])];
+
+        sync_all(&p, &[lib("lib")], &[], &items, &mtimes_of(&items, 100)).unwrap();
+
+        let got = crate::get_item(&p, "m1").unwrap().unwrap();
+        let read = got.files[0].video.as_ref().unwrap();
+        assert_eq!(read.dolby_vision_level, Some(6));
+        assert_eq!(read.dolby_vision_compatibility, Some(1));
+        assert_eq!(got.files[0].audio_tracks[0].spatial, Some(SpatialAudio::Atmos));
     }
 
     #[test]

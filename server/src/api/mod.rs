@@ -76,6 +76,8 @@ mod it_cast;
 #[cfg(test)]
 mod it_content;
 #[cfg(test)]
+mod it_discover_lists;
+#[cfg(test)]
 mod it_diagnostics;
 #[cfg(test)]
 mod it_direct;
@@ -162,6 +164,10 @@ mod it_server_status;
 #[cfg(test)]
 mod it_store_versions;
 #[cfg(test)]
+mod it_remote_stream;
+#[cfg(test)]
+mod it_stream_download;
+#[cfg(test)]
 mod it_stream_hls;
 #[cfg(test)]
 mod it_suggest;
@@ -171,6 +177,8 @@ mod it_trailers;
 mod it_updates;
 #[cfg(test)]
 mod it_verify_email;
+#[cfg(test)]
+mod it_watch_now;
 #[cfg(test)]
 pub(crate) mod test_support;
 

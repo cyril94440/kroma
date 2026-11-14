@@ -1,5 +1,12 @@
 import type { ItemId } from '@kromatv/client/media';
-import { decodableVideoCodecs, type EngineDecision, streamRefusal } from '@kromatv/core';
+import {
+  type AudioDelivery,
+  deviceDeclaration,
+  type EngineDecision,
+  observedAudioDelivery,
+  readSourceFailure,
+  streamRefusal,
+} from '@kromatv/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StreamFailure } from '#web/features/playback/stream-failure';
 import { useWebRuntime } from '#web/shared/lib/web-runtime';
@@ -17,6 +24,7 @@ export interface StreamProbe {
   baseSec: number;
   srcReady: boolean;
   serverDurSec: number;
+  delivered: AudioDelivery | null;
   failure: StreamFailure | null;
   refused: (status: number, resumeAt?: number) => void;
   fail: (failure: StreamFailure) => void;
@@ -30,6 +38,11 @@ interface ProbeKey {
   audioIndex: number;
   renewals: number;
 }
+
+const SOURCE_RETRIES = 2;
+const SOURCE_RETRY_MS = 1500;
+
+const pause = (ms: number) => new Promise((wake) => setTimeout(wake, ms));
 
 function numberHeader(r: Response, name: string): number {
   const raw = r.headers.get(name);
@@ -57,6 +70,7 @@ export function useStreamProbe({
   const [baseSec, setBaseSec] = useState(0);
   const [srcReady, setSrcReady] = useState(false);
   const [serverDurSec, setServerDurSec] = useState(0);
+  const [delivered, setDelivered] = useState<AudioDelivery | null>(null);
   const [failure, setFailure] = useState<StreamFailure | null>(null);
   const [renewals, setRenewals] = useState(0);
   const renewed = useRef(false);
@@ -96,6 +110,7 @@ export function useStreamProbe({
       const direct = decision.kind === 'direct';
       setSrcReady(direct);
       setFailure(null);
+      setDelivered(null);
       if (direct) setBaseSec(0);
     }
   }
@@ -109,33 +124,43 @@ export function useStreamProbe({
       decision.aacMaster,
       anchor,
       audioIndex,
-      {
-        videoCodecs: decodableVideoCodecs(),
-      },
+      deviceDeclaration(),
     );
-    fetch(url)
-      .then((r) => {
-        if (cancelled) return;
-        if (streamRefusal(r.status)) {
-          refused(r.status);
+    const ask = async (retries: number): Promise<void> => {
+      const r = await fetch(url);
+      if (cancelled) return;
+      if (streamRefusal(r.status)) {
+        refused(r.status);
+        return;
+      }
+      const source = await readSourceFailure(r);
+      if (cancelled) return;
+      if (source) {
+        if (retries > 0) {
+          await pause(SOURCE_RETRY_MS);
+          if (!cancelled) await ask(retries - 1);
           return;
         }
-        renewed.current = false;
-        const start = numberHeader(r, 'X-Hls-Start');
-        const total = numberHeader(r, 'X-Media-Duration');
-        setBaseSec(Number.isFinite(start) ? start : anchor);
-        if (Number.isFinite(total) && total > 0) setServerDurSec(total);
-        setSrcReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setBaseSec(anchor);
-        setSrcReady(true);
-      });
+        setFailure(source);
+        return;
+      }
+      renewed.current = false;
+      const start = numberHeader(r, 'X-Hls-Start');
+      const total = numberHeader(r, 'X-Media-Duration');
+      setDelivered(observedAudioDelivery(r.url));
+      setBaseSec(Number.isFinite(start) ? start : anchor);
+      if (Number.isFinite(total) && total > 0) setServerDurSec(total);
+      setSrcReady(true);
+    };
+    ask(SOURCE_RETRIES).catch(() => {
+      if (cancelled) return;
+      setBaseSec(anchor);
+      setSrcReady(true);
+    });
     return () => {
       cancelled = true;
     };
   }, [itemId, decision, anchor, audioIndex, booted, renewals, refused]);
 
-  return { baseSec, srcReady, serverDurSec, failure, refused, fail: setFailure };
+  return { baseSec, srcReady, serverDurSec, delivered, failure, refused, fail: setFailure };
 }

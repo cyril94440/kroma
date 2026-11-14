@@ -3,8 +3,8 @@ use std::path::Path;
 use super::render::{gateway_lines, proxy_lines};
 use super::send::chosen_proxy;
 use super::*;
-use crate::multipart::FormPart;
 use crate::egress::{scrubbed, Decision};
+use crate::multipart::FormPart;
 
 #[test]
 fn empty_socks5_is_ignored() {
@@ -323,17 +323,32 @@ fn gateway() -> crate::egress::Gateway {
 
 #[test]
 fn the_gateway_hears_the_purpose_and_the_modules_token() {
-    let lines = gateway_lines(&gateway(), &crate::egress::Gateway::username("indexer", false, false));
+    let lines = gateway_lines(
+        &gateway(),
+        &crate::egress::Gateway::username("indexer", false, false),
+    );
 
-    assert!(lines.contains("socks5-hostname = \"127.0.0.1:41000\""), "{lines}");
-    assert!(lines.contains("proxy-user = \"indexer:module-token\""), "{lines}");
+    assert!(
+        lines.contains("socks5-hostname = \"127.0.0.1:41000\""),
+        "{lines}"
+    );
+    assert!(
+        lines.contains("proxy-user = \"indexer:module-token\""),
+        "{lines}"
+    );
 }
 
 #[test]
 fn the_gateway_hears_what_the_caller_asked_of_the_route() {
-    let lines = gateway_lines(&gateway(), &crate::egress::Gateway::username("indexer", true, true));
+    let lines = gateway_lines(
+        &gateway(),
+        &crate::egress::Gateway::username("indexer", true, true),
+    );
 
-    assert!(lines.contains("proxy-user = \"indexer.public.vpn:module-token\""), "{lines}");
+    assert!(
+        lines.contains("proxy-user = \"indexer.public.vpn:module-token\""),
+        "{lines}"
+    );
 }
 
 #[test]

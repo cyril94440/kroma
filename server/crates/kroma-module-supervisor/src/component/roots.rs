@@ -81,6 +81,23 @@ fn held(dir: impl Into<PathBuf>, writable: bool) -> Preopen {
 }
 
 impl Supervisor {
+    /// The data directories module `id` keeps under the server's data directory,
+    /// which only a module the official registry shipped may hold.
+    pub fn data_dirs_of(&self, id: &str) -> Vec<PathBuf> {
+        if !self.origin(id).official {
+            return Vec::new();
+        }
+        self.installed_manifests()
+            .into_iter()
+            .find(|manifest| manifest.id == id)
+            .map(|manifest| manifest.data_dirs)
+            .unwrap_or_default()
+            .iter()
+            .filter(|name| is_data_dir_name(name))
+            .map(|name| self.cfg.data_dir.join(name))
+            .collect()
+    }
+
     pub(super) fn component_roots(
         &self,
         id: &str,

@@ -29,7 +29,7 @@ describe('the audio line', () => {
 
   it('names the language first, then the codec and the layout', () => {
     expect(audioString(t, { audio: audio({ codec: 'eac3', channels: 6 }) })).toBe(
-      'Français · EAC3 5.1',
+      'Français · Dolby Digital+ 5.1',
     );
   });
 

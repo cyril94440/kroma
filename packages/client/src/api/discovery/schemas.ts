@@ -6,6 +6,10 @@ import { RequestId, RequestKind, RequestStatus } from '../requests';
 export const DiscoverType = z.enum(['movie', 'tv', 'all']);
 export type DiscoverType = z.infer<typeof DiscoverType>;
 
+/** The named TMDB lists a person can browse; each path segment is the name. */
+export const DiscoverList = z.enum(['trending', 'popular', 'upcoming', 'top-rated']);
+export type DiscoverList = z.infer<typeof DiscoverList>;
+
 /** The route vocabulary a TMDB detail is fetched under, which is TMDB's split
  * rather than the catalog's. */
 export const TmdbKind = DiscoverType.exclude(['all']);
@@ -55,6 +59,7 @@ export const DiscoverDetail = DiscoverEntry.extend({
   similar: z.array(DiscoverEntry),
   airStatus: z.string().nullable(),
   nextAirDate: z.string().nullable(),
+  watchNow: z.boolean().default(false),
 });
 export type DiscoverDetail = z.infer<typeof DiscoverDetail>;
 
@@ -78,10 +83,52 @@ export type DiscoverEpisode = z.infer<typeof DiscoverEpisode>;
 export const DiscoverSeasonEpisodes = z.object({ episodes: z.array(DiscoverEpisode) });
 export type DiscoverSeasonEpisodes = z.infer<typeof DiscoverSeasonEpisodes>;
 
-/** `GET /api/discover/search` / `GET /api/discover/trending`. */
+/** One genre TMDB files titles under, named in the reader's language. */
+export const DiscoverGenre = z.object({ id: z.number(), name: z.string() });
+export type DiscoverGenre = z.infer<typeof DiscoverGenre>;
+
+/** `GET /api/discover/genres`. */
+export const DiscoverGenres = z.object({ genres: z.array(DiscoverGenre) });
+export type DiscoverGenres = z.infer<typeof DiscoverGenres>;
+
+/** `GET /api/discover/search` and every list under `/api/discover`. */
 export const DiscoverResponse = z.object({
   results: z.array(DiscoverEntry),
   page: z.number(),
   totalPages: z.number(),
 });
 export type DiscoverResponse = z.infer<typeof DiscoverResponse>;
+
+/** Which episode of a show to watch now. A movie has none. */
+export const WatchNowEpisode = z.object({
+  season: z.number().int().positive(),
+  episode: z.number().int().positive(),
+});
+export type WatchNowEpisode = z.infer<typeof WatchNowEpisode>;
+
+/** `POST /api/discover/:kind/:tmdbId/watch-now`: the title is in the library
+ * (`ready`), was asked for and will arrive (`requested`), or cannot be fetched
+ * now (`unavailable`, with the server's own words for why). */
+export const WatchNowResult = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('ready'),
+    itemId: z.string(),
+    fileId: z.string().nullish(),
+  }),
+  z.object({
+    status: z.literal('preparing'),
+    itemId: z.string(),
+    fileId: z.string().nullish(),
+  }),
+  z.object({
+    status: z.literal('requested'),
+    requestId: z.string().nullish(),
+  }),
+  z.object({
+    status: z.literal('unavailable'),
+    reason: z.enum(['noEngine', 'noIndexer', 'noRelease']),
+    message: z.string(),
+    requestId: z.string().nullish(),
+  }),
+]);
+export type WatchNowResult = z.infer<typeof WatchNowResult>;

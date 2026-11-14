@@ -20,11 +20,14 @@ stage! {
     triggers: &[Trigger::AfterJob(JobKey("pipeline.probe"))],
 }
 
-fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
-    crate::db::analyzable_file_sigs(&state.db)
+pub(super) fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
+    Ok(crate::db::analyzable_file_sigs(&state.db)?
+        .into_iter()
+        .map(|(id, abs, sig)| (id, super::when_cached(state, &abs, sig)))
+        .collect())
 }
 
-fn process(ctx: &JobContext, file_id: &str) -> Result<()> {
+pub(super) fn process(ctx: &JobContext, file_id: &str) -> Result<()> {
     let Some((abs_path, tracks_json)) = crate::db::loudness_target(&ctx.state.db, file_id)? else {
         return Ok(());
     };
@@ -36,11 +39,8 @@ fn process(ctx: &JobContext, file_id: &str) -> Result<()> {
     let Some(track) = track_to_measure(&tracks) else {
         return Ok(());
     };
-    let result = crate::infra::loudness::measure(
-        std::path::Path::new(&abs_path),
-        track.index,
-        track.channels,
-    )?;
+    let whole = super::whole_file(&ctx.state, &abs_path)?;
+    let result = crate::infra::loudness::measure(&whole, track.index, track.channels)?;
     let analysis = crate::infra::loudness::to_analysis(&result);
     crate::db::set_audio_analysis(&ctx.state.db, file_id, track.index, &analysis)?;
     ctx.info(format!(
@@ -78,6 +78,9 @@ mod tests {
             title: None,
             default,
             region: None,
+            profile: None,
+            layout: None,
+            spatial: None,
         }
     }
 

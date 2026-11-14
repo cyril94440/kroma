@@ -35,6 +35,29 @@ impl DownloadManager {
             .ok_or_else(|| anyhow!("no enabled download client"))?;
         drop(clients);
 
+        let wanted_ids = spec.wanted_ids.clone();
+        let row = self.new_row(&client, spec, "queued", "");
+        db::insert_download(self.core(), &row)?;
+        db::set_wanted_status(self.core(), &wanted_ids, "grabbed", now_ms())?;
+        if let Some(req_id) = &row.request_id {
+            // Deliberately not persisted: `downloading` is derived at read time
+            // from the live download, so it self-heals if the grab fails.
+            host.publish(Event::new(
+                "request.updated",
+                json!({ "id": req_id, "status": RequestStatus::Downloading.as_str() }),
+            ));
+        }
+        tracing::info!(release = %row.release_title, client = %client.name, "queued torrent grab");
+        Ok(row)
+    }
+
+    pub(super) fn new_row(
+        &self,
+        client: &DownloadClientRow,
+        spec: GrabSpec,
+        status: &str,
+        client_ref: &str,
+    ) -> DownloadRow {
         let id = kroma_module_sdk::primitives::short_hash(&format!(
             "download|{}|{}",
             spec.release_title,
@@ -43,12 +66,11 @@ impl DownloadManager {
         // External engines use their own directory and report it via status().
         let save_path = (client.kind == "rqbit")
             .then(|| self.downloads_dir.join(&id).to_string_lossy().into_owned());
-
-        let row = DownloadRow {
+        DownloadRow {
             id,
             client_id: client.id.clone(),
-            client_ref: String::new(), // filled in by activate() once added
-            request_id: spec.request_id.clone(),
+            client_ref: client_ref.to_string(),
+            request_id: spec.request_id,
             kind: spec.kind,
             tmdb_id: spec.tmdb_id,
             title: spec.title,
@@ -62,7 +84,7 @@ impl DownloadManager {
             size_bytes: spec.size_bytes,
             score: spec.score,
             score_breakdown: spec.score_breakdown,
-            status: "queued".into(),
+            status: status.into(),
             progress: 0.0,
             save_path,
             imported_paths: None,
@@ -76,19 +98,7 @@ impl DownloadManager {
             lifetime_downloaded_bytes: 0,
             lifetime_uploaded_bytes: 0,
             match_source: spec.tmdb_id.map(|_| crate::MatchSource::Pinned),
-        };
-        db::insert_download(self.core(), &row)?;
-        db::set_wanted_status(self.core(), &spec.wanted_ids, "grabbed", now_ms())?;
-        if let Some(req_id) = &row.request_id {
-            // Deliberately not persisted: `downloading` is derived at read time
-            // from the live download, so it self-heals if the grab fails.
-            host.publish(Event::new(
-                "request.updated",
-                json!({ "id": req_id, "status": RequestStatus::Downloading.as_str() }),
-            ));
         }
-        tracing::info!(release = %row.release_title, client = %client.name, "queued torrent grab");
-        Ok(row)
     }
 
     /// Background phase of a grab: safe to run detached from the request that

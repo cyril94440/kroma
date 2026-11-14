@@ -20,6 +20,12 @@ pub(crate) enum Placement {
     Beside,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Landed {
+    pub path: PathBuf,
+    pub created: bool,
+}
+
 // An upgrade must land even when its rendered name matches the file it
 // replaces (a PROPER of the same quality). With replacement on it writes beside
 // the destination, retires what is there and renames over it; with replacement
@@ -29,27 +35,28 @@ pub(crate) fn place(
     src: &Path,
     dest: &Path,
     mode: Placement,
-) -> Result<PathBuf> {
+) -> Result<Landed> {
+    let landed = |path: PathBuf, created: bool| Landed { path, created };
     if dest.exists() {
         match mode {
-            Placement::Skip => return Ok(dest.to_path_buf()),
+            Placement::Skip => return Ok(landed(dest.to_path_buf(), false)),
             Placement::Replace => {
                 let staged = dest.with_extension("kroma-upgrade");
                 let _ = std::fs::remove_file(&staged);
                 write_to(src, &staged)?;
                 super::recycle::retire(host, dest)?;
                 std::fs::rename(&staged, dest)?;
-                return Ok(dest.to_path_buf());
+                return Ok(landed(dest.to_path_buf(), true));
             }
             Placement::Beside => {
                 let free = free_path(dest);
                 write_to(src, &free)?;
-                return Ok(free);
+                return Ok(landed(free, true));
             }
         }
     }
     write_to(src, dest)?;
-    Ok(dest.to_path_buf())
+    Ok(landed(dest.to_path_buf(), true))
 }
 
 fn free_path(dest: &Path) -> PathBuf {
@@ -105,9 +112,9 @@ mod tests {
         write(&src, "new");
         write(&dest, "old");
 
-        let at = place(&StubHost::new(), &src, &dest, Placement::Skip).unwrap();
+        let landed = place(&StubHost::new(), &src, &dest, Placement::Skip).unwrap();
         assert_eq!(std::fs::read_to_string(&dest).unwrap(), "old");
-        assert_eq!(at, dest);
+        assert_eq!(landed, Landed { path: dest, created: false });
     }
 
     #[test]
@@ -122,7 +129,7 @@ mod tests {
         write(&src, "new");
         write(&dest, "old");
 
-        let at = place(&StubHost::new(), &src, &dest, Placement::Replace).unwrap();
+        let at = place(&StubHost::new(), &src, &dest, Placement::Replace).unwrap().path;
         assert_eq!(std::fs::read_to_string(&dest).unwrap(), "new");
         assert_eq!(at, dest);
         assert!(
@@ -141,7 +148,7 @@ mod tests {
         write(&src, "new");
         write(&dest, "old");
 
-        let at = place(&StubHost::new(), &src, &dest, Placement::Beside).unwrap();
+        let at = place(&StubHost::new(), &src, &dest, Placement::Beside).unwrap().path;
         assert_eq!(
             std::fs::read_to_string(&dest).unwrap(),
             "old",
@@ -165,8 +172,8 @@ mod tests {
         write(&src, "new");
         write(&dest, "old");
 
-        let first = place(&StubHost::new(), &src, &dest, Placement::Beside).unwrap();
-        let second = place(&StubHost::new(), &src, &dest, Placement::Beside).unwrap();
+        let first = place(&StubHost::new(), &src, &dest, Placement::Beside).unwrap().path;
+        let second = place(&StubHost::new(), &src, &dest, Placement::Beside).unwrap().path;
         assert_ne!(first, second);
         assert!(first.exists() && second.exists());
     }
@@ -180,7 +187,7 @@ mod tests {
         );
         write(&src, "new");
 
-        let at = place(&StubHost::new(), &src, &dest, Placement::Skip).unwrap();
+        let at = place(&StubHost::new(), &src, &dest, Placement::Skip).unwrap().path;
         assert_eq!(std::fs::read_to_string(&dest).unwrap(), "new");
         assert_eq!(at, dest);
     }

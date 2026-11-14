@@ -5,6 +5,8 @@ import {
   type VideoTrack,
 } from '@kromatv/client/media';
 import type { Translate } from '@kromatv/i18n';
+import { audioFormatName } from './audio-label';
+import { hdrLabel } from './hdr-label';
 import { langKey } from './lang';
 import { match } from './match';
 import { formatRuntime } from './player';
@@ -77,7 +79,10 @@ export function codecLabel(codec: string): string {
 export function qualityBadgeForVideo(video: VideoTrack | null | undefined): string | null {
   if (!video) return null;
   return match(video)
-    .when((v) => v.hdr === true, 'HDR')
+    .when(
+      (v) => v.hdr === true,
+      (v) => hdrLabel(v) ?? 'HDR',
+    )
     .when((v) => (v.width ?? 0) >= 3840, '4K')
     .when((v) => v.codec === 'hevc', 'H.265')
     .otherwise(null);
@@ -119,7 +124,8 @@ export function metaLine(item: Pick<MediaItem, 'year' | 'durationMs' | 'video'>)
   if (rt) parts.push(rt);
   if (item.video?.codec) parts.push(codecLabel(item.video.codec));
   if ((item.video?.width ?? 0) >= 3840) parts.push('4K');
-  if (item.video?.hdr) parts.push('HDR');
+  const hdr = hdrLabel(item.video);
+  if (hdr) parts.push(hdr);
   return parts.join(' · ');
 }
 
@@ -155,17 +161,19 @@ export function langName(t: Translate, code: string | null | undefined): string 
   return key ? t(key) : code.toUpperCase();
 }
 
-/** Concise label for a selected audio track, language first: "Français · 5.1 ·
- * EAC3" (a stream `title` tag wins over the language name). Undefined when
- * there is no track. */
+/** Concise label for a selected audio track, language first: "Français · Dolby
+ * Digital+ Atmos 5.1" (a stream `title` tag wins over the language name).
+ * Undefined when there is no track. */
 export function audioTrackLabel(
   t: Translate,
   track: AudioTrack | null | undefined,
 ): string | undefined {
   if (!track) return undefined;
   const name = track.title?.trim() || langName(t, track.language) || undefined;
-  const codec = track.codec ? track.codec.toUpperCase() : undefined;
-  const label = [name, channelLabel(track.channels), codec].filter(Boolean).join(' · ');
+  const format = track.codec
+    ? [audioFormatName(track), channelLabel(track.channels)].filter(Boolean).join(' ')
+    : channelLabel(track.channels);
+  const label = [name, format].filter(Boolean).join(' · ');
   return label || undefined;
 }
 

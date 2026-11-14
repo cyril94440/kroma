@@ -54,6 +54,7 @@ managed there and the variables are ignored.
 | `KROMA_HWACCEL` | found at startup | Forces a conversion method: `qsv`, `vaapi`, `nvenc`, `videotoolbox`, or `software` for the processor. See [Hardware transcoding](hardware-transcoding.md). |
 | `KROMA_RENDER_NODE` | `/dev/dri/renderD128` | The graphics device to use when there are several. |
 | `KROMA_ENCODE_EFFORT` | chosen from the machine | `quality` or `realtime`, for conversions on the processor. |
+| `KROMA_TONEMAP` | `on` | `off` stops KROMA from converting HDR pictures to standard colours when it converts a video. Use it if a weak machine cannot keep up with HDR films. `cpu` keeps the conversion but rules out the graphics chip's own routes for it. |
 | `KROMA_MAX_TRANSCODES` | half the cores, from 1 to 4 | Video conversions at once. A request past the limit is refused, so the player says so instead of stuttering. |
 | `KROMA_FFMPEG_CONCURRENCY` | the number of cores minus one | Background media tasks at once, such as thumbnails and subtitle extraction. |
 

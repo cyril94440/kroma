@@ -4,7 +4,7 @@
 --disable-doc
 --disable-ffplay
 --disable-autodetect
---disable-network
+--enable-network
 --disable-everything
 --enable-shared
 --disable-static
@@ -17,8 +17,8 @@
 --enable-bsfs
 --enable-demuxers
 --enable-hwaccels
---enable-protocol=file,pipe
+--enable-protocol=file,pipe,http,tcp
 --enable-indev=lavfi
---enable-encoder=libx264,aac,mjpeg,png,libwebp,webvtt,subrip,srt,mov_text,pcm_s16le,pcm_f32le,rawvideo,wrapped_avframe
+--enable-encoder=libx264,aac,ac3,eac3,mjpeg,png,libwebp,webvtt,subrip,srt,mov_text,pcm_s16le,pcm_f32le,rawvideo,wrapped_avframe
 --enable-muxer=hls,mp4,mov,matroska,webvtt,srt,null,rawvideo,pcm_s16le,pcm_f32le,image2,webp
 --enable-filter=buffer,buffersink,abuffer,abuffersink,scale,crop,tile,format,aformat,fps,null,anull,copy,trim,atrim,setpts,asetpts,transpose,hflip,vflip,rotate,hwupload,hwdownload,acompressor,volume,asplit,pan,loudnorm,aresample,testsrc,testsrc2,color,sine

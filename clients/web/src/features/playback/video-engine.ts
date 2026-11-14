@@ -9,8 +9,9 @@ import type { MovieView, WebRuntime } from '#web/shared/lib/api';
 import type { AudioTrack } from '@kromatv/client/media';
 import type { PlaybackMode } from '@kromatv/client/playback';
 import {
+  type AudioDelivery,
   attachHlsRecovery,
-  decodableVideoCodecs,
+  deviceDeclaration,
   type EngineDecision,
   hlsBufferConfig,
   itemBufferPlan,
@@ -58,6 +59,7 @@ export interface VideoPlayback {
   waitReason: WaitReason | null;
   failure: StreamFailure | null;
   mode: PlaybackMode;
+  delivered: AudioDelivery | null;
   ready: boolean;
   cur: number;
   dur: number;
@@ -180,9 +182,7 @@ export function attachMediaSource(
     decision.aacMaster,
     startSec,
     audioRel,
-    {
-      videoCodecs: decodableVideoCodecs(),
-    },
+    deviceDeclaration(),
   );
   let destroyed = false;
 

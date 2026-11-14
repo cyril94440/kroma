@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::MpvState;
+use crate::mpv_options;
 
 const OBSERVED: &[&str] = &[
     "time-pos",
@@ -24,6 +25,10 @@ pub(super) fn pump_events(app: &AppHandle, read_half: UnixStream) {
         app,
         &json!({ "command": ["set_property", "focus-on", "never"] }),
     );
+    let spdif = mpv_options::passthrough_from_env();
+    for (name, value) in mpv_options::ipc_properties(spdif.as_deref()) {
+        let _ = write_ipc(app, &json!({ "command": ["set_property", name, value] }));
+    }
     for (i, prop) in OBSERVED.iter().enumerate() {
         let _ = write_ipc(
             app,

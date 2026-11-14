@@ -154,6 +154,10 @@ fn answer(path: &str, query: &str) -> serde_json::Value {
         }
         "/api/_host/setting" if query.contains("kind=bool") => serde_json::json!({ "value": true }),
         "/api/_host/setting" => serde_json::json!({ "value": 42 }),
+        "/api/_host/config" if query.contains("key=cacheMaxGb") => {
+            serde_json::json!({ "value": "12" })
+        }
+        "/api/_host/config" => serde_json::json!({ "value": null }),
         "/api/_host/session" => serde_json::to_value(user(&["library.manage"])).unwrap(),
         "/api/_host/notify" => serde_json::json!({ "sent": 3 }),
         "/api/_host/enabled" => serde_json::json!({ "enabled": false }),

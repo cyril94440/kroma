@@ -4,6 +4,91 @@ import { makeItem, track, UNPROBED } from './directplay.fixture';
 import { avplayDirectPlayable, nativeDirectPlayable, type PlayEnv, selectEngine } from './engine';
 import { MSE_CAPS, SAFARI_CAPS } from './runtime-caps';
 
+describe('direct play and the track a title opens on', () => {
+  const dtsMp4 = makeItem({
+    container: 'mp4',
+    videoCodec: 'hevc',
+    audio: [
+      track({ index: 0, codec: 'truehd', channels: 8, default: true }),
+      track({ index: 1, codec: 'eac3', channels: 6 }),
+    ],
+  });
+
+  it('keeps a TrueHD-default file off tvOS, which has no decoder for it, and on Android TV', () => {
+    expect(nativeDirectPlayable(dtsMp4, 'ios')).toBe(false);
+    expect(nativeDirectPlayable(dtsMp4, 'android')).toBe(true);
+  });
+
+  it('opens the same file when the viewer picked a track the set decodes', () => {
+    expect(nativeDirectPlayable(dtsMp4, 'ios', 1)).toBe(true);
+  });
+
+  it('applies to Tizen and webOS through their own tables', () => {
+    const flac = makeItem({
+      container: 'mkv',
+      videoCodec: 'hevc',
+      audio: [track({ index: 0, codec: 'flac', channels: 2 })],
+    });
+    expect(avplayDirectPlayable(flac)).toBe(true);
+    expect(avplayDirectPlayable(dtsMp4, 0)).toBe(true);
+    const unnamed = makeItem({
+      container: 'mkv',
+      videoCodec: 'hevc',
+      audio: [track({ index: 0, codec: 'unknown' })],
+    });
+    expect(avplayDirectPlayable(unnamed)).toBe(false);
+    expect(nativeDirectPlayable(unnamed, 'webos')).toBe(false);
+  });
+
+  it('refuses Dolby Vision profile 5 on Samsung and on tvOS-less sets alike, but not on LG', () => {
+    const p5 = makeItem({
+      container: 'mkv',
+      videoCodec: 'hevc',
+      bitDepth: 10,
+      hdrFormat: 'dolbyVision',
+      dolbyVisionProfile: 5,
+      dolbyVisionCompatibility: 0,
+      audio: [track({ index: 0, codec: 'eac3', channels: 6 })],
+    });
+    expect(avplayDirectPlayable(p5)).toBe(false);
+    expect(nativeDirectPlayable(p5, 'tizen')).toBe(false);
+    expect(nativeDirectPlayable(p5, 'webos')).toBe(true);
+  });
+
+  it('plays a profile 7 file on Samsung as the HDR10 it carries', () => {
+    const p7 = makeItem({
+      container: 'mkv',
+      videoCodec: 'hevc',
+      bitDepth: 10,
+      hdrFormat: 'dolbyVision',
+      dolbyVisionProfile: 7,
+      dolbyVisionCompatibility: 6,
+      audio: [track({ index: 0, codec: 'eac3', channels: 6 })],
+    });
+    expect(avplayDirectPlayable(p7)).toBe(true);
+  });
+});
+
+describe('selectEngine with E-AC-3 surround on the server', () => {
+  it('stream-copies a DTS 5.1 master for a browser that decodes E-AC-3 instead of forcing AAC', () => {
+    const item = makeItem({
+      container: 'mkv',
+      videoCodec: 'hevc',
+      audio: [track({ index: 0, codec: 'dts', channels: 6 })],
+    });
+    expect(
+      selectEngine(item, { platform: 'web', safari: false, runtimeCaps: SAFARI_CAPS }),
+    ).toEqual({
+      kind: 'web-mse',
+      aacMaster: false,
+    });
+    expect(selectEngine(item, { platform: 'web', safari: false, runtimeCaps: MSE_CAPS })).toEqual({
+      kind: 'web-mse',
+      aacMaster: true,
+    });
+  });
+});
+
 describe('nativeDirectPlayable', () => {
   it('opens the QuickTime family on both, but Matroska only on Media3', () => {
     const mkv = makeItem({

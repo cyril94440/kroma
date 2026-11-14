@@ -188,6 +188,24 @@ describe('planEngine', () => {
     expect(planEngine(MKV, env({ platform: 'tizen' }), 'avplay').eng).toBe('avplay');
   });
 
+  it('keeps AVPlay off the original file when the track it opens on is one the set cannot decode', () => {
+    vi.stubGlobal('webapis', { avplay: { play: () => {} } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (SMART-TV; Tizen 6.0)' });
+    const twoTracks = makeItem({
+      container: 'mkv',
+      audio: [
+        track({ index: 0, codec: 'eac3', channels: 6, default: true }),
+        track({ index: 1, codec: 'unknown', channels: 6 }),
+      ],
+    });
+    const plan = (audioIndex?: number) =>
+      planEngine(twoTracks, env({ platform: 'tizen' }), 'auto', undefined, audioIndex);
+
+    expect(plan().avplayDirect).toBe(true);
+    expect(plan(1).avplayDirect).toBe(false);
+    expect(plan(1).playbackMode).toBe('remux');
+  });
+
   it('reports a remux when AVPlay cannot demux the original container', () => {
     vi.stubGlobal('webapis', { avplay: { play: () => {} } });
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (SMART-TV; Tizen 6.0)' });

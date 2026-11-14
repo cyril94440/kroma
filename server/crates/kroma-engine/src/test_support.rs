@@ -71,13 +71,24 @@ fn build_state_serving(
     services: Services,
     adjust: impl FnOnce(&mut Config),
 ) -> SharedState {
+    build_state_wired(embedder, tmdb_api_key, official, services, adjust, |_, _| ())
+}
+
+fn build_state_wired(
+    embedder: Point,
+    tmdb_api_key: Option<&str>,
+    official: Vec<String>,
+    services: Services,
+    adjust: impl FnOnce(&mut Config),
+    wire: impl FnOnce(&std::path::Path, &mut crate::state::ModuleWiring),
+) -> SharedState {
     let scratch = kroma_testing::temp_dir("engine-test");
     let db = db::init(&scratch.path().join("kroma.db")).expect("init db");
     let mut config = test_config(scratch.path().to_path_buf());
     config.tmdb_api_key = tmdb_api_key.map(str::to_string);
     adjust(&mut config);
     let settings = Settings::load(&db);
-    let wiring = crate::state::ModuleWiring {
+    let mut wiring = crate::state::ModuleWiring {
         services,
         jobs: &[],
         contributions: Arc::new(|_| Vec::new()),
@@ -85,10 +96,69 @@ fn build_state_serving(
         permissions: Arc::new(|_| None),
         network_providers: Arc::new(Vec::new),
         network_listeners: Arc::new(Vec::new),
+        source_roots: std::sync::Arc::new(|_| Vec::new()),
     };
+    wire(scratch.path(), &mut wiring);
     let state = AppState::new(config, false, db, settings, embedder, wiring);
     state.own_scratch_dir(scratch);
     state
+}
+
+pub(crate) const SOURCE_MODULE: &str = "tv.example.debrid";
+pub(crate) const SOURCE_ID: &str = "debrid";
+
+/// Like [`test_state`], with a `source` contribution (`SOURCE_ID`, held by module
+/// `SOURCE_MODULE`) answering whatever `answer` builds from the folder the module
+/// may hold copies in. The server is returned so a test can read what was asked.
+pub(crate) fn test_state_with_source(
+    answer: impl FnOnce(&std::path::Path) -> serde_json::Value,
+) -> (SharedState, recording_server::RecordingServer) {
+    let mut server = None;
+    let state = build_state_wired(
+        Point::absent("embedder"),
+        None,
+        Vec::new(),
+        HashMap::new(),
+        |_| (),
+        |data_dir, wiring| {
+            let held = data_dir.join("sources").join(SOURCE_MODULE);
+            std::fs::create_dir_all(&held).unwrap();
+            let fake = recording_server::RecordingServer::replying(200, &answer(&held).to_string());
+            let base = fake.base().to_string();
+            wiring.contributions = Arc::new(move |point| {
+                if point != "source" {
+                    return Vec::new();
+                }
+                vec![kroma_module_host::Contribution {
+                    module_id: SOURCE_MODULE.into(),
+                    instance: Some(SOURCE_ID.into()),
+                    base_url: base.clone(),
+                    token: "t".into(),
+                }]
+            });
+            let root = data_dir.join("sources");
+            wiring.source_roots = Arc::new(move |module| vec![root.join(module)]);
+            wiring.official_modules = Arc::new(|| vec![SOURCE_MODULE.to_string()]);
+            server = Some(fake);
+        },
+    );
+    (state, server.expect("the wiring ran"))
+}
+
+/// A stub in the data dir naming `SOURCE_ID`, `size` bytes long; returns its path.
+pub(crate) fn write_stub(state: &SharedState, name: &str, size: u64) -> String {
+    let path = state.config.data_dir.join(format!("{name}.kremote"));
+    kroma_primitives::remote_file::write(
+        &path,
+        &kroma_primitives::remote_file::RemoteFile {
+            source: SOURCE_ID.into(),
+            reference: format!("ref-{name}"),
+            name: format!("{name}.mkv"),
+            size,
+        },
+    )
+    .unwrap();
+    path.to_string_lossy().into_owned()
 }
 
 /// Like [`test_state`], with `service` registered for `service::<T>()` to find.

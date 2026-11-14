@@ -15,7 +15,7 @@
 //! [`Transport`] is chosen per URL, loopback TCP for `http://127.0.0.1:<port>`
 //! and a Unix socket for a URL built by [`loopback::unix_url`].
 
-pub mod address;
+pub use kroma_primitives::address;
 mod builder;
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 mod config;
@@ -28,6 +28,8 @@ mod multipart;
 #[cfg(not(target_family = "wasm"))]
 mod pin;
 mod response;
+#[cfg(all(feature = "test-hosts", not(target_family = "wasm")))]
+pub mod test_hosts;
 
 #[cfg(not(target_family = "wasm"))]
 pub use curl::curl_available;
@@ -39,6 +41,8 @@ pub fn curl_available() -> bool {
 #[cfg(target_family = "wasm")]
 pub use fetch::guest::{set_guest_fetcher, GuestCall, GuestDownloader, GuestFetcher};
 pub use fetch::Fetch;
+#[cfg(not(target_family = "wasm"))]
+pub use fetch::Streamed;
 pub use loopback::{Loopback, Method, Request, Transport, MAX_BODY_BYTES};
 pub use multipart::FormPart;
 pub use response::Response;

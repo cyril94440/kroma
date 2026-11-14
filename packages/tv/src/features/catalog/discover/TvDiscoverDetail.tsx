@@ -1,6 +1,6 @@
 import { hasPermission } from '@kromatv/client/accounts';
 import { type DiscoverEntry, tmdbKindOf } from '@kromatv/client/discovery';
-import { formatRuntime } from '@kromatv/core';
+import { formatRuntime, offersWatchNow } from '@kromatv/core';
 import { useAskForTitle } from '@kromatv/core/react';
 import { useT } from '@kromatv/ui';
 import {
@@ -20,10 +20,11 @@ import { TvDetailScaffold } from '#tv/features/catalog/detail/DetailScaffold';
 import { CastRow } from '#tv/features/catalog/detail/parts';
 import { TrailerButton } from '#tv/features/catalog/detail/TrailerButton';
 import { useDiscoverDetail } from '#tv/features/catalog/discover/useDiscoverDetail';
+import { firstEpisodeOf, WatchNowButton } from '#tv/features/catalog/discover/WatchNowButton';
 
 const STAGE_W = 1920;
 
-function AskButton({ entry }: Readonly<{ entry: DiscoverEntry }>) {
+function AskButton({ entry, autoFocus }: Readonly<{ entry: DiscoverEntry; autoFocus: boolean }>) {
   const t = useT();
   const client = useClient();
   const { status, asking, failed, ask } = useAskForTitle(client, entry);
@@ -36,7 +37,7 @@ function AskButton({ entry }: Readonly<{ entry: DiscoverEntry }>) {
     <Button
       variant="outline"
       size="lg"
-      autoFocus
+      autoFocus={autoFocus}
       icon="download"
       loading={asking}
       disabled={status !== null}
@@ -59,6 +60,7 @@ export function TvDiscoverDetail() {
   useFocusNav({ onBack: nav.back });
 
   const detail = fiche.state === 'read' ? fiche.detail : null;
+  const watchNow = detail != null && offersWatchNow(user, detail.watchNow);
   const span = detail?.seasons.length
     ? t('content.seasonCount', { count: detail.seasons.length })
     : formatRuntime((detail?.runtimeMin ?? 0) * 60_000);
@@ -78,12 +80,19 @@ export function TvDiscoverDetail() {
       overview={detail?.overview ?? entry.overview}
       actions={
         <FocusRegion style={s.actionRow}>
-          {canAsk ? <AskButton entry={entry} /> : null}
+          {watchNow ? (
+            <WatchNowButton
+              kind={entry.kind}
+              tmdbId={entry.tmdbId}
+              episode={firstEpisodeOf(entry.kind, detail?.seasons)}
+            />
+          ) : null}
+          {canAsk ? <AskButton entry={entry} autoFocus={!watchNow} /> : null}
           <TrailerButton
             kind={tmdbKindOf(entry.kind)}
             tmdbId={entry.tmdbId}
             title={entry.title}
-            autoFocus={!canAsk}
+            autoFocus={!canAsk && !watchNow}
           />
         </FocusRegion>
       }

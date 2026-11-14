@@ -9,8 +9,7 @@ import type { MediaItem } from '@kromatv/client/media';
 import {
   attachDirectPlay,
   type BufferPlan,
-  decodableAudioCodecs,
-  decodableVideoCodecs,
+  deviceDeclaration,
   isPlayableAt,
   itemBufferPlan,
   reachableBufferEnd,
@@ -141,7 +140,7 @@ export class HtmlEngine implements TvEngine {
       this.opts.masterAac,
       this.baseSec,
       this.rendition,
-      { copyCodecs: decodableAudioCodecs(), videoCodecs: decodableVideoCodecs() },
+      deviceDeclaration(),
     );
     // The stream really starts at the keyframe AT-OR-BEFORE the anchor; correct
     // `baseSec` from X-Hls-Start so the clock + subtitle cues don't drift a GOP.

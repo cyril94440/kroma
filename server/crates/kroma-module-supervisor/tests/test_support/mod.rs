@@ -99,6 +99,21 @@ impl Modules {
         self
     }
 
+    /// Install `id` declaring the `config` fields in `fields`, a JSON array.
+    pub fn configured(self, id: &str, fields: &str) -> Self {
+        let dir = self.dir.path().join(INSTALLED_DIR).join(id);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("module.json"),
+            format!(
+                r#"{{ "schemaVersion": {}, "id": "{id}", "name": "{id}", "version": "1.0.0", "config": {fields} }}"#,
+                kroma_module_manifest::MODULE_SCHEMA_VERSION,
+            ),
+        )
+        .unwrap();
+        self
+    }
+
     pub fn token(&self, id: &str) -> String {
         self.supervisor.module_token(id)
     }

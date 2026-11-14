@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { I18nProvider } from '@kromatv/ui';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { WebRuntimeProvider } from '#web/shared/lib/web-runtime';
 import { createWebTestRuntime } from '#web/shared/lib/web-runtime.fixture';
@@ -17,7 +17,11 @@ afterAll(() => {
 
 afterEach(cleanup);
 
-function row(listed: Parameters<typeof MissingEpisodeRow>[0]['listed'], pending = false) {
+function row(
+  listed: Parameters<typeof MissingEpisodeRow>[0]['listed'],
+  pending = false,
+  watchNow?: Parameters<typeof MissingEpisodeRow>[0]['watchNow'],
+) {
   return render(
     <WebRuntimeProvider value={createWebTestRuntime({})}>
       <I18nProvider locale="en">
@@ -28,6 +32,7 @@ function row(listed: Parameters<typeof MissingEpisodeRow>[0]['listed'], pending 
           pending={pending}
           selected={false}
           onToggle={() => {}}
+          watchNow={watchNow}
         />
       </I18nProvider>
     </WebRuntimeProvider>,
@@ -82,5 +87,29 @@ describe('MissingEpisodeRow', () => {
 
     expect(screen.getByText('9. The Wedding')).toBeTruthy();
     expect(screen.getByText(/2031/)).toBeTruthy();
+  });
+
+  it('offers no watch-now button unless the server does', () => {
+    row(null);
+
+    expect(screen.queryByLabelText('Watch this episode now')).toBeNull();
+  });
+
+  it('watches the episode now when its button is pressed', () => {
+    const onWatch = vi.fn();
+    row(null, false, { onWatch, disabled: false });
+
+    fireEvent.click(screen.getByLabelText('Watch this episode now'));
+
+    expect(onWatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds the button while another search is running', () => {
+    const onWatch = vi.fn();
+    row(null, false, { onWatch, disabled: true });
+
+    fireEvent.click(screen.getByLabelText('Watch this episode now'));
+
+    expect(onWatch).not.toHaveBeenCalled();
   });
 });

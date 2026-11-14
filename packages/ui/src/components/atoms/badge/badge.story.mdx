@@ -1,7 +1,7 @@
 import { defineStory } from '@kromatv/workbench/story';
 import { Box } from '#ui/components/atoms/box';
-import { Badge, badgeVariants } from './badge';
-import { TONES } from './badge.fixtures';
+import { Badge, badgeVariants, qualityTone } from './badge';
+import { QUALITY_LABELS, TONES } from './badge.fixtures';
 
 export const story = defineStory({
   group: 'Feedback',
@@ -22,6 +22,18 @@ A metadata pill: video quality, codec, state. Each tone has its own dedicated co
     <Box row wrap gap={12} align="center">
       {TONES.map((tone) => (
         <Badge key={tone} {...props} tone={tone} />
+      ))}
+    </Box>
+  ))}
+</Scene>
+
+<Scene name="Quality pills">
+  {story.take((props) => (
+    <Box row wrap gap={12} align="center">
+      {QUALITY_LABELS.map((label) => (
+        <Badge key={label} {...props} tone={qualityTone(label)}>
+          {label}
+        </Badge>
       ))}
     </Box>
   ))}

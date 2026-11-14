@@ -2,7 +2,12 @@
 // has no Web API to read. Optional so a build without the native module yields
 // null rather than throwing.
 
-import type { DecoderFrameLimits, FrameSize } from '@kromatv/core';
+import {
+  type DecoderFrameLimits,
+  type FrameSize,
+  type HdrSupport,
+  parseHdrSupport,
+} from '@kromatv/core';
 import { type NativeModule, requireOptionalNativeModule } from 'expo';
 
 declare class DeviceHardwareNativeModule extends NativeModule {
@@ -10,6 +15,7 @@ declare class DeviceHardwareNativeModule extends NativeModule {
   memoryBytes(): number;
   freeMemoryBytes(): number | null;
   decoderFrameLimits(): Record<string, FrameSize>;
+  hdrSupport?(): unknown;
 }
 
 const native = requireOptionalNativeModule<DeviceHardwareNativeModule>('DeviceHardware');
@@ -50,4 +56,15 @@ export function decoderFrameLimits(): DecoderFrameLimits | null {
     if (codec) limits[codec] = size;
   }
   return Object.keys(limits).length > 0 ? limits : null;
+}
+
+/** What this device says about HDR: the Dolby Vision profiles its decoders take
+ * (Android) and the HDR systems its display reports. Null where the native build
+ * predates the query, throws, or answers in a shape that is not one. */
+export function hdrSupport(): HdrSupport | null {
+  try {
+    return parseHdrSupport(native?.hdrSupport?.());
+  } catch {
+    return null;
+  }
 }

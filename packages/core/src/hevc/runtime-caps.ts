@@ -47,7 +47,7 @@ export const SAFARI_CAPS: PlaybackCapabilities = {
   source: 'videoElement',
 };
 
-const TV_AUDIO: AudioCapabilities = {
+export const TV_AUDIO: AudioCapabilities = {
   aac: true,
   ac3: true,
   eac3: true,
@@ -73,6 +73,43 @@ export const NATIVE_TV_CAPS: PlaybackCapabilities = {
   source: 'platform-tv',
 };
 
+/** Samsung Tizen: HDR10, HDR10+ and HLG; no Dolby Vision decoder in any Samsung
+ * set, so a profile 5 stream has no picture here and a profile 7/8 one plays
+ * as its HDR10 base layer. */
+export const TIZEN_CAPS: PlaybackCapabilities = {
+  ...NATIVE_TV_CAPS,
+  hdr: { hdr10: true, hdr10Plus: true, dolbyVision: false, hlg: true },
+  hdrDeclared: true,
+};
+
+/** LG webOS: HDR10, HLG and Dolby Vision; no HDR10+. */
+export const WEBOS_CAPS: PlaybackCapabilities = {
+  ...NATIVE_TV_CAPS,
+  hdr: { hdr10: true, hdr10Plus: false, dolbyVision: true, hlg: true },
+  hdrDeclared: true,
+};
+
+const APPLE_TV_AUDIO: AudioCapabilities = { ...TV_AUDIO, dts: false, truehd: false };
+
+/** tvOS (AVPlayer): Dolby Digital and Digital+ natively, neither DTS nor TrueHD.
+ * Dolby Vision depends on the connected display and nothing exposed to JS asks it,
+ * so it is not claimed. */
+export const APPLE_TV_CAPS: PlaybackCapabilities = {
+  ...NATIVE_TV_CAPS,
+  hdr: { ...NATIVE_TV_CAPS.hdr, dolbyVision: false },
+  audio: APPLE_TV_AUDIO,
+  hdrDeclared: true,
+};
+
+/** Android TV and Fire TV (Media3): the FFmpeg audio extension decodes every
+ * audio codec the table names in software, ahead of any passthrough. Dolby Vision
+ * is per device and nothing here can ask the set, so it is not claimed. */
+export const ANDROID_TV_CAPS: PlaybackCapabilities = {
+  ...NATIVE_TV_CAPS,
+  hdr: { ...NATIVE_TV_CAPS.hdr, dolbyVision: false },
+  hdrDeclared: true,
+};
+
 // Measured on a Tizen 9.0 set (AVPlay, HLS fMP4): AAC, AC-3, E-AC-3 and MPEG
 // audio prepare and play, while FLAC, DTS and TrueHD fail `prepareAsync` outright
 // and Opus prepares with a zero-channel track. The same silicon reads all of them
@@ -93,15 +130,23 @@ const AVPLAY_HLS_AUDIO: AudioCapabilities = {
  * TV's direct play of a file, so anything outside this table must reach the set
  * as AAC. */
 export const AVPLAY_HLS_CAPS: PlaybackCapabilities = {
-  ...NATIVE_TV_CAPS,
+  ...TIZEN_CAPS,
   audio: AVPLAY_HLS_AUDIO,
 };
+
+/** The capabilities AVPlay reads the server's HLS master with: the runtime's own
+ * picture and display answers (HDR refined by the set), and the narrower audio set
+ * AVPlay opens from an fMP4. */
+export function avplayHlsCapabilities(runtime?: PlaybackCapabilities): PlaybackCapabilities {
+  return runtime ? { ...runtime, audio: AVPLAY_HLS_AUDIO } : AVPLAY_HLS_CAPS;
+}
 
 /** mpv on the desktop shell: ffmpeg's own decoders behind whatever the box
  * accelerates, so a profile no silicon takes falls to software rather than to a
  * black picture. */
 export const MPV_CAPS: PlaybackCapabilities = {
   ...NATIVE_TV_CAPS,
+  hdrDeclared: true,
   h26410bit: true,
   av1: true,
   source: 'unknown',

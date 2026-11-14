@@ -26,7 +26,7 @@ const domains = {
     upNext: endpoint(),
     following: endpoint(),
   },
-  discovery: { detail: endpoint(), trending: endpoint() },
+  discovery: { detail: endpoint(), list: endpoint(), genres: endpoint(), genre: endpoint() },
   requests: { list: endpoint(), calendar: endpoint(), missing: endpoint() },
   accounts: { sessions: endpoint(), passkeys: { list: endpoint() } },
   notifications: { list: endpoint(), prefs: endpoint(), push: { key: endpoint() } },

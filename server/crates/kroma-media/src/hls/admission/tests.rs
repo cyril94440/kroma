@@ -29,13 +29,13 @@ async fn sweep(s: &Sessions) {
 
 async fn admits(s: &Sessions) -> bool {
     let mut map = s.inner.lock().await;
-    s.admits_transcode(&mut map).await
+    s.admits_transcode(&mut map, 1).await
 }
 
 async fn retires_then_admits(s: &Sessions, key: &str, opener: &str) -> bool {
     let mut map = s.inner.lock().await;
     s.reap_superseded(&mut map, key, Some(opener)).await;
-    s.admits_transcode(&mut map).await
+    s.admits_transcode(&mut map, 1).await
 }
 
 #[tokio::test]
@@ -92,21 +92,23 @@ async fn a_host_with_no_slot_left_refuses_a_master_before_it_spawns_anything() {
     let (mut s, dir) = registry("admit-refused", 8, &[(TRANSCODE, LIVE)]).await;
     s.transcode_cap = 1;
     let s = Arc::new(s);
-    let input = dir.path().join("never-opened.mkv");
+    let input = crate::input::MediaInput::Local(dir.path().join("never-opened.mkv"));
     let asked = Asked {
         item_id: "itB",
-        input: input.to_str().expect("a path"),
+        input: &input,
         opener: Some(VIEWER),
         audio: 0,
         mode: StreamMode::new(VideoMode::H264At(Rung::P1080), AudioMode::Copy),
         anchor: 0,
         source: None,
+        video: None,
+        track: None,
     };
 
     let answer = s.master("itB:h264-1080-copy:0:a0", &asked).await;
 
     assert_eq!(answer.err(), Some(Refusal::Busy));
-    assert!(!input.exists(), "nothing read the file it was refused for");
+    assert!(!input.local().unwrap().exists(), "nothing read the file it was refused for");
 }
 
 #[tokio::test]
@@ -187,4 +189,49 @@ fn the_ceiling_leaves_a_box_at_least_one_re_encode_and_never_more_than_four() {
     let ceiling = max_live_transcodes();
 
     assert!((1..=4).contains(&ceiling), "{ceiling}");
+}
+
+async fn admits_taking(s: &Sessions, slots: usize) -> bool {
+    let mut map = s.inner.lock().await;
+    s.admits_transcode(&mut map, slots).await
+}
+
+#[tokio::test]
+async fn a_tone_map_on_the_cpu_takes_two_slots_so_a_second_re_encode_does_not_fit_beside_it() {
+    let (s, _dir) = registry_allowing("admit-weight", 2, &[]).await;
+    seed(&s, TRANSCODE, LIVE, Some(VIEWER)).await;
+
+    assert!(admits_taking(&s, 1).await);
+    assert!(!admits_taking(&s, 2).await);
+}
+
+#[tokio::test]
+async fn an_idle_host_admits_a_tone_map_even_where_two_slots_are_all_it_has_to_give() {
+    let (s, _dir) = registry_allowing("admit-idle-weight", 1, &[]).await;
+
+    assert!(admits_taking(&s, 2).await);
+}
+
+#[tokio::test]
+async fn a_live_session_is_counted_by_the_slots_its_pipeline_takes() {
+    use super::super::hwaccel::{HwAccel, Pipeline};
+    use super::super::session::testing::seed_on;
+    use super::super::software::Effort;
+    use super::super::tonemap::{Filters, ToneMap, ToneSource};
+    let (s, _dir) = registry_allowing("admit-counted", 2, &[]).await;
+    let mapping = Pipeline {
+        accel: HwAccel::Software,
+        effort: Effort::Quality,
+        tonemap: ToneMap::resolve(
+            ToneSource::Pq,
+            Filters {
+                zimg: true,
+                placebo: false,
+            },
+        ),
+        frame: Some((3840, 2160)),
+    };
+    seed_on(&s, TRANSCODE, LIVE, Some(VIEWER), mapping).await;
+
+    assert!(!admits_taking(&s, 1).await);
 }

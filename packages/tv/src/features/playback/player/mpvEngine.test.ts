@@ -1,5 +1,5 @@
 import type { HlsMasterDeclaration, MediaItem } from '@kromatv/client/media';
-import { fakeClient } from '@kromatv/client/test';
+import { fakeClient, recordingClient } from '@kromatv/client/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EngineOptions } from './baseEngine';
 import type { EngineListeners } from './engine';
@@ -183,22 +183,35 @@ describe('MpvEngine construction / open', () => {
 });
 
 describe('MpvEngine audio declaration', () => {
-  it('asks the server to copy the soundtracks its own decoders play', () => {
+  it('asks the server to copy only the soundtracks an fMP4 carries', () => {
     const t = fakeTauri();
     vi.stubGlobal('__TAURI__', t.bridge);
 
     new MpvEngine(opts({ direct: false, startSec: 0 })).start();
 
-    expect(declared.at(-1)?.copyCodecs).toEqual([
-      'aac',
-      'ac3',
-      'eac3',
-      'dts',
-      'truehd',
-      'flac',
-      'opus',
-      'mp3',
-      'vorbis',
+    expect(declared.at(-1)?.copyCodecs).toEqual(['aac', 'ac3', 'eac3']);
+  });
+});
+
+describe('MpvEngine master request', () => {
+  it('opens the copy program declaring only what an fMP4 carries, so TrueHD and DTS arrive as surround Dolby', () => {
+    const t = fakeTauri();
+    vi.stubGlobal('__TAURI__', t.bridge);
+    const { client: real } = recordingClient();
+
+    new MpvEngine(
+      opts({
+        direct: false,
+        startSec: 0,
+        client: fakeClient({ media: { hlsMasterUrl: real.media.hlsMasterUrl } }),
+      }),
+    ).start();
+
+    expect(t.loads()).toEqual([
+      {
+        url: 'http://kroma.test/api/items/v9/hls/copy/0/0/index.m3u8?copy=aac%2Cac3%2Ceac3&video=hevc%2Ch264%2Ch26410bit%2Cav1%2Cvp9&hdr=hdr10%2Chdr10plus%2Chlg%2Cdv',
+        start: 0,
+      },
     ]);
   });
 });

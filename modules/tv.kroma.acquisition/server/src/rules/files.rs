@@ -235,6 +235,7 @@ mod tests {
             episode: Some(1),
             episode_end: Some(episodes),
             file: MediaFile {
+                remote: false,
                 id: "f1".into(),
                 rel_path: None,
                 container: "mkv".into(),

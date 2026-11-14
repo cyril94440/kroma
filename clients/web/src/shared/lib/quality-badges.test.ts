@@ -31,4 +31,27 @@ describe('the quality pills beside the meta line', () => {
       'H.265',
     ]);
   });
+
+  it('names the HDR system instead of a generic HDR', () => {
+    expect(qualityBadges(video({ hdr: true, hdrFormat: 'dolbyVision' }))).toEqual(['Dolby Vision']);
+    expect(qualityBadges(video({ hdr: true, hdrFormat: 'hdr10Plus' }))).toEqual(['HDR10+']);
+    expect(qualityBadges(video({ hdr: true, hdrFormat: 'hlg' }))).toEqual(['HLG']);
+  });
+
+  it('adds the object-based audio an item carries, last', () => {
+    const atmos = {
+      index: 0,
+      codec: 'truehd',
+      channels: 8,
+      language: null,
+      default: true,
+      spatial: 'atmos' as const,
+    };
+    expect(qualityBadges(video({ width: 3840, hdr: true, hdrFormat: 'hdr10' }), [atmos])).toEqual([
+      '4K',
+      'HDR10',
+      'Dolby Atmos',
+    ]);
+    expect(qualityBadges(video({}), [{ ...atmos, spatial: 'dtsx' }])).toEqual(['DTS:X']);
+  });
 });

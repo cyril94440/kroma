@@ -33,23 +33,30 @@ pub struct Detection {
 
 static DETECTED: OnceLock<Detection> = OnceLock::new();
 
-/// The best pipeline this host offers, probed once. Override with
+/// The best pipeline this host offers, probed once by [`prime`]. Override with
 /// `KROMA_HWACCEL=<label>`, which is how an operator picks between two devices
-/// or pins the software path to rule it out of a problem.
+/// or pins the software path to rule it out of a problem. Software until the
+/// probe has finished: no request waits on it.
 pub fn detect() -> HwAccel {
     detected().accel
 }
 
 /// [`detect`] with the sentence that explains it.
 pub fn detected() -> &'static Detection {
-    DETECTED.get_or_init(run)
+    static UNPRIMED: OnceLock<Detection> = OnceLock::new();
+    DETECTED.get().unwrap_or_else(|| {
+        UNPRIMED.get_or_init(|| Detection {
+            accel: HwAccel::Software,
+            reason: "the hardware probe has not finished yet".to_owned(),
+        })
+    })
 }
 
-/// Probe now rather than on the first frame anyone asks for. The validation
-/// encodes shell out, and the alternative is paying for them inside the request
-/// that starts a session.
+/// Probe now, once, rather than on the first frame anyone asks for. The
+/// validation encodes shell out and may take seconds, so this runs at boot on its
+/// own thread.
 pub fn prime() {
-    let d = detected();
+    let d = DETECTED.get_or_init(run);
     if d.accel.is_device() {
         tracing::info!(accel = d.accel.label(), reason = %d.reason, "video re-encodes run on hardware");
     } else {
@@ -161,25 +168,11 @@ fn usable(accel: HwAccel) -> Result<(), String> {
     }
     let mut cmd = std::process::Command::new("ffmpeg");
     cmd.args(["-v", "error", "-nostdin"]);
-    match accel {
-        HwAccel::Vaapi => {
-            cmd.args(["-vaapi_device", node]);
-        }
-        HwAccel::Qsv => {
-            let derive_from = format!("vaapi=va:{node}");
-            cmd.args(["-init_hw_device", derive_from.as_str()]).args([
-                "-init_hw_device",
-                "qsv=hw@va",
-                "-filter_hw_device",
-                "hw",
-            ]);
-        }
-        _ => {}
-    }
+    cmd.args(accel.upload_device_args());
     cmd.args(input::generated(TEST_SOURCE))
         .args(["-frames:v", "3"]);
-    if matches!(accel, HwAccel::Qsv | HwAccel::Vaapi) {
-        cmd.args(["-vf", "format=nv12,hwupload"]);
+    if let Some(upload) = accel.upload_filter() {
+        cmd.args(["-vf", upload]);
     }
     cmd.args(["-c:v", encoder_of(accel)]);
     if matches!(accel, HwAccel::VideoToolbox | HwAccel::Nvenc) {

@@ -58,7 +58,11 @@ impl Plan {
     }
 
     pub(super) const fn transcodes_video(&self) -> bool {
-        !matches!(self.mode.video, VideoMode::Copy)
+        !self.mode.video.copies()
+    }
+
+    pub(super) fn slots(&self) -> usize {
+        self.pipeline.slots()
     }
 }
 
@@ -70,9 +74,9 @@ pub struct Transcode {
     pub id: String,
     pub item_id: String,
     pub audio_track: u32,
-    /// `copy` | `h264` | `h264-1080` | `h264-720`.
+    /// `copy` | `copy-dv` | `h264` | `h264-1080` | `h264-720`.
     pub video: String,
-    /// `copy` | `aac` | `aac-standard` | `aac-night`.
+    /// `copy` | `aac` | `aac-standard` | `aac-night` | `eac3` | `ac3`.
     pub audio: String,
     /// Whether the picture is being re-encoded, which is the expensive axis.
     pub transcodes_video: bool,
@@ -146,7 +150,7 @@ fn report(plan: &Plan, dir: &Path, running: bool, start_secs: f64) -> Transcode 
         item_id: plan.item_id.clone(),
         audio_track: plan.audio_track,
         video: video_label(plan.mode.video).to_owned(),
-        audio: audio_label(plan.mode.audio).to_owned(),
+        audio: plan.mode.audio.label().to_owned(),
         transcodes_video: plan.transcodes_video(),
         transcodes_audio: !matches!(plan.mode.audio, AudioMode::Copy),
         accel: plan.pipeline.accel.label().to_owned(),
@@ -181,17 +185,9 @@ const fn split(size: Option<(u32, u32)>) -> (Option<u32>, Option<u32>) {
 const fn video_label(video: VideoMode) -> &'static str {
     match video {
         VideoMode::Copy => "copy",
+        VideoMode::CopyDolby => "copy-dv",
         VideoMode::H264 => "h264",
         VideoMode::H264At(rung) => rung.label(),
-    }
-}
-
-const fn audio_label(audio: AudioMode) -> &'static str {
-    match audio {
-        AudioMode::Copy => "copy",
-        AudioMode::Aac => "aac",
-        AudioMode::AacStandard => "aac-standard",
-        AudioMode::AacNight => "aac-night",
     }
 }
 

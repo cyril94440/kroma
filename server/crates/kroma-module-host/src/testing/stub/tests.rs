@@ -204,3 +204,44 @@ fn the_stub_defaults_to_something_usable() {
     );
     assert!(StubHost::default().published().is_empty());
 }
+
+#[test]
+fn an_unconfigured_stub_hands_back_the_callers_config_defaults() {
+    let host = StubHost::new();
+
+    assert_eq!(host.config_value("cacheMaxGb"), None);
+    assert_eq!(host.config_i64("cacheMaxGb", 50), 50);
+    assert!(host.config_bool("flag", true));
+    assert_eq!(host.config_str("region", "eu"), "eu");
+}
+
+#[test]
+fn seeded_config_reads_typed_and_a_later_save_replaces_it() {
+    let host = StubHost::new()
+        .with_config("cacheMaxGb", json!("7"))
+        .with_config("flag", json!(false))
+        .with_config("region", json!("us"));
+
+    assert_eq!(host.config_i64("cacheMaxGb", 50), 7);
+    assert!(!host.config_bool("flag", true));
+    assert_eq!(host.config_str("region", "eu"), "us");
+
+    host.set_config("cacheMaxGb", json!(9));
+
+    assert_eq!(host.config_i64("cacheMaxGb", 50), 9);
+}
+
+#[test]
+fn a_config_value_of_the_wrong_type_falls_back_to_the_default() {
+    let host = StubHost::new().with_config("cacheMaxGb", json!("lots"));
+
+    assert_eq!(host.config_i64("cacheMaxGb", 50), 50);
+}
+
+#[test]
+fn the_cores_stored_config_is_per_module() {
+    let host = StubHost::new().with_module_config("tv.a", "k", json!(1));
+
+    assert_eq!(host.module_config("tv.a").get("k"), Some(&json!(1)));
+    assert!(host.module_config("tv.b").is_empty());
+}

@@ -37,7 +37,7 @@ describe('buildLeanStats', () => {
     expect(s.mode).toBe('AVPlay');
     expect(s.resolution).toBe('3840×1600');
     expect(s.videoCodec).toBe('HEVC 10-bit HDR');
-    expect(s.audioFormat).toBe('EAC3 6.0 (en)');
+    expect(s.audioFormat).toBe('Dolby Digital+ 5.1 (en)');
     expect(s.dropped).toBeUndefined(); // no <video>, no frame counters
   });
 
@@ -51,8 +51,8 @@ describe('buildLeanStats', () => {
   });
 
   it('selects the audio track by its index, falling back to the first', () => {
-    expect(buildLeanStats(input({ audioIndex: 5 })).audioFormat).toBe('AC3 2.0 (fr)');
-    expect(buildLeanStats(input({ audioIndex: 99 })).audioFormat).toBe('EAC3 6.0 (en)');
+    expect(buildLeanStats(input({ audioIndex: 5 })).audioFormat).toBe('Dolby Digital 2.0 (fr)');
+    expect(buildLeanStats(input({ audioIndex: 99 })).audioFormat).toBe('Dolby Digital+ 5.1 (en)');
   });
 
   it('has no audio format when there are no audio tracks', () => {

@@ -6,6 +6,7 @@ import {
   canDirectPlay,
   type DirectPlayVerdict,
   preferredAudioIndex,
+  probeSourceFailure,
 } from '@kromatv/core';
 import { storedAudioFilter } from '@kromatv/ui';
 import { useDeviceStore } from '@kromatv/ui/device-store';
@@ -136,12 +137,20 @@ export function useEngineLifecycle(
       return;
     }
     setError(failure);
+    void probeSourceFailure(client.media.streamUrl(item.id)).then((source) => {
+      if (source) setError({ ...source, hintKey: 'player.sourceFailedHint' });
+    });
   });
+  const [opening, setOpening] = useState({ itemId: item.id, index: audioIndex });
+  if (opening.itemId !== item.id) {
+    setOpening({ itemId: item.id, index: openingAudioIndex(item, audioLanguage) });
+  }
   const plan = backend.planEngine(
     item,
     env,
     fellBackToVlc ? 'vlc' : enginePref,
     playbackCapabilities,
+    opening.index,
   );
   const { surface, playbackMode, deviceLabel, rebuildKey } = plan;
   const durationSec = item.durationMs ? item.durationMs / 1000 : 0;

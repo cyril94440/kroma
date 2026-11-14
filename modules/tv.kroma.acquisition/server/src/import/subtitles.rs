@@ -7,24 +7,31 @@ use anyhow::Result;
 use kroma_module_sdk::host::HostCtx;
 use kroma_module_sdk::primitives::external_subtitles::beside;
 
-use super::place::{place, Placement};
+use super::place::{place, Landed, Placement};
+use super::remote::named;
 
 /// Place `src` in the library, then every subtitle file beside it, renamed to
 /// the stem the video landed under so the catalogue matches the two again.
-/// Answers where the video landed.
+/// Answers where the video landed, whether this call wrote it, and the subtitle
+/// files it wrote.
 pub(super) fn place_with_subtitles(
     host: &dyn HostCtx,
     src: &Path,
     around: &[PathBuf],
     dest: &Path,
     mode: Placement,
-) -> Result<PathBuf> {
-    let at = place(host, src, dest, mode)?;
-    let placed = subtitles_beside(host, src, around, &at, mode);
-    if placed > 0 {
-        tracing::info!(video = %at.display(), placed, "subtitle files imported beside a video");
+) -> Result<WithSubtitles> {
+    let video = place(host, src, dest, mode)?;
+    let subtitles = subtitles_beside(host, src, around, &video.path, mode);
+    if !subtitles.is_empty() {
+        tracing::info!(video = %video.path.display(), placed = subtitles.len(), "subtitle files imported beside a video");
     }
-    Ok(at)
+    Ok(WithSubtitles { video, subtitles })
+}
+
+pub(super) struct WithSubtitles {
+    pub video: Landed,
+    pub subtitles: Vec<PathBuf>,
 }
 
 fn subtitles_beside(
@@ -33,24 +40,25 @@ fn subtitles_beside(
     around: &[PathBuf],
     at: &Path,
     mode: Placement,
-) -> usize {
+) -> Vec<PathBuf> {
     let Some(stem) = at.file_stem().and_then(std::ffi::OsStr::to_str) else {
-        return 0;
+        return Vec::new();
     };
     let folder = at.parent().unwrap_or_else(|| Path::new("."));
-    beside(src, around)
+    let around: Vec<PathBuf> = around.iter().map(|path| named(path)).collect();
+    beside(&named(src), &around)
         .iter()
-        .filter(|found| {
+        .filter_map(|found| {
             let to = folder.join(found.named_after(stem));
             match place(host, &found.path, &to, mode) {
-                Ok(_) => true,
+                Ok(landed) => landed.created.then_some(landed.path),
                 Err(e) => {
                     tracing::warn!(file = %found.path.display(), error = %format!("{e:#}"), "a subtitle file would not import");
-                    false
+                    None
                 }
             }
         })
-        .count()
+        .collect()
 }
 
 #[cfg(test)]
@@ -100,7 +108,7 @@ mod tests {
     fn a_subtitle_file_follows_the_video_under_its_new_name() {
         let r = release("follows", &["Old.Release.1080p.fr.srt"]);
 
-        let at = place_with_subtitles(&StubHost::new(), &r.video, &r.around, &r.dest, Placement::Skip).unwrap();
+        let at = place_with_subtitles(&StubHost::new(), &r.video, &r.around, &r.dest, Placement::Skip).unwrap().video.path;
 
         assert_eq!(at, r.dest);
         assert!(
@@ -134,7 +142,7 @@ mod tests {
     fn a_release_that_ships_no_subtitle_file_still_imports() {
         let r = release("none", &[]);
 
-        let at = place_with_subtitles(&StubHost::new(), &r.video, &r.around, &r.dest, Placement::Skip).unwrap();
+        let at = place_with_subtitles(&StubHost::new(), &r.video, &r.around, &r.dest, Placement::Skip).unwrap().video.path;
 
         assert!(at.exists());
     }

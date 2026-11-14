@@ -50,6 +50,8 @@ pub struct StubHost {
     libraries: Vec<LibraryFolders>,
     settings: Arc<Mutex<BTreeMap<String, serde_json::Value>>>,
     string_settings: Option<StringSettings>,
+    config: Arc<Mutex<BTreeMap<String, serde_json::Value>>>,
+    module_configs: Arc<Mutex<BTreeMap<String, serde_json::Map<String, serde_json::Value>>>>,
     services: Arc<Mutex<Vec<Service>>>,
     points: Arc<Mutex<Vec<crate::Contribution>>>,
     log: Arc<Log>,
@@ -101,6 +103,8 @@ impl StubHost {
             libraries: Vec::new(),
             settings: Arc::new(Mutex::new(BTreeMap::new())),
             string_settings: None,
+            config: Arc::new(Mutex::new(BTreeMap::new())),
+            module_configs: Arc::new(Mutex::new(BTreeMap::new())),
             services: Arc::new(Mutex::new(Vec::new())),
             points: Arc::new(Mutex::new(Vec::new())),
             log: Arc::new(Log::default()),
@@ -201,6 +205,33 @@ impl StubHost {
     /// which is what makes the un-configured host neutral.
     pub fn with_setting(self, key: &str, value: serde_json::Value) -> Self {
         self.settings.lock().unwrap().insert(key.into(), value);
+        self
+    }
+
+    /// Seed a `config` value of the module under test, as `config_value` answers
+    /// it. Change it between calls with [`set_config`](Self::set_config) to
+    /// imitate an operator saving in Admin.
+    pub fn with_config(self, key: &str, value: serde_json::Value) -> Self {
+        self.set_config(key, value);
+        self
+    }
+
+    /// Replace one `config` value of the module under test on a host already
+    /// shared with the code under test.
+    pub fn set_config(&self, key: &str, value: serde_json::Value) {
+        self.config.lock().unwrap().insert(key.into(), value);
+    }
+
+    /// Seed what the core has stored for `module`'s config, as
+    /// [`HostCtx::module_config`] answers it: what the supervisor's
+    /// `/_host/config` is served from.
+    pub fn with_module_config(self, module: &str, key: &str, value: serde_json::Value) -> Self {
+        self.module_configs
+            .lock()
+            .unwrap()
+            .entry(module.into())
+            .or_default()
+            .insert(key.into(), value);
         self
     }
 

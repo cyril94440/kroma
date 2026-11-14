@@ -1,6 +1,6 @@
 //! `/download-clients` torrent engine management: the seeded
-//! embedded engine row plus external Transmission / qBittorrent connectors,
-//! with a live connection test. Gated on `settings.manage`; passwords are
+//! embedded engine row plus a row per external engine module, with a live
+//! connection test. Gated on `settings.manage`; passwords are
 //! write-only.
 
 use std::sync::Arc;
@@ -19,11 +19,20 @@ use crate::{ClientTestResult, DownloadClientView, DownloadClientsView, SaveDownl
 use kroma_module_sdk::host::{blocking, json_error, query, service, AuthUser, HostStorage};
 use kroma_module_sdk::primitives::{now_ms, random_token, short_hash};
 
+use crate::engine::remote::DOWNLOAD_CLIENT;
 use crate::DownloadManager;
+use kroma_module_sdk::host::Contribution;
 
 // Resolve the module's download manager from the host service registry.
 fn dm<S: HostStorage>(state: &S) -> Arc<DownloadManager> {
     service::<DownloadManager>(state).expect("download manager registered")
+}
+
+fn is_external_engine(answering: &[Contribution], kind: &str) -> bool {
+    kind != crate::engine::EMBEDDED_KIND
+        && answering
+            .iter()
+            .any(|each| each.instance.as_deref() == Some(kind))
 }
 
 pub fn routes<S: HostStorage + Clone + Send + Sync + 'static>() -> Router<S> {
@@ -95,11 +104,8 @@ pub async fn create<S: HostStorage + Clone + Send + Sync + 'static>(
 ) -> Result<Response, Response> {
     state.require(&user, Permission::SettingsManage)?;
     let kind = body.kind.as_deref().unwrap_or_default().trim().to_string();
-    if !matches!(kind.as_str(), "transmission" | "qbittorrent") {
-        return Err(json_error(
-            StatusCode::BAD_REQUEST,
-            "kind must be transmission or qbittorrent",
-        ));
+    if !is_external_engine(&state.contributions(DOWNLOAD_CLIENT), &kind) {
+        return Err(state.lerr(&user, StatusCode::BAD_REQUEST, "error.noEngineForKind"));
     }
     let url = body
         .url
@@ -107,9 +113,6 @@ pub async fn create<S: HostStorage + Clone + Send + Sync + 'static>(
         .map(str::trim)
         .unwrap_or_default()
         .to_string();
-    if url.is_empty() {
-        return Err(json_error(StatusCode::BAD_REQUEST, "url is required"));
-    }
     let row = DownloadClientRow {
         id: short_hash(&format!("dlclient|{url}|{}", random_token())),
         name: body
@@ -128,11 +131,37 @@ pub async fn create<S: HostStorage + Clone + Send + Sync + 'static>(
         created_at: now_ms(),
     };
     let view = view_of(&row, crate::EngineState::Unknown, None);
+    let row = vet_new_client(dm(&state), row).await?;
     query(state.store(), move |pool| {
         db::insert_download_client(&pool, &row)
     })
     .await?;
     Ok(Json(view).into_response())
+}
+
+fn looks_incomplete(row: &DownloadClientRow) -> bool {
+    row.url.is_empty() || row.password.is_empty()
+}
+
+/// An engine's own `test` is the only place that knows which of its fields it
+/// needs, so a definition that leaves the URL or the secret empty is put to it
+/// before it is saved, and refused with the engine's reason when it fails.
+async fn vet_new_client(
+    manager: Arc<DownloadManager>,
+    row: DownloadClientRow,
+) -> Result<DownloadClientRow, Response> {
+    if !looks_incomplete(&row) {
+        return Ok(row);
+    }
+    let tried = blocking(move || {
+        let outcome = manager.engine_for(&row).and_then(|engine| engine.test());
+        Ok((row, outcome))
+    })
+    .await?;
+    match tried {
+        (row, Ok(_)) => Ok(row),
+        (_, Err(error)) => Err(json_error(StatusCode::BAD_REQUEST, &format!("{error:#}"))),
+    }
 }
 
 /// `PUT /download-clients/:id` partial update (kind is immutable;
@@ -203,10 +232,7 @@ pub async fn remove<S: HostStorage + Clone + Send + Sync + 'static>(
 ) -> Result<Response, Response> {
     state.require(&user, Permission::SettingsManage)?;
     if id == EMBEDDED_CLIENT_ID {
-        return Err(json_error(
-            StatusCode::BAD_REQUEST,
-            "the embedded engine cannot be deleted",
-        ));
+        return Err(state.lerr(&user, StatusCode::BAD_REQUEST, "error.embeddedClientPermanent"));
     }
     let deleted = query(state.store(), move |pool| {
         db::delete_download_client(&pool, &id)
@@ -254,3 +280,6 @@ pub async fn test<S: HostStorage + Clone + Send + Sync + 'static>(
         None => Err(state.lerr(&user, StatusCode::NOT_FOUND, "error.clientNotFound")),
     }
 }
+
+#[cfg(test)]
+mod tests;

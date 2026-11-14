@@ -3,32 +3,49 @@
 //! regular scan/enrich/pipeline takes over. Hardlink first (the torrent keeps
 //! seeding from its download folder for free), copy across filesystems.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 
 use crate::peers::downloads::DownloadRow;
 use kroma_module_sdk::db;
-use kroma_module_sdk::domain::RequestKind;
+use kroma_module_sdk::host::HostStorage;
 use kroma_module_sdk::primitives::now_ms;
-use kroma_module_sdk::host::{HostStorage, LibraryFolders};
 
+mod claim;
 mod content;
 mod ledger;
 mod naming;
 mod place;
 mod recycle;
+mod remote;
 mod replace;
+mod row;
 mod subtitles;
 
 pub use recycle::empty_recycle_bin;
+pub use row::{Landing, Placed};
 
-use content::{is_gone, is_held, largest, Content, FilesGone};
+use content::FilesGone;
 use ledger::{until_it_lands, BUSY_BACKOFF};
-use naming::{episode_ctx, movie_ctx, resolve_meta, stem_of};
-use place::{ext_of, Placement};
-use replace::drop_replaced;
-use subtitles::place_with_subtitles;
+use row::{place_row, Replaced};
+
+/// Takes files this module wrote out of the library again, each through the
+/// recycle bin when one is set. Only the exact paths given go: a subtitle or a
+/// video that was already there is never found by looking beside them.
+pub fn retire_written(host: &dyn kroma_module_sdk::host::HostCtx, paths: &[String]) -> usize {
+    paths
+        .iter()
+        .filter(|path| match recycle::retire(host, Path::new(path)) {
+            Ok(_) => true,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+            Err(e) => {
+                tracing::warn!(file = %path, "a rejected file stayed behind: {e}");
+                false
+            }
+        })
+        .count()
+}
 
 #[derive(Debug, Default)]
 pub struct ImportSummary {
@@ -37,7 +54,7 @@ pub struct ImportSummary {
     pub failed: usize,
 }
 
-fn finalize_import<S: HostStorage>(state: &S, row: &DownloadRow, written: &[String]) {
+pub(crate) fn finalize_import<S: HostStorage>(state: &S, row: &DownloadRow, written: &[String]) {
     use kroma_module_sdk::requests::lifecycle::{on_download_imported, Imported};
     if row.tmdb_id != 0 {
         let imported = Imported {
@@ -90,6 +107,12 @@ pub fn import_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<Im
     let ready = crate::peers::downloads::completed(state)?;
     let mut summary = ImportSummary::default();
     for row in ready {
+        if crate::watch_now::is_held_for_watch_now(state, &row) {
+            continue;
+        }
+        let Some(_claim) = claim::Claim::take(state.store(), &row.id) else {
+            continue;
+        };
         match import_one(state, &row) {
             Ok(paths) => {
                 log(format!(
@@ -99,14 +122,9 @@ pub fn import_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<Im
                 ));
                 summary.imported += 1;
                 summary.files += paths.len();
-                let marked = until_it_lands(&BUSY_BACKOFF, "mark imported", || {
-                    crate::peers::downloads::mark_imported(state, &row.id, &paths, now_ms())
-                });
-                if let Err(e) = marked {
+                if let Err(e) = record_import(state, &row, &paths) {
                     tracing::warn!(download = %row.id, error = %format!("{e:#}"), "could not mark the download imported");
-                    continue;
                 }
-                finalize_import(state, &row, &paths);
             }
             Err(e) => {
                 log(format!(
@@ -114,17 +132,7 @@ pub fn import_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<Im
                     row.release_title
                 ));
                 summary.failed += 1;
-                let status = if e.is::<FilesGone>() {
-                    "removed"
-                } else {
-                    "completed"
-                };
-                crate::peers::downloads::set_status(
-                    state,
-                    &row.id,
-                    status,
-                    Some(&format!("import: {e:#}")),
-                )?;
+                refuse_import(state, &row, &e)?;
             }
         }
     }
@@ -134,135 +142,90 @@ pub fn import_pass<S: HostStorage>(state: &S, log: &dyn Fn(String)) -> Result<Im
     Ok(summary)
 }
 
+fn record_import<S: HostStorage>(state: &S, row: &DownloadRow, paths: &[String]) -> Result<()> {
+    until_it_lands(&BUSY_BACKOFF, "mark imported", || {
+        crate::peers::downloads::mark_imported(state, &row.id, paths, now_ms())
+    })?;
+    finalize_import(state, row, paths);
+    Ok(())
+}
+
+fn refuse_import<S: HostStorage>(state: &S, row: &DownloadRow, error: &anyhow::Error) -> Result<()> {
+    let status = if error.is::<FilesGone>() {
+        "removed"
+    } else {
+        "completed"
+    };
+    crate::peers::downloads::set_status(state, &row.id, status, Some(&format!("import: {error:#}")))?;
+    Ok(())
+}
+
 fn import_one<S: HostStorage>(state: &S, row: &DownloadRow) -> Result<Vec<String>> {
-    let save_path = row
-        .save_path
-        .as_deref()
-        .ok_or_else(|| anyhow!("download folder unknown (external client did not report it)"))?;
-    if !is_held(Path::new(save_path)) {
-        bail!(
-            "{save_path} is in no folder the download modules may open: add it to Download folders under Admin > Acquisition, or mount its drive if it is listed there already"
-        );
-    }
-    if is_gone(Path::new(save_path)) {
-        return Err(FilesGone(save_path.to_string()).into());
-    }
-    let meta = resolve_meta(state, row)?;
-
-    let content = Content::under(Path::new(save_path), &row.content_rel_paths);
-    let videos = content.videos();
-    let Some(largest_video) = largest(&videos) else {
-        bail!("no video file found under {save_path}");
-    };
-
-    let lib = target_library_def(state, meta.kind)?;
-    let lib_root = PathBuf::from(
-        lib.folders
-            .first()
-            .ok_or_else(|| anyhow!("library {} has no folder", lib.name))?,
-    );
-    let tpl = kroma_naming::NamingTemplates::read(|k, d| state.setting_str(k, d));
-    let replacing = row.upgrade
-        && state.setting_bool("acqReplaceOnUpgrade", true)
-        && !crate::rules::store::is_beside(state.store(), &row.id)?;
-    let mode = match (row.upgrade, replacing) {
-        (true, true) => Placement::Replace,
-        (true, false) => Placement::Beside,
-        (false, _) => Placement::Skip,
-    };
-    // A replaced episode is only known once its number is, and what it replaces
-    // depends on where the new file landed: collect both as they are placed.
-    let mut placed: Vec<(Replaced, String)> = Vec::new();
-    match row.kind.as_str() {
-        "movie" => {
-            let ctx = movie_ctx(&meta, largest_video);
-            let dest = lib_root.join(tpl.movie_rel_path(&ctx, ext_of(largest_video)));
-            let at = place_with_subtitles(state, largest_video, content.files(), &dest, mode)?;
-            placed.push((Replaced::Movie, at.to_string_lossy().into_owned()));
-        }
-        "episode" => {
-            let parsed = kroma_scene::parse_release_name(stem_of(largest_video));
-            let episode = row
-                .episodes
-                .as_ref()
-                .and_then(|e| e.first().copied())
-                .or(parsed.episode)
-                .ok_or_else(|| anyhow!("could not determine the episode number"))?;
-            let season = row.season.or(parsed.season).unwrap_or(1);
-            let ctx = episode_ctx(&meta, season, episode, &parsed);
-            let dest = lib_root.join(tpl.episode_rel_path(&ctx, ext_of(largest_video)));
-            let at = place_with_subtitles(state, largest_video, content.files(), &dest, mode)?;
-            placed.push((
-                Replaced::Episode(season, episode),
-                at.to_string_lossy().into_owned(),
-            ));
-        }
-        "season" => {
-            let mut skipped_other_season = 0usize;
-            for src in &videos {
-                let parsed = kroma_scene::parse_release_name(stem_of(src));
-                let Some(episode) = parsed.episode else {
-                    tracing::debug!(file = %src.display(), "season pack: no episode marker, skipped");
-                    continue;
-                };
-                let season = parsed.season.or(row.season).unwrap_or(1);
-                // A mixed or complete-series pack carries episodes the grab was
-                // not for, and whose upgrade verdict was never computed.
-                if row.season.is_some_and(|want| want != season) {
-                    skipped_other_season += 1;
-                    tracing::debug!(
-                        file = %src.display(),
-                        season,
-                        "season pack: file from another season, skipped"
-                    );
-                    continue;
-                }
-                let ctx = episode_ctx(&meta, season, episode, &parsed);
-                let dest = lib_root.join(tpl.episode_rel_path(&ctx, ext_of(src)));
-                let at = place_with_subtitles(state, src, content.files(), &dest, mode)?;
-                placed.push((
-                    Replaced::Episode(season, episode),
-                    at.to_string_lossy().into_owned(),
-                ));
-            }
-            if placed.is_empty() {
-                if skipped_other_season > 0 {
-                    bail!("season pack held no episode of season {:?}", row.season);
-                }
-                bail!("season pack had no files with parsable episode numbers");
-            }
-        }
-        other => bail!("unknown download kind {other:?}"),
-    }
-    if replacing {
-        drop_replaced(state, row, &placed, &lib.id);
-    }
-    Ok(placed.into_iter().map(|(_, at)| at).collect())
+    Ok(place_row(state, row)?
+        .videos
+        .into_iter()
+        .map(|p| p.path)
+        .collect())
 }
 
-// What an upgrade just improved, resolved to file paths after the new ones land.
-enum Replaced {
-    Movie,
-    Episode(u32, u32),
+/// Places one `completed` download's files for a watch-now, without telling
+/// the ledger or the request anything: that is [`finalize_placed`]'s job once
+/// the caller has judged the file. Says where each file landed, and which of
+/// them this call wrote. `None` when the import pass, or another call, holds
+/// the download. Failures land on the row like the pass's do.
+pub fn place_download<S: HostStorage>(
+    state: &S,
+    download_id: &str,
+) -> Result<Option<(DownloadRow, Landing)>> {
+    let Some(claim) = claim::Claim::take(state.store(), download_id) else {
+        return Ok(None);
+    };
+    let row = crate::peers::downloads::completed(state)?
+        .into_iter()
+        .find(|row| row.id == download_id)
+        .ok_or_else(|| anyhow!("download {download_id} is not waiting to be imported"))?;
+    let landing = match place_row(state, &row) {
+        Ok(landing) => landing,
+        Err(e) => {
+            refuse_import(state, &row, &e)?;
+            return Err(e);
+        }
+    };
+    drop(claim);
+    state.trigger_job("library.scan", "acquisition-import");
+    Ok(Some((row, landing)))
 }
 
-fn target_library_def<S: HostStorage>(state: &S, kind: RequestKind) -> Result<LibraryFolders> {
-    let defs = state.library_folders();
-    if defs.is_empty() {
-        bail!("no library configured");
-    }
-    let (setting, wanted_kind) = match kind {
-        RequestKind::Movie => ("acqMovieLibrary", "movies"),
-        RequestKind::Show => ("acqSeriesLibrary", "shows"),
-    };
-    let preferred = state.setting_str(setting, "Auto");
-    let def: &LibraryFolders = defs
-        .iter()
-        .find(|d| preferred != "Auto" && !preferred.is_empty() && d.name == preferred)
-        .or_else(|| defs.iter().find(|d| d.kind == wanted_kind))
-        .or_else(|| defs.first())
-        .ok_or_else(|| anyhow!("no library configured"))?;
-    Ok(def.clone())
+/// What a download recorded as imported: the files and nothing else, read back
+/// for a download another import already finished.
+pub fn recorded_paths<S: HostStorage>(state: &S, download_id: &str) -> Result<Option<Vec<String>>> {
+    let conn = state.db().get()?;
+    let found: Option<(String, Option<String>)> = conn
+        .query_row(
+            "SELECT status, imported_paths FROM downloads WHERE id = ?1",
+            [download_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .ok();
+    Ok(found.and_then(|(status, paths)| {
+        (status == "imported")
+            .then(|| paths.and_then(|text| serde_json::from_str(&text).ok()))
+            .flatten()
+    }))
+}
+
+/// Records a placed download as imported and tells the request: available,
+/// notified, ledgered.
+pub fn finalize_placed<S: HostStorage>(state: &S, row: &DownloadRow, paths: &[String]) -> Result<()> {
+    record_import(state, row, paths)
+}
+
+#[cfg(test)]
+pub(crate) fn hold_for_test<'a>(
+    store: &'a kroma_module_sdk::db::Pool,
+    download_id: &str,
+) -> impl Drop + 'a {
+    claim::Claim::take(store, download_id).expect("a free claim")
 }
 
 #[cfg(test)]

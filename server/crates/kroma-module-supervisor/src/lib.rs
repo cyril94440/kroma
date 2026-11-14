@@ -265,6 +265,17 @@ impl Supervisor {
         &self.cfg.host_token
     }
 
+    /// The `config` field `key` of `id`'s manifest, `None` when `id` is not
+    /// installed or declares no such field.
+    pub fn config_field(&self, id: &str, key: &str) -> Option<kroma_module_manifest::ConfigField> {
+        self.installed_manifests()
+            .into_iter()
+            .find(|m| m.id == id)?
+            .config
+            .into_iter()
+            .find(|field| field.key == key)
+    }
+
     /// What `id` declared under `settings`, or `None` when it declared nothing,
     /// which reaches no setting.
     pub fn settings_scope(&self, id: &str) -> Option<kroma_module_manifest::SettingsScope> {

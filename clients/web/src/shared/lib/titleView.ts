@@ -17,7 +17,7 @@ import type {
   VideoTrack,
 } from '@kromatv/client/media';
 import type { RequestStatus } from '@kromatv/client/requests';
-import { directorsOf, formatRuntime, genreLabels } from '@kromatv/core';
+import { directorsOf, formatRuntime, genreLabels, offersWatchNow } from '@kromatv/core';
 import type { Translate } from '@kromatv/i18n';
 import { imageUrl } from '#web/shared/lib/api';
 
@@ -72,6 +72,7 @@ export interface TitleView {
   requestStatus: RequestStatus | null;
   requestProgress: number | null;
   canRequest: boolean;
+  watchNow: boolean;
   similar: SimilarTarget[];
 }
 
@@ -141,6 +142,7 @@ export function buildTitleView(
       requestStatus: discover?.requestStatus ?? null,
       requestProgress: discover?.requestProgress ?? null,
       canRequest: false,
+      watchNow: false,
       similar: movieSimilarTargets(c, t, similar),
     };
   }
@@ -183,6 +185,7 @@ export function buildTitleView(
       requestStatus: discover?.requestStatus ?? null,
       requestProgress: discover?.requestProgress ?? null,
       canRequest: canReq(meta?.tmdbId ?? null, discover != null),
+      watchNow: false,
       similar: similarShows.map((s) => ({
         key: s.id,
         title: s.title,
@@ -231,6 +234,7 @@ export function buildTitleView(
     requestStatus: d.requestStatus,
     requestProgress: d.requestProgress,
     canRequest: canReq(d.tmdbId, true),
+    watchNow: offersWatchNow(user, d.watchNow) && canReq(d.tmdbId, true),
     similar: d.similar.map((e: DiscoverEntry) => ({
       key: e.inLibrary && e.localId ? e.localId : `tmdb:${e.tmdbId}`,
       title: e.title,

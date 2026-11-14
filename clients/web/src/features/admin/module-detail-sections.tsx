@@ -188,6 +188,7 @@ export function ModuleSettings({
           moduleId={module.id}
           fields={fields}
           values={module.configValues}
+          locales={module.configLocales}
           onSaved={onSaved}
         />
       )}

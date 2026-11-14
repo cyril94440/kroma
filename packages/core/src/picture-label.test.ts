@@ -1,6 +1,7 @@
 import type { VideoTrack } from '@kromatv/client/media';
 import { describe, expect, it } from 'vitest';
-import { hdrLabel, pictureBadge, pictureFormat } from './picture-label';
+import { hdrLabel } from './hdr-label';
+import { pictureBadge, pictureFormat } from './picture-label';
 
 const picture = (over: Partial<VideoTrack> = {}): VideoTrack => ({
   codec: 'hevc',

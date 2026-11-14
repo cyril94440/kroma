@@ -53,6 +53,13 @@ pub(super) fn sample(event: NotificationEvent, admin: &str) -> NotificationSpec 
         .link("/")
         .push_category(PushCategory::MediaAvailable)
         .action(link_action("watch", "notifications.action.watch", "/")),
+        NotificationEvent::RequestFailed => NotificationSpec::new(
+            event,
+            "notifications.request.failed.title",
+            "notifications.request.failed.body",
+        )
+        .param("title", film)
+        .link("/requests"),
         NotificationEvent::MediaAdded => NotificationSpec::new(
             event,
             "notifications.media.added.title",

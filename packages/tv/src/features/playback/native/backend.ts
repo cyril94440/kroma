@@ -55,6 +55,7 @@ export function planEngine(
   _env: PlayEnv,
   pref: EnginePref,
   playbackCapabilities?: PlaybackCapabilities,
+  audioIndex?: number,
 ): EnginePlan {
   const os = nativePlayerOs();
   // A picture over this device's decoder ceiling can only arrive smaller than it
@@ -75,13 +76,11 @@ export function planEngine(
       rebuildKey: 'vlc',
     };
   }
-  const direct = pref !== 'remux' && !oversized && nativeDirectPlayable(item, os);
+  const direct = pref !== 'remux' && !oversized && nativeDirectPlayable(item, os, audioIndex);
   const eng: Engine = direct ? 'expo-direct' : 'expo-remux';
   return {
     eng,
     surface: 'video',
-    // The native players decode AC-3 / E-AC-3, so the server's master is
-    // stream-copied and the audio is never re-encoded (never 'transcode').
     playbackMode: direct ? 'direct' : 'remux',
     // A native build knows what it is running on; there is no user-agent to
     // sniff (and no `navigator` at all).

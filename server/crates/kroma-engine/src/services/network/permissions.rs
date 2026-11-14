@@ -19,6 +19,25 @@ pub type DeclaredListeners = Arc<dyn Fn() -> Vec<Listen> + Send + Sync>;
 pub const PERMISSION_NET_CONNECT: &str = "permission:net.connect";
 
 impl Network {
+    /// Whether `caller` declared a `net.connect` entry, for any purpose, that
+    /// reaches `target`. A module with no block declares nothing to refuse.
+    pub fn declares_connect(&self, caller: &str, target: &WebTarget) -> bool {
+        let Some(declared) = (self.declared)(caller) else {
+            return true;
+        };
+        let named = |key: &str| hosts_named(&self.settings.get(key));
+        declared.net.connect.iter().any(|entry| {
+            let attempt = Attempt {
+                purpose: &entry.purpose,
+                host: &target.host,
+                host_is_local: target.is_local(),
+                port: target.port,
+                proto: Proto::Tcp,
+            };
+            declared.connect_reach(&attempt, &named).is_some()
+        })
+    }
+
     /// How far `caller` may reach for `purpose` at `target`, or the refusal that
     /// names what it did not declare. A module with no block reaches as it did
     /// before the block existed.

@@ -86,6 +86,11 @@ pub fn build(
         })
     };
 
+    let source_roots: kroma_engine::services::source::SourceRoots = {
+        let supervisor = supervisor.clone();
+        Arc::new(move |id: &str| supervisor.data_dirs_of(id))
+    };
+
     let network_listeners = {
         let settings = settings.clone();
         supervisor.listeners_of(move |id| kroma_engine::modules::module_enabled(&settings, id))
@@ -119,6 +124,7 @@ pub fn build(
             permissions,
             network_providers,
             network_listeners,
+            source_roots,
         },
     );
     if let Err(e) = state.network.install() {

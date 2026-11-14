@@ -70,6 +70,41 @@ pub fn acquired_file_present(conn: &Connection, tmdb_id: u64) -> rusqlite::Resul
     )
 }
 
+/// The items that play a title right now, as `(item_id, library)`: a movie, or
+/// one `(season, episode)` of a show. A title counts when enrichment matched it or
+/// when an import pinned its id to one of the item's files, because a file is
+/// playable well before enrichment has run.
+pub fn playable_items(
+    conn: &Connection,
+    tmdb_id: u64,
+    episode: Option<(u32, u32)>,
+) -> rusqlite::Result<Vec<(String, String)>> {
+    let tmdb = tmdb_id as i64;
+    let (sql, bound): (&str, Vec<i64>) = match episode {
+        None => (
+            "SELECT i.id, i.library FROM metadata_core c JOIN items i ON i.id = c.subject_id \
+             WHERE c.subject_kind = 'item' AND c.tmdb_id = ?1 AND i.kind IN ('movie', 'video') \
+             UNION \
+             SELECT i.id, i.library FROM acq_file_tmdb a JOIN files f ON f.abs_path = a.abs_path \
+             JOIN items i ON i.id = f.item_id WHERE a.tmdb_id = ?1 AND i.kind IN ('movie', 'video')",
+            vec![tmdb],
+        ),
+        Some((season, episode)) => (
+            "SELECT i.id, i.library FROM metadata_core c JOIN items i ON i.show_id = c.subject_id \
+             WHERE c.subject_kind = 'show' AND c.tmdb_id = ?1 AND i.kind = 'episode' \
+               AND i.season = ?2 AND i.episode = ?3 \
+             UNION \
+             SELECT i.id, i.library FROM acq_file_tmdb a JOIN files f ON f.abs_path = a.abs_path \
+             JOIN items i ON i.id = f.item_id WHERE a.tmdb_id = ?1 AND i.kind = 'episode' \
+               AND i.season = ?2 AND i.episode = ?3",
+            vec![tmdb, i64::from(season), i64::from(episode)],
+        ),
+    };
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt.query_map(rusqlite::params_from_iter(bound), |r| Ok((r.get(0)?, r.get(1)?)))?;
+    rows.collect()
+}
+
 /// Every movie item that has an acquisition TMDB hint, keyed by item id. Loaded
 /// once per enrichment run instead of a per-item query (the table is empty on a
 /// library that never used the built-in acquisition).
@@ -133,6 +168,35 @@ mod tests {
             params![format!("f-{item_id}"), item_id, abs_path],
         )
         .unwrap();
+    }
+
+    #[test]
+    fn a_pinned_movie_file_plays_before_enrichment_has_matched_it() {
+        let p = pool();
+        seed_movie(&p, "m1", "/lib/a.mkv");
+        set_file_tmdb(&p, "/lib/a.mkv", 603).unwrap();
+        let conn = p.get().unwrap();
+
+        let found = playable_items(&conn, 603, None).unwrap();
+
+        assert_eq!(found, [("m1".to_string(), "lib".to_string())]);
+        assert!(playable_items(&conn, 604, None).unwrap().is_empty());
+        assert!(playable_items(&conn, 603, Some((1, 1))).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_pinned_episode_file_is_found_by_its_season_and_episode_only() {
+        let p = pool();
+        seed_movie(&p, "e1", "/lib/s01e01.mkv");
+        let conn = p.get().unwrap();
+        conn.execute("UPDATE items SET kind = 'episode', season = 1, episode = 1 WHERE id = 'e1'", []).unwrap();
+        drop(conn);
+        set_file_tmdb(&p, "/lib/s01e01.mkv", 42).unwrap();
+        let conn = p.get().unwrap();
+
+        assert_eq!(playable_items(&conn, 42, Some((1, 1))).unwrap().len(), 1);
+        assert!(playable_items(&conn, 42, Some((1, 2))).unwrap().is_empty());
+        assert!(playable_items(&conn, 42, None).unwrap().is_empty());
     }
 
     #[test]

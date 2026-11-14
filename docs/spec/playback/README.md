@@ -26,9 +26,15 @@ A file direct-plays when **all** of the following hold:
 - **PLAY-2** (AGREED) - The client declares it can demux the **container**
   ([`surfaces/`](../surfaces/)).
 - **PLAY-3** (AGREED) - The client can decode the **video stream**, meaning codec, profile,
-  level, bit depth and HDR variant, in hardware, as declared for that device generation.
+  level, bit depth and HDR variant, in hardware, as declared for that device generation. On a
+  stream request a client may declare the HDR systems its display shows as `hdr=` (`hdr10`,
+  `hdr10plus`, `hlg`, `dv`; empty means SDR only; absent means undeclared, and the request
+  stands). The server then re-encodes, tone-mapped and no larger than 1080p, a source the
+  display cannot show.
 - **PLAY-4** (AGREED) - Every **audio stream the person might select** is decodable by the
-  client at its native channel layout, or is passthrough-capable to a connected receiver.
+  client at its native channel layout, or is passthrough-capable to a connected receiver. A
+  copy is always preferred when the client declares the codec; otherwise a surround track is
+  re-encoded to E-AC-3 or AC-3 5.1 when the client declares one, else to stereo AAC.
 - **PLAY-5** (AGREED) - The chosen **subtitle**, if any, is either a format the client renders
   itself or a sidecar it can fetch alongside.
 - **PLAY-6** (AGREED) - The **link** sustains the file's peak bitrate. On a local network this
@@ -64,7 +70,8 @@ change on another stream would do.
 - **PLAY-14** (SHIPPED) - Rung 5, **video transcode**, the last resort. The video stream is
   re-encoded to a codec, profile and bitrate the client can decode, downscaling resolution and
   tone-mapping HDR to SDR only as far as required. This rung always loses quality and costs
-  the server real work.
+  the server real work: a tone-map on the CPU counts for two of the host's re-encode slots, and
+  a 4K source on a host of four cores or fewer is served at 720p, the size it can keep up with.
 
 **PLAY-15** (AGREED) - KROMA takes the highest rung that satisfies the client and does not
 skip rungs for convenience. If remux suffices it remuxes; it does not transcode because a
@@ -110,7 +117,10 @@ than a buried log line.
 **PLAY-25** (AGREED) - KROMA never re-encodes video to save bandwidth unless the device
 profile forces it.
 
-**PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so.
+**PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so. The server tone-maps
+every HDR re-encode it can, so the notice is the client's to show. Dolby Vision profile 7
+reaches a client over HLS as its HDR10 base layer, and profile 5 as Dolby Vision only where
+the client declared `dv`.
 
 **PLAY-27** (AGREED) - KROMA never burns in subtitles the person did not ask to see.
 
@@ -241,6 +251,22 @@ never blames the person and never implies the file is broken.
 > web apps, or ask the server owner to enable conversion for this device.
 
 The file is fine; this screen just cannot decode it.
+
+## Streamed titles
+
+Status: **SHIPPED**.
+
+A title that is a [remote file](../media/#remote-files) plays without the client knowing.
+
+- **PLAY-61** (SHIPPED) - Direct play of a remote file serves the original bytes with the
+  same `200`, `206`, `Content-Length` and `Content-Range` a stored file would, honouring
+  open-ended, bounded and past-the-end ranges, and stops reading from the source the
+  moment the client goes away.
+- **PLAY-62** (SHIPPED) - Opening a remote file for playback asks its source to start
+  caching a complete local copy, and once there is one the same requests are served from it.
+- **PLAY-63** (SHIPPED) - A transcode, a remux and an offline download of a remote file
+  read it from its link or its local copy, resolved again each time a session starts or
+  seeks, so a link that has expired is never reused.
 
 ## Trailers
 

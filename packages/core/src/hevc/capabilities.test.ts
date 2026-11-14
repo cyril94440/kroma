@@ -15,7 +15,9 @@ import {
   decodableAudioCodecs,
   decodableVideoCodecs,
   detectCapabilities,
+  deviceDeclaration,
   type HdrCapabilities,
+  hdrDeclaration,
   type PlaybackCapabilities,
 } from './capabilities';
 
@@ -23,7 +25,7 @@ type G = Record<string, unknown>;
 const g = globalThis as unknown as G;
 
 afterEach(() => {
-  for (const k of ['tizen', 'webOS', 'MediaSource', 'matchMedia', 'document']) {
+  for (const k of ['tizen', 'webOS', 'webapis', 'MediaSource', 'matchMedia', 'document']) {
     delete g[k];
   }
 });
@@ -118,7 +120,7 @@ describe('detectCapabilities (node baseline: no DOM, no MediaSource)', () => {
 });
 
 describe('detectCapabilities (TV platforms)', () => {
-  it('treats Tizen as fully hardware-capable (platform-tv)', () => {
+  it('treats Tizen as hardware-capable with no Dolby Vision (platform-tv)', () => {
     g.tizen = {};
     const caps = detectCapabilities();
     expect(caps.source).toBe('platform-tv');
@@ -129,14 +131,85 @@ describe('detectCapabilities (TV platforms)', () => {
       h26410bit: false,
       av1: false,
       vp9: true,
-      hdr: { hdr10: true, hdr10Plus: true, dolbyVision: true, hlg: true },
+      hdr: { hdr10: true, hdr10Plus: true, dolbyVision: false, hlg: true },
     });
     expect(caps.audio).toMatchObject({ aac: true, ac3: true, eac3: true, dts: true, truehd: true });
   });
 
-  it('treats webOS as platform-tv', () => {
+  it('treats webOS as platform-tv with Dolby Vision and no HDR10+', () => {
     g.webOS = {};
-    expect(detectCapabilities().source).toBe('platform-tv');
+    const caps = detectCapabilities();
+    expect(caps.source).toBe('platform-tv');
+    expect(caps.hdr).toEqual({ hdr10: true, hdr10Plus: false, dolbyVision: true, hlg: true });
+  });
+
+  it('declares an SDR display on a Tizen set that reports no HDR panel', () => {
+    g.tizen = {};
+    g.webapis = { avinfo: { isHdrTvSupport: () => false } };
+    const caps = detectCapabilities();
+    expect(caps.hdr).toEqual({ hdr10: false, hdr10Plus: false, dolbyVision: false, hlg: false });
+    expect(hdrDeclaration(caps)).toEqual([]);
+  });
+
+  it('keeps the Tizen table when the HDR query is missing or throws', () => {
+    g.tizen = {};
+    g.webapis = {
+      avinfo: {
+        isHdrTvSupport: () => {
+          throw new Error('denied');
+        },
+      },
+    };
+    expect(detectCapabilities().hdr.hdr10).toBe(true);
+    g.webapis = {};
+    expect(detectCapabilities().hdr.hdr10).toBe(true);
+  });
+
+  it('declares each TV platform its own HDR systems to the server', () => {
+    g.tizen = {};
+    expect(hdrDeclaration(detectCapabilities())).toEqual(['hdr10', 'hdr10plus', 'hlg']);
+    delete g.tizen;
+    g.webOS = {};
+    expect(hdrDeclaration(detectCapabilities())).toEqual(['hdr10', 'hlg', 'dv']);
+  });
+});
+
+describe('hdrDeclaration', () => {
+  it('says nothing for a table that is a guess, so the server behaves as before', () => {
+    expect(hdrDeclaration(videoCaps({ hdr: { ...NO_HDR, hdr10: true } }))).toBeUndefined();
+  });
+
+  it('names every system the display shows, and an empty list for a declared SDR display', () => {
+    const declared = (hdr: HdrCapabilities) => videoCaps({ hdr, hdrDeclared: true });
+    expect(
+      hdrDeclaration(declared({ hdr10: true, hdr10Plus: true, dolbyVision: true, hlg: true })),
+    ).toEqual(['hdr10', 'hdr10plus', 'hlg', 'dv']);
+    expect(hdrDeclaration(declared(NO_HDR))).toEqual([]);
+  });
+
+  it('declares dv only for HEVC Dolby Vision, never for an AV1-only decoder', () => {
+    const declared = (profiles: number[]) =>
+      videoCaps({
+        hdr: {
+          hdr10: true,
+          hdr10Plus: false,
+          hlg: true,
+          dolbyVision: true,
+          dolbyVisionProfiles: profiles,
+        },
+        hdrDeclared: true,
+      });
+    expect(hdrDeclaration(declared([10]))).toEqual(['hdr10', 'hlg']);
+    expect(hdrDeclaration(declared([10, 8]))).toEqual(['hdr10', 'hlg', 'dv']);
+    expect(hdrDeclaration(declared([5]))).toEqual(['hdr10', 'hlg', 'dv']);
+  });
+
+  it('is what a stream request carries beside the codec lists', () => {
+    g.tizen = {};
+    const declaration = deviceDeclaration(detectCapabilities());
+    expect(declaration.hdr).toEqual(['hdr10', 'hdr10plus', 'hlg']);
+    expect(declaration.copyCodecs).toContain('eac3');
+    expect(declaration.videoCodecs).toContain('hevc');
   });
 });
 
@@ -154,6 +227,23 @@ describe('detectCapabilities (React Native)', () => {
       mp3: true,
       vorbis: true,
     });
+  });
+
+  it('declares tvOS and Android TV the HDR systems that hold for any set, and no Dolby Vision', () => {
+    const declared = ['hdr10', 'hdr10plus', 'hlg'];
+    expect(asReactNative('ios', () => hdrDeclaration(detectCapabilities()))).toEqual(declared);
+    expect(asReactNative('android', () => hdrDeclaration(detectCapabilities()))).toEqual(declared);
+  });
+
+  it('copies only what an fMP4 carries on every TV engine table, never TrueHD or DTS', () => {
+    expect(
+      asReactNative('android', () => deviceDeclaration(detectCapabilities()).copyCodecs),
+    ).toEqual(['aac', 'ac3', 'eac3']);
+    expect(asReactNative('ios', () => deviceDeclaration(detectCapabilities()).copyCodecs)).toEqual([
+      'aac',
+      'ac3',
+      'eac3',
+    ]);
   });
 
   it('keeps DTS and TrueHD on Android, which bundles the ffmpeg decoders', () => {
@@ -324,6 +414,29 @@ describe('detectCapabilities (browser detection paths)', () => {
   it('reports no HDR when neither query matches', () => {
     g.matchMedia = () => ({ matches: false });
     expect(detectCapabilities().hdr).toEqual(NO_HDR);
+  });
+
+  it('declares a browser display to the server only when the panel is HDR', () => {
+    g.matchMedia = () => ({ matches: true });
+    expect(hdrDeclaration(detectCapabilities())).toEqual(['hdr10', 'hlg']);
+    g.matchMedia = () => ({ matches: false });
+    expect(hdrDeclaration(detectCapabilities())).toBeUndefined();
+  });
+
+  it('probes every Dolby Vision profile, with both sample entries, and names the ones taken', () => {
+    g.matchMedia = () => ({ matches: true });
+    g.MediaSource = {
+      isTypeSupported: (t: string) => t.includes('dvhe.08') || t.includes('dvh1.05'),
+    };
+    const caps = detectCapabilities();
+    expect(caps.hdr.dolbyVision).toBe(true);
+    expect(caps.hdr.dolbyVisionProfiles).toEqual([5, 8]);
+    expect(hdrDeclaration(caps)).toEqual(['hdr10', 'hlg', 'dv']);
+  });
+
+  it('claims no Dolby Vision profile a runtime does not name', () => {
+    g.MediaSource = { isTypeSupported: (t: string) => t.includes('dvh1.08') };
+    expect(detectCapabilities().hdr.dolbyVisionProfiles).toEqual([8]);
   });
 
   it('probes Dolby Vision like a codec, because it needs a decoder and not a panel', () => {

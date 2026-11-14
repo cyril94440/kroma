@@ -44,21 +44,21 @@ fn walk_threads_default_range_and_env_override() {
     std::env::remove_var("KROMA_WALK_THREADS");
 }
 
-fn temp_scan_dir() -> kroma_testing::TempDir {
+pub(super) fn temp_scan_dir() -> kroma_testing::TempDir {
     kroma_testing::temp_dir("scanroot")
 }
 
-struct ScanOutcome {
-    items: HashMap<String, MediaItem>,
-    shows: HashMap<String, Show>,
-    mtimes: HashMap<String, Option<i64>>,
-    item_ids: HashSet<String>,
-    movie_seen: bool,
-    episode_seen: bool,
-    unreadable: usize,
+pub(super) struct ScanOutcome {
+    pub(super) items: HashMap<String, MediaItem>,
+    pub(super) shows: HashMap<String, Show>,
+    pub(super) mtimes: HashMap<String, Option<i64>>,
+    pub(super) item_ids: HashSet<String>,
+    pub(super) movie_seen: bool,
+    pub(super) episode_seen: bool,
+    pub(super) unreadable: usize,
 }
 
-fn scan_into(lib_id: &str, root: &Path) -> ScanOutcome {
+pub(super) fn scan_into(lib_id: &str, root: &Path) -> ScanOutcome {
     let mut items = HashMap::new();
     let mut shows = HashMap::new();
     let mut mtimes = HashMap::new();

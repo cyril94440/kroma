@@ -25,12 +25,27 @@ pub fn create_request<S: HostStorage>(
     user: &User,
     body: &CreateRequestBody,
 ) -> Result<MediaRequest> {
-    let key = tmdb_key(state)?;
-    let lang = language(state);
-    let detail = discover::detail(&key, &lang, body.kind, body.tmdb_id)
-        .map_err(|()| anyhow!("TMDB lookup failed"))?
-        .ok_or_else(|| anyhow!("title not found on TMDB"))?;
+    create_with(state, &user.id, Some(user), body)
+}
 
+/// [`create_request`] for a requester whose title is fetched at once: the
+/// request is approved whatever the requester holds, and no moderator is told
+/// about it. The caller has already decided the requester may skip review.
+pub fn create_approved<S: HostStorage>(
+    state: &S,
+    requester_id: &str,
+    body: &CreateRequestBody,
+) -> Result<MediaRequest> {
+    create_with(state, requester_id, None, body)
+}
+
+fn create_with<S: HostStorage>(
+    state: &S,
+    requester_id: &str,
+    reviewed_as: Option<&User>,
+    body: &CreateRequestBody,
+) -> Result<MediaRequest> {
+    let approve = reviewed_as.is_none_or(|user| user.can(Permission::RequestsAuto));
     let asked_seasons: Option<Vec<u32>> = match body.kind {
         RequestKind::Movie => None,
         RequestKind::Show => body.seasons.clone().filter(|s| !s.is_empty()).map(|mut s| {
@@ -50,14 +65,20 @@ pub fn create_request<S: HostStorage>(
         if body.kind == RequestKind::Show {
             merge_show_request(state, &existing, asked_seasons, asked_episodes)?;
         }
-        if existing.status == RequestStatus::Pending && user.can(Permission::RequestsAuto) {
-            approve_request(state, &existing.id, Some(&user.id))?;
+        if existing.status == RequestStatus::Pending && approve {
+            approve_request(state, &existing.id, Some(requester_id))?;
         }
         let conn = state.db().get()?;
         return db::get_request(&conn, &existing.id)?
             .ok_or_else(|| anyhow!("request vanished during merge"));
     }
     drop(conn);
+
+    let key = tmdb_key(state)?;
+    let lang = language(state);
+    let detail = discover::detail(&key, &lang, body.kind, body.tmdb_id)
+        .map_err(|()| anyhow!("TMDB lookup failed"))?
+        .ok_or_else(|| anyhow!("title not found on TMDB"))?;
 
     let id = kroma_primitives::short_hash(&format!(
         "request|{}|{}|{}",
@@ -75,13 +96,13 @@ pub fn create_request<S: HostStorage>(
         seasons: asked_seasons,
         episodes: asked_episodes,
         status: RequestStatus::Pending,
-        requested_by: Some(user.id.clone()),
+        requested_by: Some(requester_id.to_string()),
     };
     db::insert_request(state.db(), &new, now_ms())?;
     publish(state, &id, RequestStatus::Pending);
 
-    if user.can(Permission::RequestsAuto) {
-        approve_request(state, &id, Some(&user.id))?;
+    if approve {
+        approve_request(state, &id, Some(requester_id))?;
     } else {
         let matched = match_one(state, &id)?;
         // A request the matcher just satisfied needs no review.
@@ -89,7 +110,7 @@ pub fn create_request<S: HostStorage>(
             let conn = state.db().get()?;
             let pending = db::get_request(&conn, &id)?;
             drop(conn);
-            if let Some(pending) = pending {
+            if let (Some(pending), Some(user)) = (pending, reviewed_as) {
                 notify_moderators(state, &pending, user);
             }
         }

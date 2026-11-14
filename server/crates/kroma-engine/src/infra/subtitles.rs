@@ -10,7 +10,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use kroma_media::subtitles::{extract_vtt, is_text_codec, timeout_for};
+use kroma_media::subtitles::{extract_vtt_from, is_text_codec, timeout_for_input};
+
+use crate::services::source::Resolved;
 
 use crate::domain::media::SubtitleTrack;
 
@@ -27,7 +29,8 @@ fn file_lock(abs: &str) -> Arc<Mutex<()>> {
         .clone()
 }
 
-/// Extract every still-missing text track of `abs`, serialized per file: the
+/// Extract every still-missing text track of `abs`, read from `resolved`, which
+/// is `abs` itself or the input a stub's source answered. Serialized per file: the
 /// pending set is computed UNDER the lock, so whichever caller ran first has
 /// already filled the cache and later callers are a cheap stat + no-op. This is
 /// the one entry point the endpoint, the playback pre-warm and the pipeline
@@ -35,11 +38,12 @@ fn file_lock(abs: &str) -> Arc<Mutex<()>> {
 pub fn extract_pending_locked(
     data_dir: &Path,
     abs: &str,
+    resolved: &Resolved,
     subs: &[SubtitleTrack],
     cancel: &dyn Fn() -> bool,
 ) -> Result<(), String> {
     // Offline mount / moved file: one stat instead of an ffmpeg spawn per caller.
-    if !Path::new(abs).exists() {
+    if resolved.input.local().is_some_and(|path| !path.exists()) {
         return Err("media file unavailable (mount offline?)".to_string());
     }
     let lock = file_lock(abs);
@@ -47,7 +51,9 @@ pub fn extract_pending_locked(
         .lock()
         .map_err(|_| "subtitle extraction lock poisoned".to_string())?;
     let pending = pending_text_tracks(data_dir, abs, subs);
-    extract_vtt(abs, &pending, timeout_for(abs), cancel).map(drop)
+    let size = resolved.stub.as_ref().map_or(0, |stub| stub.size);
+    let budget = timeout_for_input(&resolved.input, size);
+    extract_vtt_from(&resolved.input, &pending, budget, cancel).map(drop)
 }
 
 /// `<data>/subs/<hash>.vtt`, keyed by file path + mtime + track index so a replaced

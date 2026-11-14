@@ -6,8 +6,11 @@ import {
   audioTracksOf,
   canDecodeAudioCodec,
   canSeamlessAudioSwitch,
+  decodesSelectedAudio,
   masterNeedsAac,
   resolveAudioRelativeIndex,
+  selectedAudioTrack,
+  surroundTargetFor,
 } from './audio-support';
 import { EN_51, FR_51, FR_COMMENTARY, makeItem, track, UNPROBED } from './directplay.fixture';
 import { MSE_CAPS, NATIVE_TV_CAPS, SAFARI_CAPS } from './runtime-caps';
@@ -176,6 +179,57 @@ describe('resolveAudioRelativeIndex', () => {
   });
 });
 
+describe('the track a title plays first', () => {
+  const item = makeItem({
+    audio: [
+      track({ index: 0, codec: 'dts', channels: 6 }),
+      track({ index: 1, codec: 'eac3', channels: 6, default: true }),
+      track({ index: 2, codec: 'aac', channels: 2 }),
+    ],
+  });
+
+  it('is the one asked for, else the default, else the first', () => {
+    expect(selectedAudioTrack(item, 2)?.index).toBe(2);
+    expect(selectedAudioTrack(item)?.index).toBe(1);
+    expect(
+      selectedAudioTrack(makeItem({ audio: [track({ index: 4, codec: 'aac' })] }))?.index,
+    ).toBe(4);
+    expect(selectedAudioTrack(makeItem({ audio: [] }))).toBeUndefined();
+  });
+
+  it('is judged on that track alone, so a title is not played silent', () => {
+    expect(decodesSelectedAudio(item, MSE_CAPS, 0)).toBe(false);
+    expect(decodesSelectedAudio(item, MSE_CAPS, 2)).toBe(true);
+    expect(decodesSelectedAudio(item, MSE_CAPS)).toBe(false);
+    expect(decodesSelectedAudio(item, SAFARI_CAPS)).toBe(true);
+    expect(decodesSelectedAudio(makeItem({ audio: [] }), MSE_CAPS)).toBe(true);
+  });
+});
+
+describe('surroundTargetFor', () => {
+  it('prefers Dolby Digital Plus, falls back to Dolby Digital, and never targets stereo', () => {
+    const surround = track({ index: 0, codec: 'truehd', channels: 8 });
+    expect(surroundTargetFor(surround, SAFARI_CAPS)).toBe('eac3');
+    expect(
+      surroundTargetFor(surround, { ...MSE_CAPS, audio: { ...MSE_CAPS.audio, ac3: true } }),
+    ).toBe('ac3');
+    expect(surroundTargetFor(surround, MSE_CAPS)).toBeNull();
+    expect(
+      surroundTargetFor(track({ index: 0, codec: 'flac', channels: 2 }), SAFARI_CAPS),
+    ).toBeNull();
+  });
+});
+
+describe('surroundTargetFor channel floor', () => {
+  it('keeps the floor the server keeps: four channels is a stereo AAC, five is a surround bed', () => {
+    const quad = track({ index: 0, codec: 'dts', channels: 4 });
+    const five = track({ index: 0, codec: 'dts', channels: 5 });
+
+    expect(surroundTargetFor(quad, SAFARI_CAPS)).toBeNull();
+    expect(surroundTargetFor(five, SAFARI_CAPS)).toBe('eac3');
+  });
+});
+
 describe('masterNeedsAac', () => {
   it('keeps an all-aac master as stream-copy on every engine', () => {
     const item = makeItem({ audio: [track({ index: 0, codec: 'aac', channels: 2 })] });
@@ -191,11 +245,30 @@ describe('masterNeedsAac', () => {
     expect(masterNeedsAac(item, NATIVE_TV_CAPS)).toBe(false);
   });
 
-  it('forces AAC for DTS everywhere (never fMP4-copy-safe)', () => {
+  it('forces AAC for DTS where no Dolby decoder can take the surround transcode', () => {
     const item = makeItem({ audio: [track({ index: 0, codec: 'dts', channels: 6 })] });
     expect(masterNeedsAac(item, MSE_CAPS)).toBe(true);
+  });
+
+  it('leaves surround DTS and TrueHD to the server where the device decodes E-AC-3 or AC-3', () => {
+    for (const codec of ['dts', 'truehd']) {
+      const item = makeItem({ audio: [track({ index: 0, codec, channels: 6 })] });
+      expect(masterNeedsAac(item, SAFARI_CAPS)).toBe(false);
+      expect(masterNeedsAac(item, NATIVE_TV_CAPS)).toBe(false);
+      expect(masterNeedsAac(item, { ...MSE_CAPS, audio: { ...MSE_CAPS.audio, ac3: true } })).toBe(
+        false,
+      );
+    }
+  });
+
+  it('keeps a stereo track the device cannot copy on AAC, since there is no stereo surround target', () => {
+    const item = makeItem({ audio: [track({ index: 0, codec: 'flac', channels: 2 })] });
     expect(masterNeedsAac(item, SAFARI_CAPS)).toBe(true);
-    expect(masterNeedsAac(item, NATIVE_TV_CAPS)).toBe(true);
+  });
+
+  it('forces AAC for a codec the probe could not name, whatever the device decodes', () => {
+    const item = makeItem({ audio: [track({ index: 0, codec: 'unknown', channels: 6 })] });
+    expect(masterNeedsAac(item, SAFARI_CAPS)).toBe(true);
   });
 
   it('forces AAC when any track is undecodable under the engine', () => {

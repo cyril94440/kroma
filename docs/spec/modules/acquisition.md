@@ -150,6 +150,44 @@ beside the file and both are kept. Only a file of the same edition is ever repla
 **MOD-79** (AGREED) - A file an upgrade replaces goes to the recycle bin when one is set, and is
 cleared after a number of days, 30 by default. With no bin it is deleted at once.
 
+## Watching now
+
+Status: **AGREED**
+
+A download client that already holds a release can hand it over at once, with nothing to wait
+for. Watching now is the one place where a person asks for a title the library does not hold and
+is given it to play, in seconds, through the same pipeline a request takes.
+
+**MOD-95** (AGREED) - Watching now is offered only to someone whose request would have been
+fetched without anyone's approval, and only on a server whose preferred download client can say
+which releases it holds. Everyone else, and every other server, keeps the plain request; they
+are never shown that the option exists.
+
+**MOD-96** (AGREED) - Watching now chooses by quality first. It considers only the releases the
+title's own rules accept, never loosened for speed, and takes the best-scored one the client
+holds. A release the rules refuse is never played, however quickly it would start.
+
+**MOD-97** (AGREED) - A film is watched as itself. A show is watched one episode at a time: its
+own releases are tried first, then the season pack of that season, which brings every episode of
+the season into the library as a bonus.
+
+**MOD-98** (AGREED) - A title nothing instant holds is not started as a slow download passed off
+as a fast one. It stays requested, the normal pipeline fetches the best release, and the person
+is told so and notified when it is available.
+
+**MOD-99** (AGREED) - What is played is the library's own item, with its history, resume and
+subtitles; a stub costs no storage. Asking again while the title is being fetched, or at the
+same moment as someone else, never imports it twice.
+
+**MOD-100** (AGREED) - The file is read back before the title is called ready. A file that cannot
+be read, holds no video, runs far from the title's own length, or is more than a step below the
+resolution its name claimed, is not what was promised: its release is blocklisted for the title,
+its files leave the library, and the next release is tried, at most three times and about 25
+seconds in all. After that the title is requested.
+
+**MOD-101** (AGREED) - A client that fetches at once leaves the account as it found it: every
+release it was asked about and did not keep is deleted from the service again.
+
 ## Not in scope
 
 Status: **AGREED**

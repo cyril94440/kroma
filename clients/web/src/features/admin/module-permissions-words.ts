@@ -13,6 +13,7 @@ const PURPOSE: Record<string, MessageKey> = {
   indexer: 'modulePermissions.purposeIndexer',
   'indexer-definitions': 'modulePermissions.purposeIndexerDefinitions',
   flaresolverr: 'modulePermissions.purposeFlaresolverr',
+  'debrid-transfer': 'modulePermissions.purposeDebridTransfer',
   'download-client': 'modulePermissions.purposeDownloadClient',
   torznab: 'modulePermissions.purposeTorznab',
   roku: 'modulePermissions.purposeRoku',

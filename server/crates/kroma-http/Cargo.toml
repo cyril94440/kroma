@@ -6,7 +6,11 @@ rust-version.workspace = true
 description = "KROMA's two HTTP transports: a curl process per call for the outside world, and a pooled client for the loopback seam between the core and its modules"
 license.workspace = true
 
+[features]
+test-hosts = []
+
 [dependencies]
+kroma-primitives = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

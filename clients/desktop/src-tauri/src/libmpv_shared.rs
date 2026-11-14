@@ -10,6 +10,8 @@ use libmpv2::{Format, Mpv, MpvInitializer, MpvStr, Result as MpvResult};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
+use crate::mpv_options;
+
 /// Holds the live engine handle, empty until the platform's `init()` succeeds.
 /// Each platform module re-exports it under its own name as Tauri managed state.
 #[derive(Default)]
@@ -62,7 +64,7 @@ impl MpvSlot {
 /// Options every engine sets, applied after the platform's own video-output
 /// options. KROMA draws its own subtitle overlay over the transparent webview,
 /// so mpv must render none itself: no auto-load and no default track.
-pub fn apply_common_options(init: &MpvInitializer) -> MpvResult<()> {
+pub fn apply_common_options(init: &MpvInitializer, hdr_hint: bool) -> MpvResult<()> {
     init.set_property("hr-seek", "yes")?;
     init.set_property("force-seekable", "yes")?;
     init.set_property("cache", "yes")?;
@@ -97,6 +99,10 @@ pub fn apply_common_options(init: &MpvInitializer) -> MpvResult<()> {
             Err(e) if is_unknown_option(&e) => {}
             Err(e) => return Err(e),
         }
+    }
+    let spdif = mpv_options::passthrough_from_env();
+    for (name, value) in mpv_options::libmpv_options(hdr_hint, spdif.as_deref()) {
+        let _ = init.set_property(name, value);
     }
     Ok(())
 }

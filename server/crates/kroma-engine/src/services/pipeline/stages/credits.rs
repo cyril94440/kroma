@@ -19,7 +19,7 @@ stage! {
     triggers: &[Trigger::AfterJob(JobKey("pipeline.markers"))],
 }
 
-fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
+pub(super) fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
     let mode = state.settings.get_str("introDetection", "chapters");
     if mode == "off" {
         return Ok(Vec::new());
@@ -33,7 +33,7 @@ fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
             if i.duration_ms.unwrap_or(0) == 0 {
                 return None;
             }
-            let sig = super::sig_for_path(abs);
+            let sig = super::when_cached(state, abs, super::sig_for_path(abs));
             if sig == crate::db::pipeline::UNREADABLE_SIG {
                 return Some((i.id, sig));
             }
@@ -43,7 +43,7 @@ fn enumerate(state: &SharedState) -> Result<Vec<(String, String)>> {
         .collect())
 }
 
-fn process(ctx: &JobContext, item_id: &str) -> Result<()> {
+pub(super) fn process(ctx: &JobContext, item_id: &str) -> Result<()> {
     let item = crate::db::get_item(&ctx.state.db, item_id)?
         .ok_or_else(|| anyhow!("item {item_id} no longer exists"))?;
     crate::services::markers::credits::detect_movie(ctx, &item)?;

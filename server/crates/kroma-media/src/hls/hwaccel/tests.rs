@@ -149,3 +149,5 @@ fn a_device_decodes_on_the_device_and_the_cpu_path_takes_the_tiers_flags() {
         .input_args(Effort::Realtime)
         .contains(&"-skip_loop_filter"));
 }
+
+mod vectors;

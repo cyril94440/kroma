@@ -14,6 +14,10 @@ import { TitleHero } from '#web/features/catalog/title-hero';
 import { TreatmentsPanel } from '#web/features/catalog/treatments-panel';
 import { useTitleCommands } from '#web/features/catalog/use-title-commands';
 import { useTitleRequest } from '#web/features/catalog/use-title-request';
+import {
+  type TitleWatchNowState,
+  useTitleWatchNow,
+} from '#web/features/catalog/use-title-watch-now';
 import { useAuth } from '#web/shared/lib/auth';
 import { useMyList } from '#web/shared/lib/mylist';
 
@@ -85,6 +89,7 @@ function TitleBody({
   season,
   onRequestAll,
   onClearSelection,
+  watchNow,
 }: Readonly<{
   view: TitleView;
   owned: boolean;
@@ -104,6 +109,7 @@ function TitleBody({
   season: number | undefined;
   onRequestAll: () => void;
   onClearSelection: () => void;
+  watchNow: TitleWatchNowState;
 }>) {
   const pageScoped = useStyles(page);
 
@@ -148,6 +154,15 @@ function TitleBody({
           onClearSelection={onClearSelection}
           pendingEpisodes={pendingEps}
           requestBusy={busy}
+          episodeWatch={
+            watchNow.offered
+              ? {
+                  busy: watchNow.state.phase === 'searching',
+                  onWatch: (seasonNumber, episode) =>
+                    watchNow.watch({ season: seasonNumber, episode }),
+                }
+              : undefined
+          }
         />
       )}
 
@@ -206,6 +221,7 @@ export function TitleDetail({
     navigate({ to: '/watch/$id', params: { id } });
   };
   useTitleCommands(view, play);
+  const watchNow = useTitleWatchNow(view, play);
 
   const fallbackOverlineKey = view.kind === 'show' ? 'content.series' : 'content.film';
   const overline = view.genres.length
@@ -234,6 +250,7 @@ export function TitleDetail({
         toggleList={toggleList}
         onPlay={play}
         onRequest={onRequestClick}
+        watchNow={watchNow}
         back={<RouteLink to={backTo} />}
       />
 
@@ -256,6 +273,7 @@ export function TitleDetail({
         season={season}
         onRequestAll={requestAllSeasons}
         onClearSelection={clearSelection}
+        watchNow={watchNow}
       />
     </main>
   );

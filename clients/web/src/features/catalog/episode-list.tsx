@@ -36,6 +36,12 @@ const sDefinition = styles({
   section: { mt: 40 },
 });
 
+/** Watching a missing episode now, when the server offers it. */
+export interface EpisodeWatch {
+  busy: boolean;
+  onWatch: (season: number, episode: number) => void;
+}
+
 function SeasonSwitcher({
   seasons,
   current,
@@ -75,6 +81,7 @@ export function SeasonSection({
   onClearSelection,
   pendingEpisodes,
   requestBusy,
+  episodeWatch,
 }: Readonly<{
   seasons: TitleSeason[];
   openOn?: number;
@@ -93,6 +100,7 @@ export function SeasonSection({
   onClearSelection: () => void;
   pendingEpisodes: Set<string>;
   requestBusy: boolean;
+  episodeWatch?: EpisodeWatch;
 }>) {
   const webRuntime = useWebRuntime();
 
@@ -168,6 +176,7 @@ export function SeasonSection({
             selected={selected}
             onToggleEpisode={onToggleEpisode}
             pendingEpisodes={pendingEpisodes}
+            episodeWatch={episodeWatch}
           />
         </>
       ) : (
@@ -218,6 +227,7 @@ function SeasonEpisodes({
   selected,
   onToggleEpisode,
   pendingEpisodes,
+  episodeWatch,
 }: Readonly<{
   current: TitleSeason;
   ordered: number[];
@@ -229,6 +239,7 @@ function SeasonEpisodes({
   selected: Set<string>;
   onToggleEpisode: (season: number, episode: number) => void;
   pendingEpisodes: Set<string>;
+  episodeWatch?: EpisodeWatch;
 }>) {
   const s = useStyles(sDefinition);
 
@@ -258,6 +269,14 @@ function SeasonEpisodes({
               pending={current.requested || pendingEpisodes.has(epKey(current.number, n))}
               selected={selected.has(epKey(current.number, n))}
               onToggle={() => onToggleEpisode(current.number, n)}
+              watchNow={
+                episodeWatch
+                  ? {
+                      onWatch: () => episodeWatch.onWatch(current.number, n),
+                      disabled: episodeWatch.busy,
+                    }
+                  : undefined
+              }
             />
           );
         })}

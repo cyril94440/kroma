@@ -3,7 +3,7 @@
 
 # Requirement index
 
-540 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
+559 requirements across the spec. The machine-readable source is [`requirements.json`](requirements.json).
 
 ## ACCT - [accounts](accounts/)
 
@@ -317,11 +317,11 @@
 - **MEDIA-17** (SHIPPED) - A codec being first-class states how *KROMA* handles it, never that a
 - **MEDIA-18** (AGREED) - HDR is preserved end to end or it is not offered. KROMA never
 - **MEDIA-19** (SHIPPED) - **Bit depth.** 8-bit and 10-bit are first-class, and 10-bit is
-- **MEDIA-20** (AGREED) - KROMA distinguishes **HDR10**, **HDR10+**, **Dolby Vision** and
+- **MEDIA-20** (SHIPPED) - KROMA distinguishes **HDR10**, **HDR10+**, **Dolby Vision** and
 - **MEDIA-21** (SHIPPED) - Colour primaries, transfer characteristics and matrix coefficients
 - **MEDIA-22** (AGREED) - Where dynamic metadata, HDR10+ or Dolby Vision, cannot be carried
 - **MEDIA-23** (AGREED) - The first-class audio codecs are **AAC**, **AC-3** and **E-AC-3**
-- **MEDIA-24** (AGREED) - An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos
+- **MEDIA-24** (SHIPPED) - An audio stream's **channel layout**, stereo, 5.1, 7.1 or Atmos
 - **MEDIA-25** (SHIPPED) - **Passthrough** is the default for multichannel and lossless audio:
 - **MEDIA-26** (AGREED) - **Downmixing** to stereo happens only when the target cannot render
 - **MEDIA-27** (SHIPPED) - Multiple audio streams, languages and commentary alike, are all
@@ -345,6 +345,15 @@
 - **MEDIA-45** (SHIPPED) - A file that will not open at all, a truncated or corrupt container,
 - **MEDIA-46** (AGREED) - Undescribed and unreadable are distinct states. The first is "we
 - **MEDIA-47** (AGREED) - An audio stream carries the region of its language when the file says
+- **MEDIA-48** (SHIPPED) - A video copied into fragmented MP4 keeps what makes it HDR: HEVC is
+- **MEDIA-49** (SHIPPED) - A video re-encoded to 8-bit H.264 from an HDR source is tone-mapped
+- **MEDIA-50** (SHIPPED) - A stub is a title like any other: it appears with the container
+- **MEDIA-51** (SHIPPED) - A media file whose bytes are streamed says so (`remote`), so a
+- **MEDIA-52** (SHIPPED) - Where a remote file's bytes are is answered by its source each
+- **MEDIA-53** (SHIPPED) - A link is used only if it is `https`, carries no credentials, and
+- **MEDIA-54** (SHIPPED) - A source that is off, gone or silent fails playback with a
+- **MEDIA-55** (SHIPPED) - Work that reads a whole title (scrub thumbnails, intro and credits
+- **MEDIA-56** (SHIPPED) - A release that makes the probe learn something new (HDR format,
 
 ## MOD - [modules](modules/)
 
@@ -442,6 +451,13 @@
 - **MOD-92** (AGREED) - A module is checked against the module interface the server implements, <sub>[README.md](modules/README.md)</sub>
 - **MOD-93** (AGREED) - `minServer` is the floor for a server capability the module needs. It is <sub>[README.md](modules/README.md)</sub>
 - **MOD-94** (SHIPPED) - The release process refuses to publish a module whose `minServer` <sub>[README.md](modules/README.md)</sub>
+- **MOD-95** (AGREED) - Watching now is offered only to someone whose request would have been <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-96** (AGREED) - Watching now chooses by quality first. It considers only the releases the <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-97** (AGREED) - A film is watched as itself. A show is watched one episode at a time: its <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-98** (AGREED) - A title nothing instant holds is not started as a slow download passed off <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-99** (AGREED) - What is played is the library's own item, with its history, resume and <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-100** (AGREED) - The file is read back before the title is called ready. A file that cannot <sub>[acquisition.md](modules/acquisition.md)</sub>
+- **MOD-101** (AGREED) - A client that fetches at once leaves the account as it found it: every <sub>[acquisition.md](modules/acquisition.md)</sub>
 
 ## PLAY - [playback](playback/)
 
@@ -470,7 +486,7 @@
 - **PLAY-23** (SHIPPED) - **Remux** is shown as *repackaged*. Quality is untouched, so this is
 - **PLAY-24** (SHIPPED) - Direct play shows nothing. The absence of a notice *is* the signal
 - **PLAY-25** (AGREED) - KROMA never re-encodes video to save bandwidth unless the device
-- **PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so.
+- **PLAY-26** (AGREED) - KROMA never tone-maps HDR without saying so. The server tone-maps
 - **PLAY-27** (AGREED) - KROMA never burns in subtitles the person did not ask to see.
 - **PLAY-28** (AGREED) - When the only playable path is one a person or an admin has disabled,
 - **PLAY-29** (SHIPPED) - Under **direct play and remux**, seeking is instant and exact. The
@@ -505,6 +521,9 @@
 - **PLAY-58** (SHIPPED) - The first play of a trailer may wait while the server fetches it, and the
 - **PLAY-59** (SHIPPED) - A trailer saves no progress, marks nothing watched and offers no next
 - **PLAY-60** (SHIPPED) - When a trailer cannot be fetched, the player says so plainly. Where the
+- **PLAY-61** (SHIPPED) - Direct play of a remote file serves the original bytes with the
+- **PLAY-62** (SHIPPED) - Opening a remote file for playback asks its source to start
+- **PLAY-63** (SHIPPED) - A transcode, a remux and an offline download of a remote file
 
 ## SURF - [surfaces](surfaces/)
 

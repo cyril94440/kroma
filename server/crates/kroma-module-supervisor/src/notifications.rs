@@ -33,6 +33,12 @@ impl Supervisor {
         declared
     }
 
+    /// The catalogs `id`'s bundle ships, as `(locale code, JSON text)`, for a
+    /// host surface that words something on the module's behalf.
+    pub fn catalogs(&self, id: &str) -> Vec<(String, String)> {
+        catalogs_in(&self.installed_dir(id).join(LOCALES_DIR))
+    }
+
     /// Whether `module`'s manifest declares the notification type `name`.
     pub fn declares_notification(&self, module: &str, name: &str) -> bool {
         self.installed_manifests()
@@ -157,5 +163,18 @@ mod tests {
         assert!(sup.declares_notification("com.example.dl", "com.example.dl/done"));
         assert!(!sup.declares_notification("com.example.dl", "com.example.dl/other"));
         assert!(!sup.declares_notification("com.example.other", "com.example.dl/done"));
+    }
+
+    #[test]
+    fn a_module_hands_over_the_catalogs_its_bundle_ships_and_a_stranger_has_none() {
+        let dir = kroma_testing::temp_dir("module-catalogs");
+        install(dir.path(), "com.example.dl", "[]", &[("en", r#"{ "k": "v" }"#)]);
+        let sup = supervisor(dir.path());
+
+        assert_eq!(
+            sup.catalogs("com.example.dl"),
+            [("en".to_string(), r#"{ "k": "v" }"#.to_string())]
+        );
+        assert!(sup.catalogs("com.example.nobody").is_empty());
     }
 }

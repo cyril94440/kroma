@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use kroma_module_sdk::host::{call, call_raw, pinned_resolver, run_blocking, HostCtx, Resolver};
+use kroma_module_sdk::http::Loopback;
 
 pub const DOWNLOAD_GRAB: &str = "tv.kroma.torrents/grab";
 
@@ -100,10 +101,79 @@ pub fn gate_open(host: &dyn HostCtx) -> bool {
     .unwrap_or(false)
 }
 
+/// A release offered to an instant grab, under the key the answer names it by.
+#[derive(Debug, Clone, Serialize)]
+pub struct InstantRelease {
+    pub key: String,
+    pub spec: GrabSpec,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InstantStatus {
+    Grabbed,
+    Nothing,
+    Unsupported,
+    Failed,
+    #[serde(other)]
+    Unknown,
+}
+
+/// What the queue's instant grab came to: the release it kept and the ledger
+/// row, already completed, when it kept one.
+#[derive(Debug, Clone, Deserialize)]
+pub struct InstantOutcome {
+    pub status: InstantStatus,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub download: Option<DownloadRow>,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub deterministic: bool,
+}
+
+/// Asks the queue to keep the best of the ranked releases that its download
+/// client already holds. The queue leaves nothing behind for the others.
+pub fn grab_instant(
+    host: &dyn HostCtx,
+    releases: &[InstantRelease],
+    budget: std::time::Duration,
+) -> anyhow::Result<InstantOutcome> {
+    let resolve = grabber(host)?;
+    let (base, token) = resolve().ok_or_else(|| anyhow::anyhow!("no module contributes this point"))?;
+    let secs = (budget.as_secs_f64().ceil() as u32 + 2).max(2);
+    let answer: Result<InstantOutcome, String> = Loopback::new()
+        .max_time(secs)
+        .header("authorization", format!("Bearer {token}"))
+        .post_json(
+            &format!("{base}/_port/{DOWNLOAD_GRAB}/grab-instant"),
+            &serde_json::json!({ "releases": releases, "budget_ms": budget.as_millis() as u64 }),
+        )?
+        .ensure_ok()?
+        .json()?;
+    answer.map_err(|e| anyhow::anyhow!(e))
+}
+
+/// Whether the preferred download client can say which releases it holds.
+/// Absent queue or a failed call read as no.
+pub fn instant_capable(host: &dyn HostCtx) -> bool {
+    let Ok(resolve) = grabber(host) else {
+        return false;
+    };
+    call_raw(
+        &resolve,
+        &format!("{DOWNLOAD_GRAB}/instant-capable"),
+        &serde_json::json!({}),
+    )
+    .unwrap_or(false)
+}
+
 /// Kick a freshly recorded row into the engine. Best effort: the row is already in
 /// the ledger, so the engine picks it up on its next sweep either way.
 pub fn activate(host: &dyn HostCtx, id: &str) {
-    if let Err(e) = lifecycle(host, "activate", id) {
+    if let Err(e) = lifecycle(host, "activate", id, false) {
         tracing::warn!(target: "acquisition", download = %id, "could not start the download: {e:#}");
     }
 }
@@ -118,16 +188,24 @@ pub fn activate_later<H: HostCtx + Send + Sync + 'static>(host: H, id: String) {
 
 /// Free a download's data and stop seeding, once its files were imported.
 pub fn drop_data(host: &dyn HostCtx, id: &str) {
-    if let Err(e) = lifecycle(host, "drop-data", id) {
+    if let Err(e) = lifecycle(host, "drop-data", id, false) {
         tracing::warn!(target: "acquisition", download = %id, "could not free the download: {e:#}");
     }
 }
 
-fn lifecycle(host: &dyn HostCtx, method: &str, id: &str) -> anyhow::Result<bool> {
+/// [`drop_data`] for a release that was turned down: the engine also removes
+/// whatever it keeps on its side for it, where it made it.
+pub fn discard(host: &dyn HostCtx, id: &str) {
+    if let Err(e) = lifecycle(host, "drop-data", id, true) {
+        tracing::warn!(target: "acquisition", download = %id, "could not discard the download: {e:#}");
+    }
+}
+
+fn lifecycle(host: &dyn HostCtx, method: &str, id: &str, discard: bool) -> anyhow::Result<bool> {
     call(
         &grabber(host)?,
         &format!("{DOWNLOAD_GRAB}/{method}"),
-        &serde_json::json!({ "id": id }),
+        &serde_json::json!({ "id": id, "discard": discard }),
     )
 }
 

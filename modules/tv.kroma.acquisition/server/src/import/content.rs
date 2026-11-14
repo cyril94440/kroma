@@ -4,6 +4,10 @@
 
 use std::path::{Path, PathBuf};
 
+use kroma_module_sdk::primitives::remote_file::is_remote_file;
+
+use super::remote;
+
 // How far under a download folder a release may bury its files before the
 // import stops looking.
 const DEEPEST_RELEASE: usize = 6;
@@ -31,7 +35,9 @@ impl Content {
         self.files
             .iter()
             .filter(|path| {
-                kroma_module_sdk::primitives::video::has_video_extension(path) && !is_a_sample(path)
+                (kroma_module_sdk::primitives::video::has_video_extension(path)
+                    || is_remote_file(path))
+                    && !is_a_sample(&remote::named(path))
             })
             .cloned()
             .collect()
@@ -72,7 +78,7 @@ fn held_by(save_path: &Path, opens: impl Fn(&Path) -> bool) -> bool {
 pub(super) fn largest(files: &[PathBuf]) -> Option<&Path> {
     files
         .iter()
-        .max_by_key(|p| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0))
+        .max_by_key(|path| remote::size_of(path))
         .map(PathBuf::as_path)
 }
 
@@ -260,3 +266,6 @@ mod tests {
         assert!(largest(&[]).is_none());
     }
 }
+
+#[cfg(test)]
+mod remote_tests;

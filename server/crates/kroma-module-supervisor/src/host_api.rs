@@ -1,5 +1,5 @@
 //! The `/api/_host/*` callback API a module reaches back into the core with:
-//! settings, events, notifications, jobs, session lookups and the network
+//! settings, module config, events, notifications, jobs, session lookups and the network
 //! policy.
 
 use std::sync::Arc;
@@ -16,6 +16,7 @@ use serde_json::{json, Value};
 use super::Supervisor;
 
 mod caller;
+mod config;
 mod job;
 mod network;
 mod settings;
@@ -37,6 +38,7 @@ where
     Router::new()
         .route("/_host/setting", get(settings::get_setting::<S>))
         .route("/_host/settings", post(settings::set_settings::<S>))
+        .route("/_host/config", get(config::get_config::<S>))
         .route("/_host/events", post(publish_event::<S>))
         .route("/_host/events_to", post(publish_event_to::<S>))
         .route("/_host/notify", post(notify::<S>))

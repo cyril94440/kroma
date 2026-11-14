@@ -9,9 +9,10 @@
 
 import {
   AT_FILM_START_SEC,
-  AVPLAY_HLS_CAPS,
-  decodableAudioCodecs,
+  avplayHlsCapabilities,
+  copyableAudioCodecs,
   decodableVideoCodecs,
+  hdrDeclaration,
   resolveMasterStart,
 } from '@kromatv/core';
 import type { AudioFilterMode, PlaneRect } from '@kromatv/ui';
@@ -80,17 +81,22 @@ export class AvplayEngine extends BaseTvEngine {
         filter: serverAudioFilter(this.filter),
         copyCodecs: this.declaredAudioCodecs(),
         videoCodecs: this.declaredVideoCodecs(),
+        hdr: this.declaredHdr(),
       });
     }
     return super.sourceUrl();
   }
 
   protected override declaredAudioCodecs(): string[] {
-    return decodableAudioCodecs(AVPLAY_HLS_CAPS);
+    return copyableAudioCodecs(avplayHlsCapabilities(this.capabilities));
   }
 
   protected override declaredVideoCodecs(): string[] {
-    return decodableVideoCodecs(AVPLAY_HLS_CAPS);
+    return decodableVideoCodecs(avplayHlsCapabilities(this.capabilities));
+  }
+
+  protected override declaredHdr(): string[] | undefined {
+    return hdrDeclaration(avplayHlsCapabilities(this.capabilities));
   }
 
   /** Reloads the source at the current position with the new filter mode; a

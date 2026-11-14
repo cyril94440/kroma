@@ -11,8 +11,9 @@ import {
   audioTracksOf,
   canDecodeAudioCodec,
   canDirectPlay,
+  copyableAudioCodecs,
   decodableVideoCodecs,
-  FMP4_COPY_CODECS,
+  hdrDeclaration,
   masterNeedsAac,
   type PlaybackCapabilities,
 } from '@kromatv/core';
@@ -30,6 +31,7 @@ export const IOS_CAPS: PlaybackCapabilities = {
   av1: false,
   vp9: false,
   hdr: { hdr10: true, hdr10Plus: false, dolbyVision: true, hlg: true },
+  hdrDeclared: true,
   audio: {
     aac: true,
     ac3: true,
@@ -45,10 +47,12 @@ export const IOS_CAPS: PlaybackCapabilities = {
 };
 
 // ExoPlayer: wide container/codec demux; HEVC/VP9 hardware decode is
-// ubiquitous on phones, AV1 is not (pre-2023 SoCs). Dolby/DTS decoders are TV
-// licenses phones usually lack, so surround masters transcode to AAC. Dolby
-// Vision is per-device and nothing here can ask, so it claims support rather
-// than forcing a transcode on a handset that would have decoded it.
+// ubiquitous on phones, AV1 is not (pre-2023 SoCs). The app ships Media3's FFmpeg
+// audio decoders (@kromatv/media3-ffmpeg) behind the MediaCodec ones, so every
+// Dolby and DTS track decodes, in software to PCM where the handset has no
+// licence. Dolby Vision is per-device and nothing here can ask, so it is not
+// claimed: a profile 5 stream is served as an SDR/HDR10 transcode and a profile 7
+// or 8 one as its HDR10 layer.
 export const ANDROID_CAPS: PlaybackCapabilities = {
   hevc: true,
   hevc10bit: true,
@@ -56,13 +60,14 @@ export const ANDROID_CAPS: PlaybackCapabilities = {
   h26410bit: false,
   av1: false,
   vp9: true,
-  hdr: { hdr10: true, hdr10Plus: true, dolbyVision: true, hlg: true },
+  hdr: { hdr10: true, hdr10Plus: true, dolbyVision: false, hlg: true },
+  hdrDeclared: true,
   audio: {
     aac: true,
-    ac3: false,
-    eac3: false,
-    dts: false,
-    truehd: false,
+    ac3: true,
+    eac3: true,
+    dts: true,
+    truehd: true,
     flac: true,
     opus: true,
     mp3: true,
@@ -95,9 +100,7 @@ export interface SourceDecision {
  * ffmpeg can stream-copy into fMP4. The rest transcode to stereo AAC
  * server-side, since offline playback has no fallback for an unplayable track. */
 export function downloadCopyCodecs(): string[] {
-  const caps = mobileCaps();
-  const decodable = decodableAudioCodecs(caps);
-  return [...FMP4_COPY_CODECS].filter((codec) => decodable.has(codec));
+  return copyableAudioCodecs(mobileCaps());
 }
 
 /** The `?video=` set this runtime declares, on a master and on `/download`
@@ -108,6 +111,11 @@ export function downloadCopyCodecs(): string[] {
  * black frame). */
 export function mobileVideoCodecs(): string[] {
   return decodableVideoCodecs(mobileCaps());
+}
+
+/** The `?hdr=` set this runtime declares, on a master and on `/download` alike. */
+export function mobileHdr(): string[] | undefined {
+  return hdrDeclaration(mobileCaps());
 }
 
 /** Whether the ORIGINAL file can be downloaded raw (byte-identical, zero

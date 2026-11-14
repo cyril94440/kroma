@@ -6,6 +6,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
+use crate::mpv_options;
+
 // A rung gets this long to configure its video output once IPC answers.
 const VO_PROBE_WINDOW: Duration = Duration::from_secs(6);
 // Ours, so a reply is told apart from mpv's events and its own startup chatter.
@@ -147,6 +149,8 @@ pub(super) fn start_mpv(
         .file_name()
         .is_some_and(|n| n.to_string_lossy().starts_with("kroma-mpv"));
     let window = window_args(wid, sidecar);
+    let spdif = mpv_options::passthrough_from_env();
+    let extra = mpv_options::binary_args(sidecar, spdif.as_deref());
     for cfg in &ladder {
         let _ = std::fs::remove_file(sock);
         let mut command = Command::new(binary);
@@ -176,6 +180,7 @@ pub(super) fn start_mpv(
             // of its own.
             .env_remove("WAYLAND_DISPLAY")
             .args(BASE_ARGS)
+            .args(&extra)
             .args(cfg)
             .arg(format!("--input-ipc-server={}", sock.display()));
         if let Some(ref p) = shim_path {

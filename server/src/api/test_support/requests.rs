@@ -70,9 +70,35 @@ pub async fn get_from(
 
 async fn drive(
     app: &Router,
-    mut req: Request<Body>,
+    req: Request<Body>,
     headers: &[(&str, &str)],
 ) -> (StatusCode, axum::http::HeaderMap, Value) {
+    let (status, out_headers, bytes) = drive_bytes(app, req, headers).await;
+    let value = if bytes.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+    };
+    (status, out_headers, value)
+}
+
+/// A request with no body, answered as the bytes the route sent: for the routes
+/// that serve media rather than JSON.
+pub async fn raw_bytes(
+    app: &Router,
+    method: &str,
+    uri: &str,
+    token: Option<&str>,
+    headers: &[(&str, &str)],
+) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+    drive_bytes(app, build_request(method, uri, token, None), headers).await
+}
+
+async fn drive_bytes(
+    app: &Router,
+    mut req: Request<Body>,
+    headers: &[(&str, &str)],
+) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
     use axum::http::{HeaderName, HeaderValue};
     for (k, v) in headers {
         req.headers_mut().insert(
@@ -86,12 +112,7 @@ async fn drive(
     let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
         .await
         .expect("read body");
-    let value = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    };
-    (status, out_headers, value)
+    (status, out_headers, bytes.to_vec())
 }
 
 /// Drive one request against the router and return `(status, parsed-json)`. A

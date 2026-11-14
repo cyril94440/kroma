@@ -4,6 +4,7 @@ import { act, renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { H, installHarness, item, makePb } from '#web/features/playback/use-web-controller.fixture';
+import type { MovieView } from '#web/shared/lib/api';
 import { WebRuntimeProvider } from '#web/shared/lib/web-runtime';
 import { createWebTestRuntime } from '#web/shared/lib/web-runtime.fixture';
 
@@ -28,7 +29,10 @@ vi.mock('@kromatv/ui', () => ({
 vi.mock('@kromatv/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@kromatv/core')>()),
   audioTrackLabel: () => 'English 5.1',
-  pictureBadge: () => H.badge,
+  pictureBadge: (video: unknown) => {
+    H.badgeVideo = video;
+    return H.badge;
+  },
 }));
 vi.mock('#web/shared/lib/lang-pref', () => ({
   useLangPrefs: () => ({ setAudio: H.rememberAudio }),
@@ -38,9 +42,9 @@ const { useWebController } = await import('#web/features/playback/use-web-contro
 
 installHarness();
 
-function render() {
+function render(shown: MovieView = item) {
   const runtime = createWebTestRuntime({});
-  return renderHook(() => useWebController(item), {
+  return renderHook(() => useWebController(shown), {
     wrapper: ({ children }: { children: ReactNode }) =>
       createElement(WebRuntimeProvider, { value: runtime }, children),
   });
@@ -135,6 +139,40 @@ describe('useWebController notices and failures', () => {
     expect(render().result.current.controller.qualities[0]?.note).toBeUndefined();
   });
 
+  it('owns up to the surround target the server answered with, and to a stereo fallback', () => {
+    const dts = {
+      ...item,
+      audioTracks: [{ index: 0, codec: 'dts', channels: 6, language: 'eng', default: true }],
+    } as unknown as MovieView;
+
+    H.pb = makePb({
+      mode: 'remux',
+      delivered: { kind: 'surround', target: 'eac3' },
+    });
+    expect(render(dts).result.current.controller.qualities[0]?.note).toBe('player.audioSurround');
+
+    H.pb = makePb({ mode: 'remux', delivered: { kind: 'stereo', leveled: false } });
+    expect(render(dts).result.current.controller.qualities[0]?.note).toBe('player.audioDownmixed');
+  });
+
+  it('badges a streamed profile 7 title as what the stream carries, never as Dolby Vision', () => {
+    const p7 = {
+      ...item,
+      video: {
+        codec: 'hevc',
+        bitDepth: 10,
+        hdr: true,
+        hdrFormat: 'dolbyVision',
+        dolbyVisionProfile: 7,
+        dolbyVisionCompatibility: 6,
+      },
+    } as unknown as MovieView;
+
+    H.pb = makePb({ mode: 'remux' });
+    render(p7);
+    expect(H.badgeVideo).not.toMatchObject({ hdrFormat: 'dolbyVision' });
+  });
+
   it('prints a refused stream across the stage, with what to do about it', () => {
     H.pb = makePb({ failure: 'denied' });
 
@@ -142,6 +180,15 @@ describe('useWebController notices and failures', () => {
 
     expect(c.error).toBe('player.streamDenied');
     expect(c.errorHint).toBe('player.streamDeniedHint');
+  });
+
+  it('names the source that could not be read, in the catalog the server answers from', () => {
+    H.pb = makePb({ failure: { messageKey: 'error.sourceRefused' } });
+
+    const c = render().result.current.controller;
+
+    expect(c.error).toBe('error.sourceRefused');
+    expect(c.errorHint).toBe('player.sourceFailedHint');
   });
 
   it('tells the chrome what a wait is on', () => {

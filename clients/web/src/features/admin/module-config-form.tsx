@@ -20,6 +20,7 @@ import {
   useStyles,
 } from '@kromatv/ui/kit';
 import { type ReactNode, useState } from 'react';
+import { type ConfigLocales, useConfigText } from './module-config-text';
 
 type ConfigValue = string | number | boolean;
 
@@ -47,16 +48,19 @@ export function ModuleConfigForm({
   moduleId,
   fields,
   values,
+  locales,
   onSaved,
 }: Readonly<{
   moduleId: string;
   fields: ConfigField[];
   values: Record<string, unknown>;
+  locales?: ConfigLocales;
   onSaved: () => void;
 }>) {
   const webRuntime = useWebRuntime();
 
   const t = useT();
+  const words = useConfigText(locales);
   const [draft, setDraft] = useState<Record<string, ConfigValue>>(() =>
     Object.fromEntries(fields.map((f) => [f.key, initial(f, values[f.key])])),
   );
@@ -84,7 +88,13 @@ export function ModuleConfigForm({
       <Box gap={8} pt={12}>
         <ListRow.Group size="sm">
           {fields.map((f) => (
-            <ConfigRow key={f.key} field={f} value={draft[f.key]} onChange={(v) => set(f.key, v)} />
+            <ConfigRow
+              key={f.key}
+              field={f}
+              value={draft[f.key]}
+              words={words}
+              onChange={(v) => set(f.key, v)}
+            />
           ))}
         </ListRow.Group>
         <Row justify="flex-end">
@@ -105,30 +115,33 @@ export function ModuleConfigForm({
 function ConfigRow({
   field,
   value,
+  words,
   onChange,
 }: Readonly<{
   field: ConfigField;
   value: ConfigValue | undefined;
+  words: (text: string) => string;
   onChange: (v: ConfigValue) => void;
 }>) {
   const s = useStyles(sDefinition);
+  const label = words(field.label);
 
   let control: ReactNode;
   if (field.type === 'bool') {
-    control = <Switch checked={value === true} onCheckedChange={onChange} label={field.label} />;
+    control = <Switch checked={value === true} onCheckedChange={onChange} label={label} />;
   } else if (field.type === 'select') {
     control = (
-      <Select.Root label={field.label} value={String(value ?? '')} onValueChange={onChange}>
+      <Select.Root label={label} value={String(value ?? '')} onValueChange={onChange}>
         <Select.Trigger style={s.select} />
         {(field.options ?? []).map((opt) => (
-          <Select.Item key={opt} value={opt} label={opt} />
+          <Select.Item key={opt} value={opt} label={words(opt)} />
         ))}
       </Select.Root>
     );
   } else if (field.type === 'number') {
     control = (
       <NumberField
-        label={field.label}
+        label={label}
         value={typeof value === 'number' ? value : 0}
         onValueChange={onChange}
         w={CONTROL_WIDTH}
@@ -136,10 +149,10 @@ function ConfigRow({
     );
   } else {
     control = (
-      <Field.Root label={field.label} hideLabel w={CONTROL_WIDTH}>
+      <Field.Root label={label} hideLabel w={CONTROL_WIDTH}>
         <Field.Input
           type={field.secret ? 'password' : 'text'}
-          placeholder={field.placeholder ?? undefined}
+          placeholder={field.placeholder ? words(field.placeholder) : undefined}
           value={String(value ?? '')}
           onValueChange={onChange}
         />
@@ -149,7 +162,7 @@ function ConfigRow({
 
   return (
     <ListRow.Root size="sm">
-      <ListRow.Label>{field.label}</ListRow.Label>
+      <ListRow.Label>{label}</ListRow.Label>
       <ListRow.Trailing>{control}</ListRow.Trailing>
     </ListRow.Root>
   );

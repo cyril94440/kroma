@@ -23,6 +23,10 @@ import type { ModuleManifest } from '@kromatv/module-sdk';
 export interface AdminModule extends ModuleManifest {
   enabled: boolean;
   configValues: Record<string, unknown>;
+  /** The module's own catalogs, by locale, sent when it declares `config`
+   *  fields: a module with no frontend has no other way to reach the web
+   *  client with its words. */
+  configLocales?: Record<string, Record<string, string>>;
   removable: boolean;
   /** Where the module came from. Absent for a compile-time module. */
   origin?: ModuleOrigin;

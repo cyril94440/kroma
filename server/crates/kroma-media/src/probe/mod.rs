@@ -3,11 +3,16 @@
 //! guess; a file ffprobe itself refused is recorded as unreadable instead.
 
 mod ffprobe_output;
+mod hdr10plus;
+mod outcome;
 mod parse;
 mod run;
+#[cfg(test)]
+mod remote_tests;
 
 use kroma_module_wire::{AudioStream, SubtitleTrack, VideoStream};
 
+pub use parse::spatial_of;
 pub use run::*;
 
 fn duration_of(printed: &[u8]) -> Option<u64> {

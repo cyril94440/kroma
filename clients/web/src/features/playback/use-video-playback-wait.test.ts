@@ -181,6 +181,63 @@ describe('useVideoPlayback when the server refuses the stream', () => {
     expect(result.current.failure).toBe('missing');
   });
 
+  it('names the source of a title the server could not read, after asking again', async () => {
+    H.decision = { kind: 'web-mse', aacMaster: false };
+    vi.useFakeTimers();
+    const unreadable = () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ error: 'x', code: 'error.sourceUnreachable' }), {
+          status: 502,
+        }),
+      );
+    const fetch = vi.fn(unreadable);
+    vi.stubGlobal('fetch', fetch);
+
+    const { result } = render();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    vi.useRealTimers();
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(result.current.failure).toEqual({ messageKey: 'error.sourceUnreachable' });
+    expect(vi.mocked(attachMediaSource)).not.toHaveBeenCalled();
+  });
+
+  it('plays once a source that was down for a moment answers again', async () => {
+    H.decision = { kind: 'web-mse', aacMaster: false };
+    vi.useFakeTimers();
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'x', code: 'error.sourceRefused' }), { status: 502 }),
+      )
+      .mockResolvedValue({ status: 200, headers: { get: () => '0' } });
+    vi.stubGlobal('fetch', fetch);
+
+    const { result } = render();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    vi.useRealTimers();
+
+    expect(result.current.failure).toBeNull();
+    expect(vi.mocked(attachMediaSource)).toHaveBeenCalled();
+  });
+
+  it('treats a server error from an engine that is not a refusal as a failure to restart from', async () => {
+    H.decision = { kind: 'web-mse', aacMaster: false };
+    const { result, v } = render();
+    await settle();
+    v.currentTime = 30;
+
+    act(() => vi.mocked(attachMediaSource).mock.calls.at(-1)?.[0].onRefused(502));
+    await settle();
+
+    expect(H.refreshSession).not.toHaveBeenCalled();
+    expect(result.current.anchor).toBe(30);
+  });
+
   it('gives up for good once the engine has failed past every restart', async () => {
     H.decision = { kind: 'web-mse', aacMaster: false };
     const { result } = render();

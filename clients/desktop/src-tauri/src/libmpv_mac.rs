@@ -127,7 +127,7 @@ pub fn init(app: &AppHandle, nswindow: *mut c_void) -> bool {
         // vo=libmpv selects the render API: mpv draws into our GL view instead of its own.
         init.set_property("vo", "libmpv")?;
         init.set_property("hwdec", "videotoolbox")?; // HW for HEVC/H264; AV1 → dav1d
-        libmpv_shared::apply_common_options(&init)
+        libmpv_shared::apply_common_options(&init, false)
     }) {
         Ok(m) => Arc::new(m),
         Err(e) => {
