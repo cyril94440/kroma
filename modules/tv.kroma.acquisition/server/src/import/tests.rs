@@ -142,7 +142,7 @@ mod stubs {
         stub(&downloads, "The.Movie.2020.2160p.WEB-DL.DDP5.1.HEVC-GRP.mkv.kremote", "The.Movie.2020.2160p.WEB-DL.DDP5.1.HEVC-GRP.mkv", 9_000_000_000);
         std::fs::write(downloads.join("The.Movie.2020.2160p.WEB-DL.DDP5.1.HEVC-GRP.en.srt"), "1\n").unwrap();
         let host = host_with_library("movies", &library);
-        let row = row("movie", &downloads, &["The.Movie.2020.2160p.WEB-DL.DDP5.1.HEVC-GRP.mkv.kremote"]);
+        let row = row("movie", &downloads, &["The.Movie.2020.2160p.WEB-DL.DDP5.1.HEVC-GRP.mkv.kremote", "The.Movie.2020.2160p.WEB-DL.DDP5.1.HEVC-GRP.en.srt"]);
 
         let placed = import_one(&host, &row).unwrap();
 
@@ -171,6 +171,7 @@ mod stubs {
             stub(&downloads, &format!("Pack/{real}.kremote"), &real, 2_000_000_000);
             std::fs::write(downloads.join(format!("Pack/The.Show.S01E0{episode}.1080p.WEB-DL-GRP.en.srt")), "1\n").unwrap();
             rels.push(format!("Pack/{real}.kremote"));
+            rels.push(format!("Pack/The.Show.S01E0{episode}.1080p.WEB-DL-GRP.en.srt"));
         }
         let host = host_with_library("shows", &library);
         let rels: Vec<&str> = rels.iter().map(String::as_str).collect();
