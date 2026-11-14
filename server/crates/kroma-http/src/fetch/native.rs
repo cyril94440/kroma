@@ -35,7 +35,8 @@ impl Fetch {
                 .prefix("kroma-http-body-")
                 .tempfile()
                 .context("create the curl request body")?;
-            held.write_all(body).context("write the curl request body")?;
+            held.write_all(body)
+                .context("write the curl request body")?;
             held.flush().context("write the curl request body")?;
             config.push_str(&option_line(
                 "data-binary",

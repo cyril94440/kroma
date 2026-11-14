@@ -67,7 +67,10 @@ async fn a_connection_that_never_opens_is_an_error_without_the_url() {
 async fn a_public_only_stream_never_reaches_a_loopback_address() {
     let (_dir, server, _) = served(10);
 
-    let refused = Fetch::new().public_only().stream(&server.url("body.bin")).await;
+    let refused = Fetch::new()
+        .public_only()
+        .stream(&server.url("body.bin"))
+        .await;
 
     assert!(refused.is_err());
     assert!(server.heard().is_empty(), "curl never connected");
@@ -78,7 +81,11 @@ async fn a_redirect_is_never_followed_by_a_no_redirect_stream() {
     let (_dir, server, _) = served(10);
     server.fail_with(302);
 
-    let streamed = Fetch::new().no_redirects().stream(&server.url("body.bin")).await.unwrap();
+    let streamed = Fetch::new()
+        .no_redirects()
+        .stream(&server.url("body.bin"))
+        .await
+        .unwrap();
 
     assert_eq!(streamed.status, 302);
     assert_eq!(server.heard().len(), 1);
@@ -92,7 +99,10 @@ fn curl_children() -> usize {
         .flatten()
         .filter_map(|entry| std::fs::read_to_string(entry.path().join("stat")).ok())
         .filter(|stat| {
-            let after_name = stat.rsplit_once(')').map(|(_, rest)| rest.trim()).unwrap_or_default();
+            let after_name = stat
+                .rsplit_once(')')
+                .map(|(_, rest)| rest.trim())
+                .unwrap_or_default();
             let mut fields = after_name.split_whitespace();
             let (state, parent) = (fields.next(), fields.next());
             stat.contains("(curl)") && parent == Some(me.as_str()) && state != Some("Z")
@@ -109,7 +119,10 @@ async fn dropping_a_stream_ends_the_process_behind_it() {
     let mut streamed = Fetch::new().stream(&server.url("body.bin")).await.unwrap();
     let mut first = [0u8; 1024];
     streamed.read_exact(&mut first).await.unwrap();
-    assert!(curl_children() > before, "curl is running while the body is read");
+    assert!(
+        curl_children() > before,
+        "curl is running while the body is read"
+    );
     drop(streamed);
 
     let mut left = curl_children();

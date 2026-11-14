@@ -69,7 +69,9 @@ fn a_post_round_trips_status_headers_and_body() {
     assert!(request.starts_with("POST / HTTP/"), "{request}");
     assert!(request.to_lowercase().contains("authorization: bearer tok"));
     assert!(
-        request.to_lowercase().contains("content-type: application/json"),
+        request
+            .to_lowercase()
+            .contains("content-type: application/json"),
         "{request}"
     );
     assert!(request.ends_with(r#"{"query":"test"}"#), "{request}");
@@ -89,7 +91,10 @@ fn a_get_carries_its_query_to_the_peer() {
         .unwrap();
 
     let request = server.join().unwrap();
-    assert!(request.starts_with("GET /?key=a+b&kind=str HTTP/"), "{request}");
+    assert!(
+        request.starts_with("GET /?key=a+b&kind=str HTTP/"),
+        "{request}"
+    );
     assert_eq!(resp.text(), "hi");
 }
 

@@ -89,6 +89,7 @@
   "player.settings": "Paramètres",
   "player.skipIntro": "Passer l'intro",
   "player.skipRecap": "Passer le résumé",
+  "player.sourceFailedHint": "La source de ce titre ne répond pas. Réessayez dans un instant, ou demandez au propriétaire du serveur de la vérifier.",
   "player.speed": "Vitesse",
   "player.stats": "Statistiques",
   "player.stoppedDefault": "La lecture a été arrêtée par l'administrateur.",

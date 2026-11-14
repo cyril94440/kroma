@@ -134,7 +134,6 @@ impl Fetch {
         self.http2 = true;
         self
     }
-
 }
 
 pub(crate) fn bare_proxy(proxy: &str) -> Option<String> {

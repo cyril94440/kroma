@@ -32,6 +32,7 @@ export * from './player';
 export * from './progress-queue';
 export * from './push-labels';
 export * from './slug';
+export * from './source-failure';
 export * from './subtitles';
 export * from './trailer';
 export * from './watch-now';

@@ -89,6 +89,7 @@
   "player.settings": "Settings",
   "player.skipIntro": "Skip Intro",
   "player.skipRecap": "Skip Recap",
+  "player.sourceFailedHint": "The title's source is not answering. Try again in a moment, or ask the server owner to check it.",
   "player.speed": "Speed",
   "player.stats": "Statistics",
   "player.stoppedDefault": "Playback was stopped by the administrator.",

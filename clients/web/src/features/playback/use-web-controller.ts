@@ -34,6 +34,9 @@ function failureCopy(t: Translate, failure: StreamFailure): { error: string; hin
   if (failure === 'missing') {
     return { error: t('player.streamMissing'), hint: t('player.streamMissingHint') };
   }
+  if (failure !== 'broken') {
+    return { error: t(failure), hint: t('player.sourceFailedHint') };
+  }
   return { error: t('player.cantPlay'), hint: t('player.cantPlayHint') };
 }
 

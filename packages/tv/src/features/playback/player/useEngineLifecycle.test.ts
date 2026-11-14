@@ -50,7 +50,7 @@ vi.mock('#tv/features/playback/player/vlcPlane', () => ({ vlcAvailable: () => H.
 
 const { useEngineLifecycle } = await import('#tv/features/playback/player/useEngineLifecycle');
 
-const CLIENT = fakeClient();
+const CLIENT = fakeClient({ media: { streamUrl: () => '/api/items/vid1/stream' } });
 const ITEM = { id: 'vid1', durationMs: 7_200_000 } as unknown as MediaItem;
 
 function open() {
@@ -153,5 +153,43 @@ describe('useEngineLifecycle decoder ceiling', () => {
 
     await waitFor(() => expect(result.current.error).not.toBeNull());
     expect(result.current.surface).not.toBe('vlc');
+  });
+});
+
+describe('useEngineLifecycle source failure', () => {
+  beforeEach(() => {
+    H.listeners = null;
+    H.vlc = false;
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('tells the viewer why the source of a title cannot be read', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ error: 'x', code: 'error.sourceRefused' }), {
+            status: 502,
+          }),
+        ),
+    );
+    const { result, on } = open();
+
+    act(() => on.onError());
+
+    await waitFor(() => expect(result.current.error?.messageKey).toBe('error.sourceRefused'));
+    expect(result.current.error?.hintKey).toBe('player.sourceFailedHint');
+  });
+
+  it('keeps the generic message when the server gives no reason', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 206 })));
+    const { result, on } = open();
+
+    act(() => on.onError());
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.error?.messageKey).toBe('player.cantPlay');
   });
 });

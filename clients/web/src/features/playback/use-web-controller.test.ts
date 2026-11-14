@@ -144,6 +144,15 @@ describe('useWebController notices and failures', () => {
     expect(c.errorHint).toBe('player.streamDeniedHint');
   });
 
+  it('names the source that could not be read, in the catalog the server answers from', () => {
+    H.pb = makePb({ failure: 'error.sourceRefused' });
+
+    const c = render().result.current.controller;
+
+    expect(c.error).toBe('error.sourceRefused');
+    expect(c.errorHint).toBe('player.sourceFailedHint');
+  });
+
   it('tells the chrome what a wait is on', () => {
     H.pb = makePb({ waiting: true, waitReason: 'buffering' });
 

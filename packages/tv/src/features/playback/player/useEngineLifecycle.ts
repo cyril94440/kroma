@@ -6,6 +6,7 @@ import {
   canDirectPlay,
   type DirectPlayVerdict,
   preferredAudioIndex,
+  probeSourceFailure,
 } from '@kromatv/core';
 import { storedAudioFilter } from '@kromatv/ui';
 import { useDeviceStore } from '@kromatv/ui/device-store';
@@ -136,6 +137,9 @@ export function useEngineLifecycle(
       return;
     }
     setError(failure);
+    void probeSourceFailure(client.media.streamUrl(item.id)).then((source) => {
+      if (source) setError({ messageKey: source, hintKey: 'player.sourceFailedHint' });
+    });
   });
   const plan = backend.planEngine(
     item,

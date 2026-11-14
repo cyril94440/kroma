@@ -80,7 +80,8 @@ impl Drop for Streamed {
                 status: Some(record.status),
                 bytes_in: self.bytes_in,
                 bytes_out: 0,
-                duration_ms: u64::try_from(record.started.elapsed().as_millis()).unwrap_or(u64::MAX),
+                duration_ms: u64::try_from(record.started.elapsed().as_millis())
+                    .unwrap_or(u64::MAX),
                 error: None,
                 rule: record.rule,
                 carried: egress::gateway().is_some(),
@@ -99,7 +100,9 @@ impl Fetch {
         let started = Instant::now();
         let (target, Ruling { decision, rule }) = egress::rule_url(self.purpose, "GET", url);
         let host_port = |target: &Option<WebTarget>| {
-            target.as_ref().map_or((String::new(), 0), |t| (t.host.clone(), t.port))
+            target
+                .as_ref()
+                .map_or((String::new(), 0), |t| (t.host.clone(), t.port))
         };
         let proxy = match chosen_proxy(decision, self.socks5.as_deref()) {
             Ok(proxy) => proxy,
@@ -111,13 +114,18 @@ impl Fetch {
         };
         let mut config = self.base_config();
         config.push_str(&option_line("max-time", "0"));
-        config.push_str(&option_line("connect-timeout", &CONNECT_SECONDS.to_string()));
+        config.push_str(&option_line(
+            "connect-timeout",
+            &CONNECT_SECONDS.to_string(),
+        ));
         config.push_str(&option_line("speed-limit", "1"));
         config.push_str(&option_line("speed-time", &STALLED_SECONDS.to_string()));
         config.push_str(&option_line("dump-header", "-"));
+        config.push_str(CONNECT_ANSWER_HIDDEN);
         config.push_str(&option_line("url", url));
         let route = if let Some(gateway) = egress::gateway() {
-            let username = egress::Gateway::username(self.purpose, self.public_only, self.socks5.is_some());
+            let username =
+                egress::Gateway::username(self.purpose, self.public_only, self.socks5.is_some());
             config.push_str(&gateway_lines(gateway, &username));
             Route::Proxy
         } else {
@@ -127,7 +135,11 @@ impl Fetch {
             if let Some(proxy) = &proxy {
                 config.push_str(&proxy_lines(proxy));
             }
-            if proxy.is_some() { Route::Proxy } else { Route::Direct }
+            if proxy.is_some() {
+                Route::Proxy
+            } else {
+                Route::Direct
+            }
         };
         let (host, port) = host_port(&target);
         let mut child = Command::new("curl")
@@ -141,7 +153,10 @@ impl Fetch {
             .spawn()
             .context("spawn curl")?;
         let mut stdin = child.stdin.take().context("curl stdin was not piped")?;
-        stdin.write_all(config.as_bytes()).await.context("write the curl config")?;
+        stdin
+            .write_all(config.as_bytes())
+            .await
+            .context("write the curl config")?;
         drop(stdin);
         let stdout = child.stdout.take().context("curl stdout was not piped")?;
         let mut stderr = child.stderr.take();
@@ -154,8 +169,23 @@ impl Fetch {
                     let _ = stderr.take(4096).read_to_string(&mut said).await;
                 }
                 let reason = scrubbed(said.trim(), url, &host);
-                egress::record(failed(self.purpose, host, port, route, rule, started, &reason));
-                return Err(anyhow!("{}", if reason.is_empty() { read.to_string() } else { reason }));
+                egress::record(failed(
+                    self.purpose,
+                    host,
+                    port,
+                    route,
+                    rule,
+                    started,
+                    &reason,
+                ));
+                return Err(anyhow!(
+                    "{}",
+                    if reason.is_empty() {
+                        read.to_string()
+                    } else {
+                        reason
+                    }
+                ));
             }
         };
         Ok(Streamed {
@@ -177,6 +207,10 @@ impl Fetch {
     }
 }
 
+/// Behind an HTTP proxy curl dumps the proxy's `200 Connection Established`
+/// ahead of the origin's head, and `read_head` would take it for the answer.
+const CONNECT_ANSWER_HIDDEN: &str = "suppress-connect-headers\n";
+
 async fn read_head(body: &mut BufReader<ChildStdout>) -> Result<(u16, Vec<(String, String)>)> {
     let mut seen = 0usize;
     loop {
@@ -184,7 +218,10 @@ async fn read_head(body: &mut BufReader<ChildStdout>) -> Result<(u16, Vec<(Strin
         let mut headers = Vec::new();
         loop {
             let mut line = String::new();
-            let read = body.read_line(&mut line).await.context("read the response headers")?;
+            let read = body
+                .read_line(&mut line)
+                .await
+                .context("read the response headers")?;
             if read == 0 {
                 bail!("the connection closed before the response headers");
             }
@@ -197,7 +234,10 @@ async fn read_head(body: &mut BufReader<ChildStdout>) -> Result<(u16, Vec<(Strin
                 break;
             }
             if let Some(rest) = line.strip_prefix("HTTP/") {
-                status = rest.split_whitespace().nth(1).and_then(|code| code.parse::<u16>().ok());
+                status = rest
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|code| code.parse::<u16>().ok());
             } else if let Some((name, value)) = line.split_once(':') {
                 headers.push((name.trim().to_string(), value.trim().to_string()));
             }
@@ -210,7 +250,13 @@ async fn read_head(body: &mut BufReader<ChildStdout>) -> Result<(u16, Vec<(Strin
     }
 }
 
-fn blocked(purpose: &'static str, host: String, port: u16, rule: Option<String>, reason: &str) -> Exchange {
+fn blocked(
+    purpose: &'static str,
+    host: String,
+    port: u16,
+    rule: Option<String>,
+    reason: &str,
+) -> Exchange {
     Exchange {
         purpose,
         method: "GET",
@@ -227,7 +273,15 @@ fn blocked(purpose: &'static str, host: String, port: u16, rule: Option<String>,
     }
 }
 
-fn failed(purpose: &'static str, host: String, port: u16, route: Route, rule: Option<String>, started: Instant, reason: &str) -> Exchange {
+fn failed(
+    purpose: &'static str,
+    host: String,
+    port: u16,
+    route: Route,
+    rule: Option<String>,
+    started: Instant,
+    reason: &str,
+) -> Exchange {
     Exchange {
         purpose,
         method: "GET",

@@ -1,5 +1,10 @@
 import type { ItemId } from '@kromatv/client/media';
-import { deviceDeclaration, type EngineDecision, streamRefusal } from '@kromatv/core';
+import {
+  deviceDeclaration,
+  type EngineDecision,
+  readSourceFailure,
+  streamRefusal,
+} from '@kromatv/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StreamFailure } from '#web/features/playback/stream-failure';
 import { useWebRuntime } from '#web/shared/lib/web-runtime';
@@ -30,6 +35,11 @@ interface ProbeKey {
   audioIndex: number;
   renewals: number;
 }
+
+const SOURCE_RETRIES = 2;
+const SOURCE_RETRY_MS = 1500;
+
+const pause = (ms: number) => new Promise((wake) => setTimeout(wake, ms));
 
 function numberHeader(r: Response, name: string): number {
   const raw = r.headers.get(name);
@@ -111,25 +121,36 @@ export function useStreamProbe({
       audioIndex,
       deviceDeclaration(),
     );
-    fetch(url)
-      .then((r) => {
-        if (cancelled) return;
-        if (streamRefusal(r.status)) {
-          refused(r.status);
+    const ask = async (retries: number): Promise<void> => {
+      const r = await fetch(url);
+      if (cancelled) return;
+      if (streamRefusal(r.status)) {
+        refused(r.status);
+        return;
+      }
+      const source = await readSourceFailure(r);
+      if (cancelled) return;
+      if (source) {
+        if (retries > 0) {
+          await pause(SOURCE_RETRY_MS);
+          if (!cancelled) await ask(retries - 1);
           return;
         }
-        renewed.current = false;
-        const start = numberHeader(r, 'X-Hls-Start');
-        const total = numberHeader(r, 'X-Media-Duration');
-        setBaseSec(Number.isFinite(start) ? start : anchor);
-        if (Number.isFinite(total) && total > 0) setServerDurSec(total);
-        setSrcReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setBaseSec(anchor);
-        setSrcReady(true);
-      });
+        setFailure(source);
+        return;
+      }
+      renewed.current = false;
+      const start = numberHeader(r, 'X-Hls-Start');
+      const total = numberHeader(r, 'X-Media-Duration');
+      setBaseSec(Number.isFinite(start) ? start : anchor);
+      if (Number.isFinite(total) && total > 0) setServerDurSec(total);
+      setSrcReady(true);
+    };
+    ask(SOURCE_RETRIES).catch(() => {
+      if (cancelled) return;
+      setBaseSec(anchor);
+      setSrcReady(true);
+    });
     return () => {
       cancelled = true;
     };

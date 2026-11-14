@@ -146,7 +146,10 @@ impl Loopback {
                 Ok(transport) => transport,
                 Err(error) => {
                     let reason = format!("{error:#}");
-                    return calls.iter().map(|_| Err(anyhow::anyhow!(reason.clone()))).collect();
+                    return calls
+                        .iter()
+                        .map(|_| Err(anyhow::anyhow!(reason.clone())))
+                        .collect();
                 }
             };
             let requests: Vec<Request<'_>> = urls

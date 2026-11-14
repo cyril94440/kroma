@@ -64,7 +64,10 @@ fn cookie_header(jar: &Path) -> Option<String> {
 
 fn keep_cookies(jar: &Path, response: &Response) {
     let mut jars = JARS.lock().unwrap_or_else(PoisonError::into_inner);
-    let cookies = jars.get_or_insert_with(HashMap::new).entry(jar.to_path_buf()).or_default();
+    let cookies = jars
+        .get_or_insert_with(HashMap::new)
+        .entry(jar.to_path_buf())
+        .or_default();
     for (name, value) in &response.headers {
         if !name.eq_ignore_ascii_case("set-cookie") {
             continue;
@@ -77,7 +80,13 @@ fn keep_cookies(jar: &Path, response: &Response) {
 }
 
 impl Fetch {
-    fn call_for(&self, method: &str, url: &str, content_type: Option<&str>, body: Vec<u8>) -> GuestCall {
+    fn call_for(
+        &self,
+        method: &str,
+        url: &str,
+        content_type: Option<&str>,
+        body: Vec<u8>,
+    ) -> GuestCall {
         let mut headers = self.headers.clone();
         if let Some(content_type) = content_type {
             headers.push(("content-type".to_string(), content_type.to_string()));
@@ -103,7 +112,13 @@ impl Fetch {
         }
     }
 
-    fn hand_over(&self, method: &str, url: &str, content_type: Option<&str>, body: Vec<u8>) -> Result<Response> {
+    fn hand_over(
+        &self,
+        method: &str,
+        url: &str,
+        content_type: Option<&str>,
+        body: Vec<u8>,
+    ) -> Result<Response> {
         let fetcher = FETCHER
             .get()
             .ok_or_else(|| anyhow!("this component has no way out yet"))?;
@@ -135,7 +150,10 @@ impl Fetch {
         let downloader = DOWNLOADER
             .get()
             .ok_or_else(|| anyhow!("this component has no way out yet"))?;
-        downloader(&self.call_for("GET", &self.with_query(url), None, Vec::new()), dest)
+        downloader(
+            &self.call_for("GET", &self.with_query(url), None, Vec::new()),
+            dest,
+        )
     }
 
     pub fn post_json(&self, url: &str, body: &serde_json::Value) -> Result<Response> {
@@ -171,7 +189,8 @@ impl Fetch {
             match part {
                 FormPart::Text(value) => {
                     body.extend_from_slice(
-                        format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes(),
+                        format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n")
+                            .as_bytes(),
                     );
                     body.extend_from_slice(value.as_bytes());
                 }
