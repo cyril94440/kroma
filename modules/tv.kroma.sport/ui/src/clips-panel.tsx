@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { clipUrl, clipVisible } from './clip-url';
 import type { Clip } from './schemas';
 
-const OWN_ID = 'tv.kroma.sport';
-
 interface ClipsPanelProps {
   clips: Clip[];
   pdt: number | null;
@@ -31,7 +29,7 @@ export function ClipsPanel({ clips, pdt, now, matchId = null }: Readonly<ClipsPa
       {playing ? (
         <Box mb={12}>
           <video
-            src={clipUrl(fileUrl, playing.file, OWN_ID)}
+            src={clipUrl(fileUrl, playing.file)}
             controls
             autoPlay
             playsInline

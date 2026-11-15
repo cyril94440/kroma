@@ -23,7 +23,8 @@ pub fn specs() -> Vec<Spec> {
 }
 
 fn stream_history(env: &mut ToolEnv, args: &Value) -> Value {
-    let minutes = int_arg(args, "minutes", 60).clamp(1, 180);
+    let asked = int_arg(args, "minutes", 60);
+    let minutes = if asked <= 0 { 60 } else { asked.min(180) };
     let Some(measure) = Measure::parse(&text_arg(args, "mesure")) else { return json!({ "erreur": "mesure inconnue : debit ou saccades" }) };
     let limit = (minutes * 60 / STEP_S) as u32;
     let history = match env.deps.control.history(limit) {

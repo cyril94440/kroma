@@ -32,6 +32,7 @@ pub struct Context<'a> {
     pub history: &'a [RoomMessage],
     pub notes: &'a [String],
     pub agent_name: &'a str,
+    pub scans: &'a [String],
 }
 
 pub struct SystemPrompt {
@@ -69,7 +70,7 @@ fn status_lines(status: &Status, lines: &mut Vec<String>) {
         lines.push("[état] Flux : saccades ou image figée côté fournisseur.".into());
     }
     if !status.provider.is_empty() {
-        lines.push(format!("[état] Fournisseur IPTV actif : {}", status.provider));
+        lines.push(format!("[état] Fournisseur IPTV actif : {}", crate::tools::provider_fr(&status.provider)));
     }
     if !status.viewers.is_empty() {
         lines.push(format!("[état] Spectateurs : {}", status.viewers.iter().map(|v| v.name.as_str()).collect::<Vec<_>>().join(", ")));
@@ -90,6 +91,7 @@ pub fn context(input: &Context) -> String {
     if let Some(status) = input.status {
         status_lines(status, &mut lines);
     }
+    lines.extend(input.scans.iter().cloned());
     if let Some(vote) = input.vote {
         let waiting = if vote.waiting_on.is_empty() { "personne".to_string() } else { vote.waiting_on.join(", ") };
         lines.push(format!("[état] VOTE EN COURS : {} (demandé par {}) — en attente de : {waiting}.", vote.label, vote.requester));

@@ -71,7 +71,8 @@ fn by_target(env: &mut ToolEnv, status: &Status, target: &'static str, force: bo
     };
     let label = provider_fr(target);
     let mut out = match error.as_deref() {
-        None if switched => {
+        None if !switched => json!({ "ok": false, "status": "refused", "raison": "changement de fournisseur refusé" }),
+        None => {
             env.ctx.diffusion_done = true;
             json!({ "status": "switched_provider", "provider": label, "note": "le flux repart chez ce fournisseur (~5 s de coupure) : dis-le en UNE phrase courte" })
         }

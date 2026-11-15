@@ -69,8 +69,8 @@ fn look_at_live_reads_the_captured_frame_and_reports_trust() {
     reading.confidence = 0.9;
     *model.0.screen.lock().unwrap() = Some(Ok(reading));
     let (out, _) = run(&rig, &model, "look_at_live", json!({ "question": "qui joue ?" }), "Mamie");
-    assert_eq!((out["type"].as_str(), out["team1"].as_str(), out["fiable"].as_bool()), (Some("direct"), Some("Lens"), Some(true)));
-    assert_eq!(out["capture_il_y_a_s"], 3);
+    assert_eq!((out["type"].as_str(), out["equipes"][0].as_str(), out["fiable"].as_bool()), (Some("direct"), Some("Lens"), Some(true)));
+    assert_eq!(out["lu_il_y_a_s"], 3);
     assert_eq!(rig.deps.store.audit_rows(Some("vision"), None, 3).unwrap()[0].event, "reading");
 }
 
@@ -79,9 +79,9 @@ fn a_live_module_without_snapshot_switches_the_tool_off_for_ten_minutes() {
     let rig = Rig::new();
     let (out, _) = run(&rig, &Scripted::new(Vec::new()), "look_at_live", json!({}), "Mamie");
     assert_eq!(out["ok"], false);
-    assert!(!rig.deps.snapshot_supported(rig.now()));
+    assert!(!rig.deps.supported("snapshot", rig.now()));
     rig.advance(601_000);
-    assert!(rig.deps.snapshot_supported(rig.now()));
+    assert!(rig.deps.supported("snapshot", rig.now()));
 }
 
 #[test]

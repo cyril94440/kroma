@@ -53,10 +53,17 @@ export function useViewerApi(): ModuleApi {
   return useMemo(() => host.moduleApi(id), [host, id]);
 }
 
-/** The URL of a file THIS module published, carrying the media ticket a
- *  `<video>` or hls.js cannot send as a header. */
-export function useModuleFileUrl(): (path: string) => string {
+/** The URL of a file a module published, carrying the media ticket a `<video>`
+ *  or hls.js cannot send as a header. Without `moduleId` it is a file of THIS
+ *  module; with one, of that module (a clip another module cut, say): the core
+ *  serves `/api/module-files/<id>/..` to any account that may play, and who may
+ *  fetch what is the publishing module's own concern. */
+export function useModuleFileUrl(): (path: string, moduleId?: string) => string {
   const id = useOwnId('useModuleFileUrl');
   const host = useViewerHost('useModuleFileUrl');
-  return useMemo(() => (path) => host.fileUrl(id, path), [host, id]);
+  return useMemo(
+    () => (path, moduleId) =>
+      host.fileUrl(moduleId === undefined ? id : ModuleId.parse(moduleId), path),
+    [host, id],
+  );
 }

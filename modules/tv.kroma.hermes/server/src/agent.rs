@@ -205,6 +205,7 @@ impl Agent {
         let external = self.deps.contributors.tools(now).iter().any(|t: &ExternalTool| tools.has(&t.decl.name));
         let system = prompt::system_instruction(tools, &self.deps.rules.render(), &settings.language, external);
         let sections = system.sections.clone();
+        let scans = self.deps.scans.summary_lines(now);
         let context = prompt::context(&prompt::Context {
             now,
             author: &message.name,
@@ -215,6 +216,7 @@ impl Agent {
             history: &history,
             notes: &notes,
             agent_name: &name,
+            scans: &scans,
         });
         (system, sections, context)
     }

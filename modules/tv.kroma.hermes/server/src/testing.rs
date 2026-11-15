@@ -31,6 +31,8 @@ pub struct Script {
     pub search: Mutex<Option<Result<WebAnswer, ModelError>>>,
     pub searches: Mutex<Vec<String>>,
     pub screen: Mutex<Option<Result<ScreenReading, ModelError>>>,
+    pub screens: Mutex<VecDeque<Result<ScreenReading, ModelError>>>,
+    pub screen_calls: Mutex<u32>,
     pub per_step: Mutex<Option<(Arc<AtomicI64>, i64)>>,
     pub no_search: Mutex<bool>,
 }
@@ -92,6 +94,10 @@ impl Model for Scripted {
     }
 
     fn read_screen(&self, _jpeg_base64: &str, _question: &str) -> Result<ScreenReading, ModelError> {
+        *self.0.screen_calls.lock().unwrap() += 1;
+        if let Some(next) = self.0.screens.lock().unwrap().pop_front() {
+            return next;
+        }
         self.0.screen.lock().unwrap().clone().unwrap_or(Err(ModelError::Rejected("no screen scripted".into())))
     }
 
@@ -112,7 +118,7 @@ pub struct Rig {
 }
 
 pub fn candidate(id: &str, name: &str, score: f64) -> Candidate {
-    Candidate { id: id.into(), name: name.into(), group: "FR".into(), score, now: None }
+    Candidate { id: id.into(), name: name.into(), group: "FR".into(), score, now: None, provider: "primary".into(), event: None }
 }
 
 pub fn programme(channel_id: &str, channel_name: &str, title: &str, start_min: i64, end_min: i64) -> Programme {

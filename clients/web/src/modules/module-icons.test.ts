@@ -7,6 +7,7 @@ describe('resolveModuleIcon', () => {
     expect(resolveModuleIcon('tv')).toBe('device-tv');
     expect(resolveModuleIcon('chart')).toBe('chart-bar');
     expect(resolveModuleIcon('chat')).toBe('messages');
+    expect(resolveModuleIcon('trophy')).toBe('trophy');
   });
 
   it('maps aliases to the same icon (stats -> chart)', () => {

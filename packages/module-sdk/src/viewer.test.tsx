@@ -82,6 +82,13 @@ describe('useModuleFileUrl', () => {
     const { result } = renderHook(() => useModuleFileUrl(), { wrapper: wrap(host()) });
     expect(result.current('live/index.m3u8')).toBe('/files/tv.kroma.probe/live/index.m3u8');
   });
+
+  it("builds the url of another module's published file when given its id", () => {
+    const { result } = renderHook(() => useModuleFileUrl(), { wrapper: wrap(host()) });
+    expect(result.current('clips/g1.mp4', 'tv.kroma.live')).toBe(
+      '/files/tv.kroma.live/clips/g1.mp4',
+    );
+  });
 });
 
 describe('useServerEvents outside the admin shell', () => {

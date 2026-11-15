@@ -6,10 +6,16 @@ const sportModule = defineModule({
     {
       path: 'sport',
       component: lazy(() => import('./SportPage')),
-      nav: { label: 'sport.nav', icon: 'chart', section: 'library' },
+      nav: { label: 'sport.nav', icon: 'trophy', section: 'library' },
     },
   ],
-  slots: [{ slot: 'tv.kroma.live/player.aside', component: lazy(() => import('./SportAside')) }],
+  slots: [
+    {
+      slot: 'tv.kroma.live/player.aside',
+      component: lazy(() => import('./SportAside')),
+      order: -1,
+    },
+  ],
 });
 
 export default sportModule;

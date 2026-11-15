@@ -57,7 +57,7 @@ fn the_context_carries_state_viewers_vote_poll_history_and_notes() {
         "[état] SONDAGE EN COURS : « Qui gagne ? » (type choice — options : Lens, PSG)",
         "[état] Chaîne en cours : TF1 (réf tf1) — en ce moment : Journal",
         "[état] Image du direct : NOIRE",
-        "[état] Fournisseur IPTV actif : primary",
+        "[état] Fournisseur IPTV actif : principal",
         "[état] Spectateurs : Mamie, Papi",
         "[état] VOTE EN COURS : M6 (demandé par Papi) — en attente de : Mamie.",
         "[ce que tu sais de Mamie]",
@@ -103,7 +103,7 @@ fn the_declared_tools_and_their_sections_follow_what_this_turn_can_do() {
     assert!(opened[0].2.contains(&"web_search".to_string()));
     assert!(!opened[1].2.contains(&"web_search".to_string()));
     assert!(opened[0].2.contains(&"look_at_live".to_string()));
-    rig.deps.mark_snapshot_unsupported(rig.now());
+    rig.deps.mark_unsupported("snapshot", rig.now());
     rig.hear("m-3", "Mamie", "mets arte");
     rig.drain();
     assert!(!model.0.opened.lock().unwrap()[2].2.contains(&"look_at_live".to_string()), "a live module without snapshot loses the tool");
@@ -113,18 +113,18 @@ fn the_declared_tools_and_their_sections_follow_what_this_turn_can_do() {
 #[test]
 fn the_sections_of_the_system_prompt_keep_a_stable_order() {
     let rig = Rig::new();
-    let set = crate::tools::ToolSet::build(&rig.deps, &crate::tools::Availability { search: true, vision: true }, rig.now());
+    let set = crate::tools::ToolSet::build(&rig.deps, &crate::tools::Availability { search: true, vision: true, ..crate::tools::Availability::default() }, rig.now());
     let prompt = crate::prompt::system_instruction(&set, "RULES", "fr", false);
     assert_eq!(
         prompt.sections,
         vec![
             "identity", "audience", "governance", "investigate", "failures", "references", "vision", "french", "context", "tools", "questions", "channel-requests", "ambiguity", "state-questions",
-            "troubleshooting", "polls", "kick", "cards", "facts", "learning"
+            "troubleshooting", "polls", "kick", "cards", "facts", "providers", "scans", "watch-party", "learning"
         ]
     );
     assert!(prompt.text.ends_with("=== RÈGLES MAISON ===\nRULES"));
     let bare = crate::tools::ToolSet::build(&rig.deps, &crate::tools::Availability::default(), rig.now());
     let without = crate::prompt::system_instruction(&bare, "RULES", "en", true);
-    assert!(!without.sections.contains(&"vision") && !without.sections.contains(&"facts") && without.sections.contains(&"extra-tools"));
+    assert!(!without.sections.contains(&"facts") && without.sections.contains(&"extra-tools"));
     assert!(without.text.contains("Langue de tes réponses : anglais."));
 }

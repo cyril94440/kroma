@@ -1,16 +1,10 @@
 import type { Clip } from './schemas';
 
-/** Clips live in the live module's published folder; the hook only builds URLs for this module's own, so the id segment is swapped (the media ticket belongs to the account). */
 export function clipUrl(
-  ownFileUrl: (path: string) => string,
+  fileUrl: (path: string, moduleId?: string) => string,
   file: Clip['file'],
-  ownId: string,
 ): string {
-  const own = ownFileUrl(file.path);
-  return own.replace(
-    `/module-files/${encodeURIComponent(ownId)}/`,
-    `/module-files/${encodeURIComponent(file.module)}/`,
-  );
+  return fileUrl(file.path, file.module);
 }
 
 const FALLBACK_DELAY_MS = 180_000;

@@ -53,7 +53,7 @@ fn a_peer_error_that_names_a_stream_url_is_masked_for_the_model_and_the_log() {
         fn status(&self) -> anyhow::Result<crate::peers::Status> {
             Err(anyhow::anyhow!("read failed on http://h:80/TESTUSER/TESTPASS42/1.ts"))
         }
-        fn resolve(&self, _: &str, _: u32) -> anyhow::Result<Vec<crate::peers::Candidate>> {
+        fn resolve(&self, _: &str, _: u32, _: Option<&str>) -> anyhow::Result<Vec<crate::peers::Candidate>> {
             Ok(Vec::new())
         }
         fn epg(&self, _: Option<&str>, _: Option<i64>, _: Option<i64>, _: u32) -> anyhow::Result<Vec<crate::peers::Programme>> {

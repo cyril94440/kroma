@@ -51,9 +51,9 @@ fn run_ops_diagnose_gives_a_verdict_from_the_measures() {
 #[test]
 fn run_ops_reads_flux_health_and_provider_and_refuses_unknown_actions() {
     let rig = Rig::new();
-    assert_eq!(call(&rig, "run_ops", json!({ "action": "fournisseurs" }), "Papi")["actif"], "primary");
+    assert_eq!(call(&rig, "run_ops", json!({ "action": "fournisseurs" }), "Papi")["actif"], "principal");
     assert_eq!(call(&rig, "run_ops", json!({ "action": "sante_flux" }), "Papi")["chaine"], "TF1");
-    let refused = call(&rig, "run_ops", json!({ "action": "restart_ingest" }), "Papi");
+    let refused = call(&rig, "run_ops", json!({ "action": "reboot_server" }), "Papi");
     assert_eq!(refused["ok"], false);
 }
 

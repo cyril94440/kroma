@@ -9,12 +9,13 @@ describe('sportModule', () => {
 
   it('fills the live player aside slot with the compact match panel', () => {
     expect(sportModule.slots?.map((s) => s.slot)).toEqual(['tv.kroma.live/player.aside']);
+    expect(sportModule.slots?.[0]?.order).toBeLessThan(0);
   });
 
   it('puts its page in the main sidebar', () => {
     expect(sportModule.routes?.map((r) => r.path)).toEqual(['sport']);
     expect(sportModule.navItems).toEqual([
-      { label: 'sport.nav', icon: 'chart', section: 'library', to: '/sport' },
+      { label: 'sport.nav', icon: 'trophy', section: 'library', to: '/sport' },
     ]);
   });
 });

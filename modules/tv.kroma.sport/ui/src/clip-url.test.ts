@@ -20,10 +20,11 @@ const clip: Clip = {
 };
 
 describe('clipUrl', () => {
-  it('points at the live module folder with the account ticket of the own url', () => {
-    const own = (path: string) => `https://h/api/module-files/tv.kroma.sport/${path}?t=abc`;
+  it('asks the host for the file in the folder of the module that published it', () => {
+    const fileUrl = (path: string, moduleId?: string) =>
+      `https://h/api/module-files/${moduleId ?? 'own'}/${path}?t=abc`;
 
-    expect(clipUrl(own, clip.file, 'tv.kroma.sport')).toBe(
+    expect(clipUrl(fileUrl, clip.file)).toBe(
       'https://h/api/module-files/tv.kroma.live/clips/g1.mp4?t=abc',
     );
   });

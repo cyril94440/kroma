@@ -60,10 +60,6 @@ impl Follow {
         Self { job, phase: Phase::Waiting, ticks: 0, poll_errors: 0, state: ScanState::default(), rows: Vec::new(), reference: None, finished_at: 0, vision_errors: 0, late: false, frames_unreadable: false }
     }
 
-    pub fn job(&self) -> &ScanJob {
-        &self.job
-    }
-
     fn wait_for_scan(&mut self, deps: &Deps) -> Option<Value> {
         self.ticks += 1;
         if self.ticks % POLL_EVERY != 1 {

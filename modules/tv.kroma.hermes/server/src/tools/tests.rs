@@ -1,8 +1,17 @@
+mod benchmark;
 mod cards;
+mod channels;
 mod guide;
+mod history;
 mod live;
 mod memory;
+mod ops;
 mod party;
+mod probe;
+mod provider;
 mod registry;
+mod scan_support;
 mod support;
+mod vision;
+mod watch;
 mod web_vision;

@@ -3,7 +3,8 @@ use std::sync::Mutex;
 use anyhow::{anyhow, Result};
 
 use super::fakes::answer;
-use super::{BenchmarkStart, Candidate, Control, History, Probe, Programme, ProviderSwitch, Restart, ScanState, Snapshot, Status};
+use super::ops::{History, Restart};
+use super::{BenchmarkStart, Candidate, Control, Probe, Programme, ProviderSwitch, ScanState, Snapshot, Status};
 
 pub type Reply<T> = Mutex<Option<Result<T, String>>>;
 
@@ -21,6 +22,7 @@ pub struct FakeControl {
     pub history: Reply<History>,
     pub frames: Mutex<Option<Result<std::collections::BTreeMap<String, String>, String>>>,
     pub down: Mutex<bool>,
+    pub status_after_snapshot: Mutex<Option<Status>>,
     pub epg_calls: Mutex<Vec<Option<String>>>,
     pub resolve_calls: Mutex<Vec<(String, Option<String>)>>,
     pub calls: Mutex<Vec<(String, String)>>,
@@ -77,7 +79,11 @@ impl Control for FakeControl {
     }
 
     fn snapshot(&self) -> Result<Snapshot> {
-        answer(&self.snapshot)
+        let taken = answer(&self.snapshot);
+        if let Some(next) = self.status_after_snapshot.lock().unwrap().take() {
+            *self.status.lock().unwrap() = next;
+        }
+        taken
     }
 
     fn restart(&self, requested_by: &str, _reason: &str) -> Result<Restart> {

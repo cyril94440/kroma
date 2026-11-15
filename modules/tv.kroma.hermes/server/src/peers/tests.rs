@@ -58,7 +58,7 @@ async fn the_room_calls_send_the_pinned_json_and_read_the_pinned_replies() {
     let out = blocking(move || {
         let said = room.say("Bonsoir", Some(json!({ "kind": "match" })), Some("m0")).unwrap();
         let history = room.history(5, Some(9)).unwrap();
-        let switched = room.request_switch("tf1", "u1", "foot").unwrap();
+        let switched = room.request_switch(&SwitchAsk { channel_id: "tf1", channel_name: None, requested_by: "u1", reason: "foot", force: false }).unwrap();
         let poll = room.start_poll("Q", "choice", &["A".into(), "B".into()], Some(60)).unwrap();
         let closed = room.close_poll().unwrap();
         room.vote_poll("u1", "a").unwrap();
@@ -97,7 +97,7 @@ async fn the_control_calls_send_the_pinned_json_and_tolerate_missing_fields() {
     )
     .await;
     let control = PeerControl::new(host);
-    let out = blocking(move || (control.status().unwrap(), control.resolve("m6", 3).unwrap(), control.epg(Some("foot"), Some(1), None, 10).unwrap(), control.snapshot().unwrap())).await;
+    let out = blocking(move || (control.status().unwrap(), control.resolve("m6", 3, None).unwrap(), control.epg(Some("foot"), Some(1), None, 10).unwrap(), control.snapshot().unwrap())).await;
     assert_eq!(out.0.channel.unwrap().name, "TF1");
     assert!(out.0.health.stutter && !out.0.health.black);
     assert_eq!(out.0.viewers[0].user_id, "u1");
@@ -106,7 +106,7 @@ async fn the_control_calls_send_the_pinned_json_and_tolerate_missing_fields() {
     assert_eq!(out.3, Snapshot { jpeg_base64: "QUJD".into(), at: 42 });
     let sent: std::collections::BTreeMap<String, Value> = seen.lock().unwrap().iter().cloned().collect();
     assert_eq!(sent["status"], json!({}));
-    assert_eq!(sent["resolve"], json!({ "query": "m6", "limit": 3 }));
+    assert_eq!(sent["resolve"], json!({ "query": "m6", "limit": 3, "provider": null }));
     assert_eq!(sent["epg"], json!({ "query": "foot", "from": 1, "to": null, "limit": 10 }));
 }
 

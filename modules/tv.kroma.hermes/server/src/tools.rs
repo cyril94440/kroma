@@ -25,7 +25,7 @@ mod web;
 
 pub use cards::validate_card;
 pub use memory::LESSONS_MAX;
-pub use scan::{Follow, ScanJob};
+pub use scan::Follow;
 
 const LONG_TOOL_MIN_S: f64 = 60.0;
 
@@ -180,6 +180,7 @@ fn specs() -> Vec<Spec> {
     let mut all = Vec::new();
     all.extend(chat::specs());
     all.extend(live::specs());
+    all.extend(ops::specs());
     all.extend(guide::specs());
     all.extend(party::specs());
     all.extend(watch::specs());

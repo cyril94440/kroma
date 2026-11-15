@@ -8,7 +8,7 @@ mod groups;
 #[cfg(test)]
 mod tests;
 
-pub use groups::{build_groups, Group, Member};
+pub use groups::{build_groups, Group};
 
 const TTL_MS: i64 = 1_800_000;
 const KEEP: usize = 5;
@@ -127,7 +127,7 @@ impl ScanCache {
 
     pub fn resolve_ref(&self, reference: &str, now: i64) -> Option<String> {
         let body = reference.trim().strip_prefix('#')?;
-        let (scan_id, group): (Option<u32>, u32) = match body.split_once('.') {
+        let (scan_id, group): (Option<u32>, usize) = match body.split_once('.') {
             Some((s, g)) => (Some(s.parse().ok()?), g.parse().ok()?),
             None => (None, body.parse().ok()?),
         };

@@ -92,18 +92,40 @@ pub struct Snapshot {
 
 /// The live television as this module uses it, over the `tv.kroma.live/control`
 /// point. It never switches channel itself: a change goes through the room's vote.
+/// The methods after `snapshot` arrived in later versions of the live module: a
+/// control that does not offer them answers like an older live module.
 pub trait Control: Send + Sync {
     fn status(&self) -> Result<Status>;
     fn resolve(&self, query: &str, limit: u32, provider: Option<&str>) -> Result<Vec<Candidate>>;
     fn epg(&self, query: Option<&str>, from: Option<i64>, to: Option<i64>, limit: u32) -> Result<Vec<Programme>>;
     fn snapshot(&self) -> Result<Snapshot>;
-    fn restart(&self, requested_by: &str, reason: &str) -> Result<Restart>;
-    fn switch_provider(&self, provider: &str, requested_by: &str, reason: &str) -> Result<ProviderSwitch>;
-    fn probe(&self, channel_id: &str) -> Result<Probe>;
-    fn benchmark(&self, channel_ids: &[String], requested_by: &str) -> Result<BenchmarkStart>;
-    fn scan_result(&self) -> Result<ScanState>;
-    fn history(&self, limit: u32) -> Result<History>;
-    fn scan_frame(&self, path: &str) -> Result<String>;
+    fn restart(&self, _requested_by: &str, _reason: &str) -> Result<Restart> {
+        Err(super::not_offered())
+    }
+
+    fn switch_provider(&self, _provider: &str, _requested_by: &str, _reason: &str) -> Result<ProviderSwitch> {
+        Err(super::not_offered())
+    }
+
+    fn probe(&self, _channel_id: &str) -> Result<Probe> {
+        Err(super::not_offered())
+    }
+
+    fn benchmark(&self, _channel_ids: &[String], _requested_by: &str) -> Result<BenchmarkStart> {
+        Err(super::not_offered())
+    }
+
+    fn scan_result(&self) -> Result<ScanState> {
+        Err(super::not_offered())
+    }
+
+    fn history(&self, _limit: u32) -> Result<History> {
+        Err(super::not_offered())
+    }
+
+    fn scan_frame(&self, _path: &str) -> Result<String> {
+        Err(super::not_offered())
+    }
 }
 
 pub struct PeerControl {

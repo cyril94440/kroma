@@ -15,6 +15,7 @@ const ICONS: Record<string, IconName> = {
   movie: 'movie',
   tv: 'device-tv',
   chat: 'messages',
+  trophy: 'trophy',
   chart: 'chart-bar',
   stats: 'chart-bar',
   database: 'database',

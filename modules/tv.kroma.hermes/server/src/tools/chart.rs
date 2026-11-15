@@ -67,7 +67,7 @@ pub fn episodes(points: &[HistoryPoint]) -> Vec<Value> {
         match point {
             Some(p) if abnormal(p) => run.push(p),
             _ => {
-                if let (Some(first), Some(last)) = (run.first(), run.last()).filter(|_| run.len() >= 2) {
+                if let (Some(first), Some(last), true) = (run.first(), run.last(), run.len() >= 2) {
                     out.push(json!({ "debut": hour(first), "fin": hour(last), "duree_s": last.at - first.at + STEP_S }));
                 }
                 run.clear();
