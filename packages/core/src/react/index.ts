@@ -41,3 +41,5 @@ export {
 } from './use-live-room';
 export type { LiveModulesState } from './use-live-modules';
 export { useLiveModules } from './use-live-modules';
+export type { LiveActions, ZapOutcome } from './use-live-actions';
+export { useLiveActions } from './use-live-actions';

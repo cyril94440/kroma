@@ -163,5 +163,5 @@ fn the_manifest_declares_the_peers_and_the_point_it_defines() {
     assert_eq!(manifest["definesPoints"][0]["name"], "tools");
     assert_eq!(manifest["definesPoints"][0]["methods"], json!(["list", "call"]));
     assert_eq!(TOOLS, "tv.kroma.hermes/tools");
-    assert_eq!(manifest["dependencies"], json!({ "tv.kroma.party": ">=0.1.0", "tv.kroma.live": ">=0.1.0" }));
+    assert_eq!(manifest["dependencies"], json!({ "tv.kroma.party": ">=0.1.0", "tv.kroma.live": ">=0.3.0" }));
 }

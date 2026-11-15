@@ -16,7 +16,7 @@ export function isRevealed(
   return context.now >= fact.t_vu + context.delay * 1000;
 }
 
-export function minuteLabel(seconds: number, period: number): string {
+function minuteLabel(seconds: number, period: number): string {
   if (period === 5) return 'TAB';
   const cap = CAP_BY_PERIOD[period] ?? 90;
   const minute = Math.floor(seconds / 60) + 1;

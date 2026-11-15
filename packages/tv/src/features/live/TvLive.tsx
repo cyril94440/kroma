@@ -1,5 +1,6 @@
 import type { ChannelView } from '@kromatv/client/live';
-import { liveBadges } from '@kromatv/core';
+import { liveBadges, pollToAnswer, voteToAnswer } from '@kromatv/core';
+import { useLiveActions } from '@kromatv/core/react';
 import { Player, TV_FLAGS, useT } from '@kromatv/ui';
 import { Box, Button, Text, toast } from '@kromatv/ui/kit';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
@@ -41,6 +42,7 @@ export function TvLive<E extends LiveEngine>({
   const client = useClient();
   const { mousePointer } = useEnv();
   const { room, playlistUrl, modules, modulesReady } = useLiveScreen();
+  const actions = useLiveActions(client, modules);
   const live = useLivePlayback(backend, playlistUrl);
   const controller = useLiveController(live);
   const [panel, setPanel] = useState<Panel | null>(null);
@@ -68,47 +70,38 @@ export function TvLive<E extends LiveEngine>({
   const zap = useCallback(
     (channel: ChannelView) => {
       setPanel(null);
-      const run = modules.party
-        ? client.party.requestSwitch(channel.id, channel.name).then((out) => out.outcome)
-        : client.live.switchTo(channel.id).then(() => 'switchedDirectly' as const);
-      run.then(
+      actions.zap(channel).then(
         (outcome) => toast({ message: t(ZAP_MESSAGE[outcome], { name: channel.name }) }),
         () => toast({ message: t('live.zapRefused') }),
       );
     },
-    [client, modules.party, t],
+    [actions, t],
   );
 
   const answerVote = useCallback(
     (approve: boolean) => {
       if (vote) setDismissedVote(vote.id);
-      client.party.vote(approve).then(
+      actions.vote(approve).then(
         () => toast({ message: t('live.voted') }),
         () => undefined,
       );
     },
-    [client, vote, t],
+    [actions, vote, t],
   );
 
   const answerPoll = useCallback(
     (value: string) => {
       if (poll) setDismissedPoll(poll.id);
-      client.party.pollVote(value).then(
+      actions.pollVote(value).then(
         () => toast({ message: t('live.pollAnswered') }),
         () => undefined,
       );
     },
-    [client, poll, t],
+    [actions, poll, t],
   );
 
-  const voteOpen =
-    vote !== null &&
-    vote.id !== dismissedVote &&
-    vote.by?.userId !== me &&
-    me !== '' &&
-    !(me in vote.votes);
-  const pollOpen =
-    poll !== null && poll.id !== dismissedPoll && !voteOpen && me !== '' && !(me in poll.votes);
+  const openVote = voteToAnswer(vote, me, dismissedVote);
+  const openPoll = openVote ? null : pollToAnswer(poll, me, dismissedPoll);
   const closePanel = useCallback(() => setPanel(null), []);
   const badge = status ? liveBadges(status)[0] : undefined;
   const title = status?.channel?.name ?? t('nav.live');
@@ -179,12 +172,12 @@ export function TvLive<E extends LiveEngine>({
         open={panel === 'chat'}
         messages={party.state?.messages ?? []}
         onClose={closePanel}
-        onReply={(text) => void client.party.chat(text).catch(() => undefined)}
+        onReply={(text) => void actions.chat(text).catch(() => undefined)}
       />
       <ReactionsDrawer
         open={panel === 'reactions'}
         onClose={closePanel}
-        onReact={(emoji) => void client.party.floating(emoji).catch(() => undefined)}
+        onReact={(emoji) => void actions.react(emoji).catch(() => undefined)}
       />
       <MatchDrawer
         open={panel === 'match'}
@@ -194,14 +187,14 @@ export function TvLive<E extends LiveEngine>({
         onClose={closePanel}
       />
       <VoteDrawer
-        vote={voteOpen ? vote : null}
+        vote={openVote}
         userId={me}
         now={now}
         onAnswer={answerVote}
         onClose={() => vote && setDismissedVote(vote.id)}
       />
       <PollDrawer
-        poll={pollOpen ? poll : null}
+        poll={openPoll}
         userId={me}
         now={now}
         onAnswer={answerPoll}

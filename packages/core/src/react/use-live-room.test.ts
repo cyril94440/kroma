@@ -100,6 +100,26 @@ describe('a live screen', () => {
     expect(f.closed).toHaveBeenCalled();
   });
 
+  it('stays present when the client is replaced, instead of leaving and joining again', async () => {
+    const f = fixture();
+    const { rerender } = renderHook(
+      ({ client }) =>
+        useLiveRoom({ client, openEvents: f.openEvents, modules: ON, watching: true }),
+      { initialProps: { client: f.client } },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    rerender({ client: { ...f.client } as LiveClient });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(f.live.leave).not.toHaveBeenCalled();
+    expect(f.live.beat).toHaveBeenCalledTimes(1);
+  });
+
   it('does not announce presence when the live module is absent', async () => {
     const f = fixture();
     await mount(f, { live: false, party: false, sport: false });

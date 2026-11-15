@@ -2,7 +2,7 @@ import type { KromaClient } from '@kromatv/client';
 import type { Status } from '@kromatv/client/live';
 import { PartyEvent } from '@kromatv/client/party';
 import { SportEventMessage } from '@kromatv/client/sport';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { applyLiveEvent } from '../live/live-state';
 import type { LiveModules } from '../live/modules';
 import {
@@ -39,13 +39,17 @@ export interface LiveRoom {
 }
 
 function usePresence(client: LiveClient, enabled: boolean): void {
+  const latest = useRef(client);
+  useEffect(() => {
+    latest.current = client;
+  });
   useEffect(() => {
     if (!enabled) return;
     let interval = DEFAULT_HEARTBEAT_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
     const beat = () => {
-      client.live
+      latest.current.live
         .beat()
         .then((answer) => {
           interval = answer.heartbeatSeconds * 1000;
@@ -59,9 +63,9 @@ function usePresence(client: LiveClient, enabled: boolean): void {
     return () => {
       stopped = true;
       clearTimeout(timer);
-      client.live.leave();
+      latest.current.live.leave();
     };
-  }, [client, enabled]);
+  }, [enabled]);
 }
 
 /** Everything one live screen follows, over a single event socket: the live

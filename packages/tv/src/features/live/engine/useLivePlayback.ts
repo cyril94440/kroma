@@ -27,7 +27,7 @@ const START: LiveState = {
   aspect: undefined,
 };
 
-export const BEHIND_POLL_MS = 500;
+const BEHIND_POLL_MS = 500;
 
 /** Plays the live playlist `url` through the backend's engine and starts it the
  *  first time the engine is ready. A null `url` holds the screen waiting with no

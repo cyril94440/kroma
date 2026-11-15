@@ -1,5 +1,5 @@
 import type { MatchPayload } from '@kromatv/client/sport';
-import { calculateMatch } from '@kromatv/core';
+import { calculateMatch, clockWords } from '@kromatv/core';
 import { Box, Text } from '@kromatv/ui/kit';
 import { useMemo } from 'react';
 import { useT } from '#mobile/lib/i18n';
@@ -10,10 +10,10 @@ export function LiveMatch({
   match,
   frameTimeMs,
   now,
-}: Readonly<{ match: MatchPayload | null; frameTimeMs: number | null; now: number }>) {
+}: Readonly<{ match: MatchPayload | null; frameTimeMs: () => number | null; now: number }>) {
   const t = useT();
   const view = useMemo(
-    () => (match ? calculateMatch(match, { pdt: frameTimeMs, now, postSeenAt: null }) : null),
+    () => (match ? calculateMatch(match, { pdt: frameTimeMs(), now, postSeenAt: null }) : null),
     [match, frameTimeMs, now],
   );
   if (!match || !view) {
@@ -23,11 +23,8 @@ export function LiveMatch({
       </Text>
     );
   }
-  const clock = view.clock.finished
-    ? t('live.matchFinished')
-    : view.clock.started
-      ? view.clock.label
-      : t('live.matchPre');
+  const words = clockWords(view.clock);
+  const clock = words ? t(words) : view.clock.label;
   return (
     <Box gap={12}>
       <Text variant="meta" color="textMuted">

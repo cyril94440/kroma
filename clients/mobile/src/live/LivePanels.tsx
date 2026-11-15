@@ -20,13 +20,15 @@ export function VoteBanner({
   const mine = voteOf(vote, userId);
   const own = vote.by?.userId === userId;
   const seconds = Math.max(0, Math.ceil((vote.endsAt - now) / 1000));
+  const waiting = voteWaiting(vote) > 0 ? ` (${voteWaiting(vote)})` : '';
+  const tally = t('live.voteTally', { yes: vote.tally.yes, no: vote.tally.no });
   return (
     <Box gap={10} p={16} radius="lg" bg="surface2">
       <Text variant="label">
         {t('live.voteBy', { name: vote.by?.name ?? '', channel: vote.label })}
       </Text>
       <Text variant="meta" color="textMuted">
-        {`${t('live.voteEnds', { seconds })}  ·  ${t('live.voteTally', { yes: vote.tally.yes, no: vote.tally.no })}${voteWaiting(vote) > 0 ? ` (${voteWaiting(vote)})` : ''}`}
+        {`${t('live.voteEnds', { seconds })}  ·  ${tally}${waiting}`}
       </Text>
       {own ? null : (
         <Box row gap={10}>

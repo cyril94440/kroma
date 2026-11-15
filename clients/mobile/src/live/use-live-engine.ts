@@ -6,7 +6,7 @@ import { usePlaybackOwner } from '#mobile/player/playback-owner';
 
 const WATCHDOG_MS = 500;
 
-export interface LiveEngine {
+interface LiveEngine {
   player: VideoPlayer;
   playing: boolean;
   waiting: boolean;

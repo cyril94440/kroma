@@ -6,8 +6,16 @@ import {
   expireFloating,
   HISTORY_MAX,
   type PartyModel as Model,
+  pollToAnswer,
+  voteToAnswer,
 } from './party-state';
-import type { ChatMessage, PartyEvent, PartyState } from '@kromatv/client/party';
+import type {
+  ChatMessage,
+  PartyEvent,
+  PartyState,
+  PollView,
+  VoteView,
+} from '@kromatv/client/party';
 
 const message = (id: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
   id,
@@ -211,5 +219,53 @@ describe('floating reactions', () => {
     expect(model.floating).toHaveLength(1);
     expect(expireFloating(model, 2000, 4000).floating).toHaveLength(1);
     expect(expireFloating(model, 5000, 4000).floating).toHaveLength(0);
+  });
+});
+
+const voteOf = (extra: Partial<VoteView> = {}): VoteView => ({
+  id: 1,
+  kind: 'channel',
+  label: 'TF1',
+  note: '',
+  by: { userId: 'u2', name: 'Bo' },
+  endsAt: 30_000,
+  endsInS: 20,
+  required: [{ userId: 'u1', name: 'Ana' }],
+  votes: {},
+  tally: { yes: 1, no: 0, blank: 0 },
+  channelId: 'p:1',
+  ...extra,
+});
+
+const pollOf = (extra: Partial<PollView> = {}): PollView => ({
+  id: 7,
+  question: 'Match ?',
+  kind: 'yesno',
+  options: ['Oui', 'Non'],
+  votes: {},
+  byAnswer: {},
+  total: 0,
+  endsAt: 60_000,
+  endsInS: 50,
+  ...extra,
+});
+
+describe('what a viewer still has to answer', () => {
+  it('asks for a vote someone else started and this viewer has not answered', () => {
+    expect(voteToAnswer(voteOf(), 'u1', null)?.id).toBe(1);
+  });
+
+  it('never asks the requester, a viewer who answered, one who put it away, or before the state is known', () => {
+    expect(voteToAnswer(voteOf({ by: { userId: 'u1', name: 'Ana' } }), 'u1', null)).toBeNull();
+    expect(voteToAnswer(voteOf({ votes: { u1: true } }), 'u1', null)).toBeNull();
+    expect(voteToAnswer(voteOf(), 'u1', 1)).toBeNull();
+    expect(voteToAnswer(voteOf(), '', null)).toBeNull();
+    expect(voteToAnswer(null, 'u1', null)).toBeNull();
+  });
+
+  it('asks for a poll until it is answered or put away', () => {
+    expect(pollToAnswer(pollOf(), 'u1', null)?.id).toBe(7);
+    expect(pollToAnswer(pollOf({ votes: { u1: 'Oui' } }), 'u1', null)).toBeNull();
+    expect(pollToAnswer(pollOf(), 'u1', 7)).toBeNull();
   });
 });

@@ -3,7 +3,7 @@ import type { Floating } from '@kromatv/core';
 import { Box, Text } from '@kromatv/ui/kit';
 import { ChatLine } from '#tv/features/live/ChatDrawer';
 
-export const OVERLAY_MESSAGE_MS = 10_000;
+const OVERLAY_MESSAGE_MS = 10_000;
 const OVERLAY_LINES = 4;
 
 export function recentMessages(

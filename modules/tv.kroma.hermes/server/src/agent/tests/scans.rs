@@ -140,3 +140,25 @@ fn a_refused_provider_then_a_scan_then_the_right_channel_ends_in_one_vote() {
     assert!(asks[1].2.contains("même match vérifié à l'image"));
     assert!(rig.room.switches.lock().unwrap().is_empty());
 }
+
+fn compared_group(at: i64) -> Value {
+    let rig = rig_with_backup();
+    let mut captured = item(1, "s:1", false, None);
+    captured.at = if at == 0 { 0 } else { rig.now() + at };
+    *rig.control.scans.lock().unwrap() = vec![state(false, vec![captured])];
+    frames(&rig, &[1]);
+    live_picture(&rig);
+    let model = Scripted::new(vec![calls(vec![bench(json!({ "query": "ligue1+", "fournisseur": "secours", "comparer_au_direct": true }))]), calls(vec![("reply", json!({ "message": "ok" }))])]);
+    readings(&model, vec![direct("Lens", "Paris FC", "1-0", "34:12"), direct("Lens", "Paris FC", "1-0", "34:20")]);
+    rig.use_model(std::sync::Arc::new(model.clone()));
+    rig.hear("m-1", "Mamie", "scanne");
+    rig.drain();
+    result_of(&model, 0, 0)["groupes"][0]["meme_que_direct"].clone()
+}
+
+#[test]
+fn the_capture_time_of_a_scan_item_replaces_the_estimate_when_the_live_module_gives_one() {
+    assert_eq!(compared_group(0), "oui");
+    assert_eq!(compared_group(8_000), "oui");
+    assert_ne!(compared_group(600_000), "oui");
+}

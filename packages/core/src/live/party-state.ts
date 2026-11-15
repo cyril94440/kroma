@@ -1,4 +1,11 @@
-import type { ChatMessage, PartyEvent, PartyState, VoteClosed } from '@kromatv/client/party';
+import type {
+  ChatMessage,
+  PartyEvent,
+  PartyState,
+  PollView,
+  VoteClosed,
+  VoteView,
+} from '@kromatv/client/party';
 
 export const HISTORY_MAX = 100;
 const FLOATING_MAX = 12;
@@ -122,4 +129,26 @@ export function voteWaiting(vote: {
   required: { userId: string }[];
 }): number {
   return vote.required.filter((person) => !(person.userId in vote.votes)).length;
+}
+
+/** The vote this viewer still has to answer, or null: none open, already
+ *  answered, put away, or their own request (a requester never votes on it). */
+export function voteToAnswer(
+  vote: VoteView | null,
+  userId: string,
+  dismissed: number | null,
+): VoteView | null {
+  if (!vote || userId === '' || vote.id === dismissed) return null;
+  if (vote.by?.userId === userId || userId in vote.votes) return null;
+  return vote;
+}
+
+/** The poll this viewer has not answered or put away. */
+export function pollToAnswer(
+  poll: PollView | null,
+  userId: string,
+  dismissed: number | null,
+): PollView | null {
+  if (!poll || userId === '' || poll.id === dismissed || userId in poll.votes) return null;
+  return poll;
 }

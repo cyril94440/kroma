@@ -96,9 +96,11 @@ impl Control for FakeControl {
     fn switch_provider(&self, provider: &str, channel_id: Option<&str>, requested_by: &str, reason: &str) -> Result<ProviderSwitch> {
         self.note("switchProvider", &format!("{provider}:{requested_by}"));
         self.provider_asks.lock().unwrap().push((provider.into(), channel_id.map(str::to_string), reason.into()));
-        match (channel_id, self.channel_provider.lock().unwrap().is_some()) {
-            (Some(_), true) => answer(&self.channel_provider),
-            _ => answer(&self.provider),
+        let scripted = self.channel_provider.lock().unwrap().is_some();
+        if channel_id.is_some() && scripted {
+            answer(&self.channel_provider)
+        } else {
+            answer(&self.provider)
         }
     }
 

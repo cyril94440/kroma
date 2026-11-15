@@ -20,7 +20,7 @@ afterEach(() => {
 
 const clientWith = (ids: { id: string; enabled?: boolean }[]) => {
   const list = vi.fn(async () => ids.map((m) => ({ ...m, name: m.id })));
-  return { client: { modules: { list } } as never, list };
+  return { client: { baseUrl: 'http://s', modules: { list } } as never, list };
 };
 
 function Probe() {

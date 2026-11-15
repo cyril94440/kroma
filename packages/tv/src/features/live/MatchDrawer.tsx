@@ -1,20 +1,24 @@
 import type { MatchPayload } from '@kromatv/client/sport';
-import { calculateMatch, type FeedItem, type MatchView } from '@kromatv/core';
+import { calculateMatch, clockWords, type FeedItem, type MatchView } from '@kromatv/core';
 import { useT } from '@kromatv/ui';
 import { Box, Drawer, Text } from '@kromatv/ui/kit';
 import { useMemo } from 'react';
-
-function clockLabel(view: MatchView, t: ReturnType<typeof useT>): string {
-  if (view.clock.finished) return t('live.matchFinished');
-  if (!view.clock.started) return t('live.matchPre');
-  return view.clock.label;
-}
 
 function feedLabel(item: FeedItem, t: ReturnType<typeof useT>): string {
   if (item.kind === 'but') return item.ownGoal ? t('live.feed.ownGoal') : t('live.feed.but');
   if (item.kind === 'jaune') return t('live.feed.jaune');
   if (item.kind === 'rouge') return t('live.feed.rouge');
   return t('live.feed.remplacement');
+}
+
+function ClockLine({ view }: Readonly<{ view: MatchView }>) {
+  const t = useT();
+  const words = clockWords(view.clock);
+  return (
+    <Text variant="labelTv" color="accentText" textAlign="center">
+      {words ? t(words) : view.clock.label}
+    </Text>
+  );
 }
 
 function FeedRow({ item }: Readonly<{ item: FeedItem }>) {
@@ -65,9 +69,7 @@ export function MatchDrawer({
               <Text variant="bannerTv">{`${view.score.dom} - ${view.score.ext}`}</Text>
               <Text variant="headingTv">{match.equipes.ext.nom}</Text>
             </Box>
-            <Text variant="labelTv" color="accentText" textAlign="center">
-              {clockLabel(view, t)}
-            </Text>
+            <ClockLine view={view} />
             {view.stats.map((stat) => (
               <Box key={stat.key} row justify="space-between">
                 <Text variant="bodyTv">{stat.dom}</Text>
