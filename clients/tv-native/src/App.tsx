@@ -9,6 +9,7 @@ import type { DeviceStore } from '@kromatv/ui/device-store';
 // stage the app is laid out on.
 
 import { createDeepLinks, createSearchRequests, type DeviceNameSource, TvApp } from '@kromatv/tv';
+import { NATIVE_LIVE_SCREEN } from '@kromatv/tv/native-live';
 import { NATIVE_PLAYBACK } from '@kromatv/tv/native-playback';
 import { expoImageBackend } from '@kromatv/ui/expo-image';
 import { KIT_FONTS } from '@kromatv/ui/fonts';
@@ -126,6 +127,7 @@ export function App() {
           lan={lanBeacon ?? undefined}
           deviceName={DEVICE_NAME}
           playback={NATIVE_PLAYBACK}
+          live={NATIVE_LIVE_SCREEN}
         />
       </TvStage>
     </KitProvider>
