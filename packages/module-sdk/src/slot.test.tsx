@@ -3,12 +3,13 @@ import { RequestId } from '@kromatv/client/requests';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AdminHostProvider } from './admin/context';
 import { defineModule } from './define';
 import { ModuleRegistry } from './registry';
 import { useModuleApi } from './scope';
-import { ModuleSlot, ModuleSlotProvider } from './slot';
+import { ModuleSlot, ModuleSlotProvider, useSlotFilled } from './slot';
+import { ViewerHostProvider } from './viewer';
 
 const MANIFEST = { id: 'tv.kroma.acq', version: '1.0.0' };
 
@@ -144,5 +145,106 @@ describe('ModuleSlot', () => {
       </QueryClientProvider>,
     );
     expect(screen.getByText('nothing')).toBeTruthy();
+  });
+});
+
+describe('ModuleSlot defined by a module', () => {
+  const NAME = 'tv.kroma.live/player.aside' as const;
+
+  function Aside({ title }: Readonly<{ title: string }>) {
+    return <span>{`aside:${title}`}</span>;
+  }
+
+  function filler(id: string) {
+    return defineModule({ ...MANIFEST, id }, { slots: [{ slot: NAME, component: Aside }] });
+  }
+
+  function mountNamed(registry: ModuleRegistry, enabled: { id: string; enabled?: boolean }[]) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(['modules'], enabled);
+    const client = { modules: { list: () => Promise.resolve(enabled) } } as never;
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <AdminHostProvider value={{ client, user: null, apiBase: '' }}>
+          <ModuleSlotProvider registry={registry}>
+            <ModuleSlot name={NAME} title="Match" fallback={<span>empty</span>} />
+          </ModuleSlotProvider>
+        </AdminHostProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  it('hands the plain props of the defining page to whichever module fills it', () => {
+    mountNamed(new ModuleRegistry().register(filler('tv.kroma.party')), [
+      { id: 'tv.kroma.party', enabled: true },
+    ]);
+    expect(screen.getByText('aside:Match')).toBeTruthy();
+  });
+
+  it('falls back when nobody fills it or the filler is off', () => {
+    mountNamed(new ModuleRegistry().register(filler('tv.kroma.party')), [
+      { id: 'tv.kroma.party', enabled: false },
+    ]);
+    expect(screen.getByText('empty')).toBeTruthy();
+  });
+
+  it('reports whether an enabled module fills it', () => {
+    function Probe() {
+      return <span>{String(useSlotFilled(NAME))}</span>;
+    }
+    const registry = new ModuleRegistry().register(filler('tv.kroma.party'));
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(['modules'], [{ id: 'tv.kroma.party', enabled: true }]);
+    const client = { modules: { list: () => Promise.resolve([]) } } as never;
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AdminHostProvider value={{ client, user: null, apiBase: '' }}>
+          <ModuleSlotProvider registry={registry}>
+            <Probe />
+          </ModuleSlotProvider>
+        </AdminHostProvider>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText('true')).toBeTruthy();
+  });
+
+  it('contains a filler that throws, so the defining page survives', () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    function Boom(): never {
+      throw new Error('boom');
+    }
+    const registry = new ModuleRegistry().register(
+      defineModule(
+        { ...MANIFEST, id: 'tv.kroma.party' },
+        { slots: [{ slot: NAME, component: Boom }] },
+      ),
+    );
+    const { container } = mountNamed(registry, [{ id: 'tv.kroma.party', enabled: true }]);
+    expect(container.textContent).toBe('');
+    quiet.mockRestore();
+  });
+
+  it('works in a shell with only the viewer host, where the module list comes from it', async () => {
+    const registry = new ModuleRegistry().register(filler('tv.kroma.party'));
+    const queryClient = new QueryClient();
+    const listModules = vi.fn(() => Promise.resolve([{ id: 'tv.kroma.party', enabled: true }]));
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ViewerHostProvider
+          value={{
+            moduleApi: () => ({}) as never,
+            fileUrl: () => '',
+            listModules: listModules as never,
+            openEvents: () => () => {},
+          }}
+        >
+          <ModuleSlotProvider registry={registry}>
+            <ModuleSlot name={NAME} title="Match" fallback={<span>empty</span>} />
+          </ModuleSlotProvider>
+        </ViewerHostProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('aside:Match')).toBeTruthy();
+    expect(listModules).toHaveBeenCalled();
   });
 });

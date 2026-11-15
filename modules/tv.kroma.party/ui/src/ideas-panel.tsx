@@ -1,8 +1,9 @@
+import { KromaApiError } from '@kromatv/client';
 import { useFormat, useT } from '@kromatv/module-sdk';
 import { Badge, Box, Button, Row, Section, Text } from '@kromatv/ui/kit';
 import { useCallback, useEffect, useState } from 'react';
 import { Entry } from './entry';
-import { type PartyApi, PartyError } from './party-api';
+import { type PartyApi } from './party-api';
 import { IDEA_GENRES, IDEA_STATUSES, type Idea } from './schemas';
 
 interface IdeasPanelProps {
@@ -71,7 +72,9 @@ export function IdeasPanel({ api, admin, version }: Readonly<IdeasPanelProps>) {
       setText('');
       setNote('party.ideas.sent');
     } catch (e) {
-      setNote(e instanceof PartyError && e.status === 429 ? 'party.ideas.tooFast' : 'party.error');
+      setNote(
+        e instanceof KromaApiError && e.status === 429 ? 'party.ideas.tooFast' : 'party.error',
+      );
     }
   };
 

@@ -1,4 +1,4 @@
-import { type KromaHost, ModuleFailed, ModuleLoading, useT } from '@kromatv/module-sdk';
+import { ModuleFailed, ModuleLoading, useT } from '@kromatv/module-sdk';
 import { Box, PageHeader, Row } from '@kromatv/ui/kit';
 import { ChatPanel } from './chat-panel';
 import { IdeasPanel } from './ideas-panel';
@@ -8,9 +8,9 @@ import { SwitchPanel } from './switch-panel';
 import { useParty } from './use-party';
 import { VotePanel } from './vote-panel';
 
-export default function PartyPage({ host }: Readonly<{ host: KromaHost }>) {
+export default function PartyPage() {
   const t = useT();
-  const { api, model, failed, now } = useParty(host);
+  const { api, model, failed, now } = useParty();
   const state = model.state;
   if (!state) return failed ? <ModuleFailed /> : <ModuleLoading panels={2} />;
 

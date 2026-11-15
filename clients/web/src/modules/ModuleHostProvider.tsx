@@ -7,6 +7,8 @@ import {
   type ModuleRegistry,
   type ModuleRoute,
   ModuleSharedProvider,
+  ModuleSlotProvider,
+  ViewerHostProvider,
 } from '@kromatv/module-sdk';
 import { useScopedT, useT } from '@kromatv/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +16,8 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useSta
 import { useModuleHost } from '#web/modules/host';
 import { hiddenModuleIds, type ModuleRouteMatch, moduleRouteAt } from '#web/modules/module-gating';
 import { createModuleRuntime } from '#web/modules/registry';
+import { createViewerHost } from '#web/modules/viewer-host';
+import { apiBase } from '#web/shared/lib/api';
 import { modulesQuery } from '#web/modules/remotes';
 import { useAuth } from '#web/shared/lib/auth';
 
@@ -54,6 +58,7 @@ export function ModuleHostProvider({ children }: Readonly<{ children: ReactNode 
   );
   const { registry: moduleRegistry, remotes, listModules } = runtime;
   const [revision, setRevision] = useState(0);
+  const viewerHost = useMemo(() => createViewerHost(client, apiBase()), [client]);
   const host = useModuleHost(revision, runtime);
 
   // A module is visible only when the backend lists it AND it is enabled: a
@@ -121,7 +126,11 @@ export function ModuleHostProvider({ children }: Readonly<{ children: ReactNode 
   );
   return (
     <ModuleHostContext.Provider value={value}>
-      <ModuleSharedProvider ready={remotes.ready}>{children}</ModuleSharedProvider>
+      <ViewerHostProvider value={viewerHost}>
+        <ModuleSlotProvider registry={moduleRegistry}>
+          <ModuleSharedProvider ready={remotes.ready}>{children}</ModuleSharedProvider>
+        </ModuleSlotProvider>
+      </ViewerHostProvider>
     </ModuleHostContext.Provider>
   );
 }

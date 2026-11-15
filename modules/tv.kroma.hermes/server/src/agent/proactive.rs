@@ -29,7 +29,11 @@ impl Agent {
 
     pub(super) fn on_live_status(&self, payload: &Value) {
         let state = payload.get("state").and_then(Value::as_str).unwrap_or_default();
-        self.deps.audit("sources", "live_status", json!({ "state": state, "channel": payload.pointer("/channel/name"), "health": payload.get("health") }));
+        let health = |key: &str| payload.pointer(&format!("/health/{key}")).and_then(Value::as_bool).unwrap_or(false);
+        let fingerprint = format!("{state}|{}|{}{}{}", payload.pointer("/channel/id").and_then(Value::as_str).unwrap_or_default(), health("black"), health("frozen"), health("stutter"));
+        if std::mem::replace(&mut self.live().last_status, fingerprint.clone()) != fingerprint {
+            self.deps.audit("sources", "live_status", json!({ "state": state, "channel": payload.pointer("/channel/name"), "health": payload.get("health") }));
+        }
         if state != "offAir" || !self.is_active() {
             return;
         }

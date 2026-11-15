@@ -25,9 +25,11 @@ export async function measureOffset(
   fetchServerNow: () => Promise<number>,
   count = 8,
   clock: () => number = Date.now,
+  gapMs = 0,
 ): Promise<ClockSample | null> {
   const samples: ClockSample[] = [];
   for (let i = 0; i < count; i += 1) {
+    if (i > 0 && gapMs > 0) await new Promise((resolve) => setTimeout(resolve, gapMs));
     const sentAt = clock();
     try {
       const serverNow = await fetchServerNow();

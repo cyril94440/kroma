@@ -1,11 +1,15 @@
-import { useT } from '@kromatv/module-sdk';
+import { ModuleSlot, useT } from '@kromatv/module-sdk';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import type { PlayerChannel, PlayerHandle } from './player-handle';
 import { useHls } from './use-hls';
 
 interface LivePlayerProps {
   url: string | null;
   title: string;
   onLost: () => void;
+  channel?: PlayerChannel | null;
+  onHandle?: (handle: PlayerHandle | null) => void;
+  onPlaying?: (playing: boolean) => void;
 }
 
 const FRAME: CSSProperties = {
@@ -24,6 +28,13 @@ const IMMERSIVE: CSSProperties = {
   width: '100vw',
   height: '100vh',
   borderRadius: 0,
+};
+const OVERLAY: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  pointerEvents: 'none',
 };
 const BAR: CSSProperties = {
   position: 'absolute',
@@ -46,12 +57,27 @@ const BUTTON: CSSProperties = {
   font: 'inherit',
 };
 
-export function LivePlayer({ url, title, onLost }: Readonly<LivePlayerProps>) {
+export function LivePlayer({
+  url,
+  title,
+  onLost,
+  channel = null,
+  onHandle,
+  onPlaying,
+}: Readonly<LivePlayerProps>) {
   const t = useT();
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const [immersive, setImmersive] = useState(false);
   const [muted, setMuted] = useState(false);
-  const state = useHls(video, url, onLost);
+  const state = useHls(video, url, onLost, channel?.id ?? null);
+  const { handle, playing } = state;
+  useEffect(() => {
+    onHandle?.(handle);
+    return () => onHandle?.(null);
+  }, [handle, onHandle]);
+  useEffect(() => {
+    onPlaying?.(playing);
+  }, [playing, onPlaying]);
 
   const toggleImmersive = useCallback(() => setImmersive((on) => !on), []);
   useEffect(() => {
@@ -89,6 +115,17 @@ export function LivePlayer({ url, title, onLost }: Readonly<LivePlayerProps>) {
       {state.failed ? (
         <div style={{ position: 'absolute', top: 12, left: 12, color: '#fff' }}>
           {t('live.player.failed')}
+        </div>
+      ) : null}
+      {handle ? (
+        <div style={OVERLAY}>
+          <ModuleSlot
+            name="tv.kroma.live/player.overlay"
+            player={handle}
+            channel={channel}
+            playing={playing}
+            immersive={immersive}
+          />
         </div>
       ) : null}
       <div style={BAR}>

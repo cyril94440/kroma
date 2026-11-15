@@ -14,6 +14,7 @@ const ICONS: Record<string, IconName> = {
   rss: 'rss',
   movie: 'movie',
   tv: 'device-tv',
+  chat: 'messages',
   chart: 'chart-bar',
   stats: 'chart-bar',
   database: 'database',

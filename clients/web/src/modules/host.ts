@@ -3,7 +3,6 @@
 
 import type { KromaClient } from '@kromatv/client';
 import { hasPermission } from '@kromatv/client/accounts';
-import { ModuleId } from '@kromatv/client/modules';
 import type { MessageKey, TVars } from '@kromatv/i18n';
 import type { HostBase, KromaHost, ModuleManifest } from '@kromatv/module-sdk';
 import { useLocale, useT } from '@kromatv/ui';
@@ -55,9 +54,6 @@ export function useModuleHost(revision = 0, provided?: ModuleRuntime): KromaHost
       api: {
         get: <T>(path: string) => apiGet<T>(latest.current.auth.client, path),
         listModules: () => apiGet<ModuleManifest[]>(latest.current.auth.client, '/modules'),
-        sessionToken: () => latest.current.auth.client.sessionToken,
-        moduleFileUrl: (moduleId, path) =>
-          latest.current.auth.client.modules.fileUrl(ModuleId.parse(moduleId), path),
       },
       auth: {
         get userId() {

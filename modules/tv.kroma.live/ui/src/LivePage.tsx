@@ -1,18 +1,24 @@
-import { type KromaHost, ModuleFailed, ModuleLoading, useT } from '@kromatv/module-sdk';
+import { ModuleFailed, ModuleLoading, ModuleSlot, useSlotFilled, useT } from '@kromatv/module-sdk';
+import { useState } from 'react';
 import { Box, Callout, PageHeader, Row, Text } from '@kromatv/ui/kit';
 import { ChannelPanel } from './channel-panel';
 import { LivePlayer } from './player';
+import type { PlayerHandle } from './player-handle';
 import { NowNext } from './now-next';
 import { StatusBadges } from './status-badges';
 import { useLive, useNow } from './use-live';
 import { ViewersPanel } from './viewers-panel';
 
-export default function LivePage({ host }: Readonly<{ host: KromaHost }>) {
+export default function LivePage() {
   const t = useT();
-  const { api, status, failed, refresh } = useLive(host, true);
+  const { api, status, failed, refresh } = useLive(true);
   const clock = useNow(5000);
+  const [handle, setHandle] = useState<PlayerHandle | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const hasAside = useSlotFilled('tv.kroma.live/player.aside');
   if (!status) return failed ? <ModuleFailed /> : <ModuleLoading panels={2} />;
   const url = status.playlist ? api.fileUrl(status.playlist) : null;
+  const channel = status.channel ? { id: status.channel.id, name: status.channel.name } : null;
 
   return (
     <>
@@ -27,6 +33,9 @@ export default function LivePage({ host }: Readonly<{ host: KromaHost }>) {
               url={url}
               title={status.channel?.name ?? t('live.title')}
               onLost={refresh}
+              channel={channel}
+              onHandle={setHandle}
+              onPlaying={setPlaying}
             />
           ) : (
             <Callout.Root>
@@ -51,6 +60,16 @@ export default function LivePage({ host }: Readonly<{ host: KromaHost }>) {
           </Box>
         </Box>
         <Box flex minW={280} style={{ flexBasis: 320 }}>
+          {handle && hasAside ? (
+            <Box mb={20}>
+              <ModuleSlot
+                name="tv.kroma.live/player.aside"
+                player={handle}
+                channel={channel}
+                playing={playing}
+              />
+            </Box>
+          ) : null}
           <ChannelPanel api={api} current={status.channel?.id ?? null} onSwitched={refresh} />
           <Box mt={20}>
             <ViewersPanel viewers={status.viewers} />

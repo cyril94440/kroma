@@ -30,3 +30,13 @@ export function isStalled(element: HTMLVideoElement): boolean {
 export function position(element: HTMLVideoElement): number {
   return element.currentTime;
 }
+
+interface WithStartDate {
+  getStartDate?: () => Date;
+}
+
+export function programmeTime(element: HTMLVideoElement, playingDate: Date | null): number | null {
+  if (playingDate) return playingDate.getTime();
+  const start = (element as WithStartDate).getStartDate?.().getTime();
+  return start === undefined || Number.isNaN(start) ? null : start + element.currentTime * 1000;
+}

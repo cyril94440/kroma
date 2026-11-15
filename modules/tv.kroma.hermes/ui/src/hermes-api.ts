@@ -1,3 +1,4 @@
+import { loadSession } from '@kromatv/client/accounts';
 import type { KromaHost } from '@kromatv/module-sdk';
 import type { z } from 'zod';
 import {
@@ -51,7 +52,7 @@ export function createHermesApi(host: Pick<KromaHost, 'api'>) {
       fetch(`${apiOrigin()}/api/module/${MODULE_ID}${path}`, {
         method,
         headers: {
-          authorization: `Bearer ${host.api.sessionToken() ?? ''}`,
+          authorization: `Bearer ${loadSession()?.accessToken ?? ''}`,
           ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         },
         body: body === undefined ? undefined : JSON.stringify(body),

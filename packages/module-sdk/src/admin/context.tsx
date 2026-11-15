@@ -40,3 +40,8 @@ export function useAdminHost(): AdminHostValue {
   }
   return ctx;
 }
+
+/** The admin host, or null outside the admin console. */
+export function useOptionalAdminHost(): AdminHostValue | null {
+  return useContext(AdminHostContext);
+}

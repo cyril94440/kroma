@@ -10,9 +10,16 @@
 // The names and their props are declared once, in `./module`'s `SlotProps`, so
 // neither side can drift from the other.
 
-import { createContext, type ReactNode, useContext, useSyncExternalStore } from 'react';
+import {
+  Component,
+  createContext,
+  type ReactNode,
+  Suspense,
+  useContext,
+  useSyncExternalStore,
+} from 'react';
 import { useModuleEnabledCheck } from './admin/engines';
-import type { SlotName, SlotProps } from './module';
+import type { CoreSlotName, ModuleSlotName, SlotName, SlotProps } from './module';
 import type { ModuleRegistry, ModuleSlotEntry } from './registry';
 import { ModuleScope } from './scope';
 
@@ -26,6 +33,16 @@ export function ModuleSlotProvider({
   children,
 }: Readonly<{ registry: ModuleRegistry | null; children: ReactNode }>) {
   return <SlotRegistryContext.Provider value={registry}>{children}</SlotRegistryContext.Provider>;
+}
+
+class Contained extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
 }
 
 const NO_ENTRIES: ModuleSlotEntry[] = [];
@@ -44,7 +61,15 @@ type ModuleSlotProps<Name extends SlotName> = {
   /** Shown when no enabled module fills the slot: the module is absent, or off.
    *  Absent fallback renders nothing, for a slot that is a decoration. */
   fallback?: ReactNode;
-} & SlotProps[Name];
+} & (Name extends CoreSlotName ? SlotProps[Name] : Record<string, unknown>);
+
+/** Whether an enabled module fills `slot`: a page that opens a slot uses it to
+ *  give the slot room only when something will draw there. */
+export function useSlotFilled(slot: SlotName): boolean {
+  const registered = useSlotEntries(slot);
+  const isEnabled = useModuleEnabledCheck();
+  return registered.some((entry) => isEnabled(entry.moduleId));
+}
 
 /**
  * Render whatever enabled modules contribute to `name`, in their declared order.
@@ -60,7 +85,7 @@ type ModuleSlotProps<Name extends SlotName> = {
  * />
  * ```
  */
-export function ModuleSlot<Name extends SlotName>({
+export function ModuleSlot<Name extends CoreSlotName | ModuleSlotName>({
   name,
   fallback = null,
   ...props
@@ -78,7 +103,11 @@ export function ModuleSlot<Name extends SlotName>({
         const Component = entry.component as (p: Record<string, unknown>) => ReactNode;
         return (
           <ModuleScope key={`${entry.moduleId}:${entry.slot}`} id={entry.moduleId}>
-            <Component {...props} />
+            <Contained>
+              <Suspense fallback={null}>
+                <Component {...props} />
+              </Suspense>
+            </Contained>
           </ModuleScope>
         );
       })}

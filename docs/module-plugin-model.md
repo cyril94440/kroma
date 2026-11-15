@@ -351,15 +351,23 @@ See [module security](module-security.md#published-files).
 
 ## Extending a module's frontend
 
-The backend recursion above has no frontend half yet. A module ships a Module
-Federation remote and can add routes and admin pages, but it cannot declare a
-slot another module fills, so qBittorrent's settings panel cannot appear inside
-the download manager's page without the download manager importing it.
+The backend recursion above has a frontend half now, built as slots. A module defines a slot
+in its own page, namespaced by its id like a point (`<module id>/<local name>`), by rendering
+`<ModuleSlot name="tv.kroma.live/player.aside" ... />`; any other module fills it from
+`defineModule({ slots })`. Props are plain data and callbacks, each side owns its types and the
+filler validates what it receives, as two parties to a point do. A filler is mounted inside its
+own module's scope (its translations, its viewer API), behind a Suspense and an error boundary,
+and an absent or disabled filler leaves the page exactly as it was.
 
-The shape that matches the backend: a frontend point is a named slot, declared by
-the module that renders it, filled by `contributes` entries whose remote exports
-a component. The registry already resolves remotes by module id; what is missing
-is the slot name and the lookup. Not built.
+What is built: the registry lookup, `ModuleSlot` in the admin console and in the main shell,
+`useSlotFilled`, and the viewer host (`useViewerApi`, `useModuleFileUrl`, `useServerEvents`)
+that lets a main-shell page and its fillers reach their own module without an admin client.
+
+What is not: the manifest does not declare defined or filled slots, so `kroma check` cannot
+flag a fill for a slot nobody defines and the admin cannot draw the relation. The declaration
+would be a new field of the published schema 3 and of the Rust manifest, for a fact that lives
+in code the manifest cannot see; it is deferred until a second pair of modules makes the cost of
+a typo visible.
 
 ## Trust, stated honestly
 
@@ -499,8 +507,8 @@ because no external client exposes a list-only add.
 What has NOT landed:
 
 8. **Module-declared permissions** (see above — it needs a decision about stored
-   auth data, not a refactor) and **frontend slots** are untouched. The point graph
-   in Admin has since landed.
+   auth data, not a refactor) is untouched. Frontend slots and the point graph in Admin
+   have since landed.
 
 ## How we know it worked
 

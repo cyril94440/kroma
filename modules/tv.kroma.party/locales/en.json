@@ -110,5 +110,21 @@
   "config.instabilityAlerts": "Tell the room when the stream stays unstable",
   "notifications.ideaUpdated.label": "Your ideas",
   "notifications.ideaUpdated.title": "Your idea moved",
-  "notifications.ideaUpdated.body": "Your idea \"{text}\" was updated."
+  "notifications.ideaUpdated.body": "Your idea \"{text}\" was updated.",
+  "party.sync.title": "Watch together",
+  "party.sync.join": "Sync with the group",
+  "party.sync.leave": "Leave the sync",
+  "party.sync.status.off": "Your player is not synchronised.",
+  "party.sync.status.alone": "Synced, nobody else yet.",
+  "party.sync.status.group": "Synced with {count} watching",
+  "party.sync.toast.joined": "Syncing with the group",
+  "party.sync.toast.left": "You left the watch party",
+  "party.sync.toast.kicked": "Removed from the watch party: {reason}. Join again whenever you like.",
+  "party.sync.toast.allLive": "The whole watch party is back to live",
+  "party.sync.toast.recalibrated": "Realigned on {name}",
+  "party.sync.fine.running": "Fine alignment in progress, a few jolts are possible (45 s at most)",
+  "party.sync.fine.done": "Fine sync done: within {ms} ms",
+  "party.sync.fine.budget": "Fine sync: within {ms} ms (time budget used up)",
+  "party.sync.fine.outOfWindow": "Fine sync: within {ms} ms (target outside my window)",
+  "party.sync.fine.noMeasure": "Fine sync interrupted: no measurement available"
 }

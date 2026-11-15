@@ -1,12 +1,14 @@
-import type { KromaHost } from '@kromatv/module-sdk';
+import { useModuleFileUrl, useViewerApi } from '@kromatv/module-sdk';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createLiveApi } from './live-api';
 import type { History, Metrics, Overview } from './schemas';
 
 const POLL_MS = 10_000;
 
-export function useAdmin(host: KromaHost) {
-  const api = useMemo(() => createLiveApi(host), [host]);
+export function useAdmin() {
+  const viewer = useViewerApi();
+  const fileUrl = useModuleFileUrl();
+  const api = useMemo(() => createLiveApi(viewer, fileUrl), [viewer, fileUrl]);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [history, setHistory] = useState<History | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);

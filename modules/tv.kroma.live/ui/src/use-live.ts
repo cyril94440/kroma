@@ -1,7 +1,6 @@
-import { KromaEvents } from '@kromatv/client/events';
-import type { KromaHost } from '@kromatv/module-sdk';
+import { useModuleFileUrl, useServerEvents, useViewerApi } from '@kromatv/module-sdk';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiOrigin, createLiveApi } from './live-api';
+import { createLiveApi } from './live-api';
 import { applyEvent } from './live-state';
 import type { Status } from './schemas';
 
@@ -17,8 +16,10 @@ export function useNow(everyMs: number): number {
   return now;
 }
 
-export function useLive(host: KromaHost, watching: boolean) {
-  const api = useMemo(() => createLiveApi(host), [host]);
+export function useLive(watching: boolean) {
+  const viewer = useViewerApi();
+  const fileUrl = useModuleFileUrl();
+  const api = useMemo(() => createLiveApi(viewer, fileUrl), [viewer, fileUrl]);
   const [status, setStatus] = useState<Status | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -38,19 +39,10 @@ export function useLive(host: KromaHost, watching: boolean) {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  useEffect(() => {
-    const events = new KromaEvents<{ type: string }>(apiOrigin(), {
-      token: () => host.api.sessionToken(),
-      refresh: async () => {
-        await host.api.get('/modules').catch(() => undefined);
-        return host.api.sessionToken();
-      },
-      onOpen: refresh,
-      onEvent: (raw) => setStatus((current) => applyEvent(current, raw)),
-    });
-    events.connect();
-    return () => events.close();
-  }, [host, refresh]);
+  useServerEvents<{ type: string }>(
+    (raw) => setStatus((current) => applyEvent(current, raw)),
+    refresh,
+  );
 
   useEffect(() => {
     if (!watching) return;

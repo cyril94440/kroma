@@ -6,8 +6,12 @@ const partyModule = defineModule({
     {
       path: 'party',
       component: lazy(() => import('./PartyPage')),
-      nav: { label: 'nav.party', icon: 'tv', section: 'library' },
+      nav: { label: 'nav.party', icon: 'chat', section: 'library' },
     },
+  ],
+  slots: [
+    { slot: 'tv.kroma.live/player.aside', component: lazy(() => import('./PartyAside')) },
+    { slot: 'tv.kroma.live/player.overlay', component: lazy(() => import('./PartyOverlay')) },
   ],
 });
 

@@ -363,6 +363,52 @@ list, and the host hands over only that at boot. The rest, the kit included, arr
 first renders. An entry that imports the kit at its top level makes every page
 of the app load it, whether or not the module shows anything there.
 
+#### Pages outside the admin console
+
+A page the main shell mounts (`section: 'library'`) is not under the admin console, so it
+has no admin client. The shell lends it a **viewer host** instead, bound to the module the
+host is rendering, so a module never names itself and never holds a token:
+
+```ts
+const api = useViewerApi();        // /api/module/<its id>/..., any signed-in account
+const fileUrl = useModuleFileUrl(); // a file this module published, with the media ticket
+useServerEvents<{ type: string }>((e) => { ... }, refetchOnReconnect);
+```
+
+`useViewerApi()` returns the same `ModuleApi` the admin hook does (`get(path, schema)`,
+`post(path, body, schema)`, ...): paths are relative to the viewer mount and every answer is
+parsed with the schema the module passes. Credentials and the one silent refresh on a 401 are
+the shell client's (`KromaClient`), the same ones the app's own calls use; the hooks resolve the
+id from `ModuleScope`, so a module reaches its own mount and published files and no other core
+route or module. `useServerEvents` works in both shells and takes an `onOpen` that runs on every
+(re)connect, the moment to re-read what a gap in the stream may have hidden. The socket carries
+every server event, so a module filters by its own event prefix.
+
+#### A panel from one module inside another module's page
+
+A module may open a slot in its own page and any other module may fill it. The name is
+`<module id>/<local name>`, as a point is, so two modules cannot collide and the defining module
+owns the contract:
+
+```tsx
+<ModuleSlot name="tv.kroma.live/player.aside" player={handle} channel={channel} playing={playing} />
+```
+
+```ts
+defineModule({ slots: [{ slot: 'tv.kroma.live/player.aside', component: lazy(() => import('./Aside')) }] });
+```
+
+Props cross as plain data and callbacks, and **each side owns its types**: the two bundles ship
+separately, so the filler declares its own props and validates what arrives (a zod schema over
+the functions it calls) rather than importing the defining module's types. `useSlotFilled(name)`
+tells the defining page whether to give a slot room; a slot nobody fills, or whose filler is
+disabled, renders its `fallback` (nothing), so the page looks exactly as it did before. A filler
+that throws is contained and the page survives. The core names no module: a module-defined slot
+is a string the registry looks up. Slots are frontend-only: they are not declared in
+`module.json`, because a fill is code (`defineModule`) the manifest cannot see, and a second
+list to keep in step with it would only drift; the dependency a fill implies is already
+declared with `dependencies` / `optionalDependencies`.
+
 ### Strings
 
 Every user-visible string is a key. Ship `locales/{en,fr}.json`; they resolve

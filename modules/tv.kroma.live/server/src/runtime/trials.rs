@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use kroma_module_sdk::host::Event;
 use kroma_module_sdk::host::process::Command;
 use serde_json::json;
 
@@ -98,7 +97,7 @@ impl Live {
                 Err(error) => (Outcome::Impossible, error.clone(), false),
             };
             live.lock().policy.trial_done(now_seconds(), outcome, &reason, nothing, Some(id));
-            live.host.publish(Event::new(TOPIC_FAILOVER, json!({ "kind": "trial", "outcome": outcome, "reason": reason, "to": other })));
+            live.emit(TOPIC_FAILOVER, json!({ "kind": "trial", "outcome": outcome, "reason": reason, "to": other }));
         });
     }
 }

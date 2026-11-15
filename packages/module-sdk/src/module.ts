@@ -39,7 +39,7 @@ export interface SettingsPanel {
  * renders a named slot and passes it props; a module answers the name. The name
  * is the contract between them, and its props are declared in {@link SlotProps}.
  */
-export interface SlotContribution<Name extends SlotName = SlotName> {
+export interface SlotContribution<Name extends CoreSlotName = CoreSlotName> {
   slot: Name;
   component: ComponentType<SlotProps[Name]>;
   /** Lower renders first when several modules fill one slot. Defaults to 0. */
@@ -93,12 +93,29 @@ export interface SlotProps {
   };
 }
 
-export type SlotName = keyof SlotProps;
+export type CoreSlotName = keyof SlotProps;
+
+/** A slot a MODULE defines in its own page: `<module id>/<local name>`, as a
+ *  point is. The defining module owns the props contract and the filling one
+ *  validates what it receives, since the two bundles ship separately. */
+export type ModuleSlotName = `${string}/${string}`;
+
+export type SlotName = CoreSlotName | ModuleSlotName;
+
+/** A fill for a slot another module defines. The component takes whatever props
+ *  the defining module documents, so its type is the filler's own. */
+export interface ModuleSlotContribution {
+  slot: ModuleSlotName;
+  component: ComponentType<never>;
+  order?: number;
+}
 
 /** A contribution to SOME slot, each element matched to its own slot's props.
  *  `SlotContribution` alone would default to the union of every slot's props and
  *  demand a component that accepts all of them at once. */
-export type AnySlotContribution = { [Name in SlotName]: SlotContribution<Name> }[SlotName];
+export type AnySlotContribution =
+  | { [Name in CoreSlotName]: SlotContribution<Name> }[CoreSlotName]
+  | ModuleSlotContribution;
 
 export interface KromaModule<Exports = unknown> {
   id: string;

@@ -1,14 +1,25 @@
 mod actions;
+mod canary;
+mod clips;
+mod codec;
 mod connections;
+mod coverage;
+mod emit;
+mod frame;
 mod guide;
 mod media;
-mod process;
+mod notify;
+mod outage;
 mod probing;
+mod process;
+mod quick;
+mod resolution;
 mod scan;
 mod snapshot;
 mod switch;
 mod tick;
 mod trials;
+mod watch;
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -18,18 +29,24 @@ use std::time::Instant;
 use kroma_module_sdk::host::process::Child;
 use kroma_module_sdk::host::HostCtx;
 
+use crate::clipbuf::Buffer;
 use crate::config::Settings;
 use crate::db::{self, Pool};
-use crate::failover::{FailoverPolicy, Limits};
+use crate::failover::bitrate::BitrateWatch;
+use crate::failover::trace::ProviderTrace;
+use crate::failover::{FailoverPolicy, Limits, Persisted};
 use crate::health::StreamHealth;
-use crate::model::Channel;
+use crate::model::{Channel, ProviderId};
 use crate::presence::Presence;
 use crate::probe::Streaks;
 use crate::providers::Providers;
 use crate::rules::Rules;
 use crate::status::{OffAirView, Phase, Proposal};
 
+pub use clips::{ClipCut, ClipError};
 pub use connections::Refusal;
+pub use coverage::CoverageState;
+pub use frame::{Frame, FrameError};
 #[cfg(test)]
 pub use connections::Use;
 pub use guide::{now_next, to_programme};
@@ -39,6 +56,8 @@ pub use switch::{SwitchOutcome, SwitchRequest};
 pub const KV_CURRENT: &str = "current";
 pub const KV_POLICY: &str = "policy";
 pub const PUBLIC_DIR: &str = "public";
+pub const TRACE_DIR: &str = "trace";
+pub const TRACE_FILE: &str = "provider-trace.jsonl";
 
 #[derive(Debug, Clone)]
 pub struct Programs {
@@ -97,6 +116,18 @@ pub struct Inner {
     pub last_health_at: Option<Instant>,
     pub saved_policy_json: String,
     pub https_ok: Option<bool>,
+    pub bitrate: BitrateWatch,
+    pub trace: ProviderTrace,
+    pub coverage: CoverageState,
+    pub action_busy: bool,
+    pub buffer: Buffer,
+    pub last_buffer_purge: Option<Instant>,
+    pub last_clip_purge: Option<Instant>,
+    pub resolution: String,
+    pub resolution_probe: Option<resolution::ResolutionRun>,
+    pub last_resolution: Option<Instant>,
+    pub codecs: HashMap<(ProviderId, i64), codec::VideoCodec>,
+    pub retag: bool,
 }
 
 pub struct Live {
@@ -107,13 +138,21 @@ pub struct Live {
     pub providers: Providers,
     pub(crate) inner: Mutex<Inner>,
     pub(crate) gate: tokio::sync::Mutex<()>,
+    pub(crate) frame: tokio::sync::Mutex<Option<frame::CachedFrame>>,
+    #[cfg(test)]
+    pub(crate) sent: Mutex<Vec<(String, serde_json::Value)>>,
 }
 
 impl Live {
     pub fn new(host: Arc<dyn HostCtx>, pool: Pool, root: PathBuf, programs: Programs) -> Arc<Live> {
         let settings = Settings::read(host.as_ref());
-        let saved = db::kv_get_json(&pool, KV_POLICY).unwrap_or_default();
         let now = now_seconds();
+        let (saved, unreadable) = db::kv_get(&pool, KV_POLICY).ok().flatten().map(|text| Persisted::from_json(&text)).unwrap_or_default();
+        let policy = FailoverPolicy::new(settings.has_backup(), limits_of(&settings), saved, now);
+        let ignored: Vec<&str> = unreadable.into_iter().chain(policy.ignored_state.iter().copied()).collect();
+        if !ignored.is_empty() {
+            tracing::warn!(ignored = ?ignored, "failover state fields ignored at load");
+        }
         let inner = Inner {
             phase: Phase::Paused,
             current: None,
@@ -134,7 +173,7 @@ impl Live {
             stderr_tail: VecDeque::new(),
             last_error: None,
             presence: Presence::default(),
-            policy: FailoverPolicy::new(settings.has_backup(), limits_of(&settings), saved, now),
+            policy,
             probe: None,
             last_probe: None,
             last_observe: None,
@@ -153,6 +192,18 @@ impl Live {
             last_health_at: None,
             saved_policy_json: String::new(),
             https_ok: None,
+            bitrate: BitrateWatch::default(),
+            trace: ProviderTrace::new(root.join(TRACE_DIR).join(TRACE_FILE)),
+            coverage: CoverageState::default(),
+            action_busy: false,
+            buffer: Buffer::default(),
+            last_buffer_purge: None,
+            last_clip_purge: None,
+            resolution: String::new(),
+            resolution_probe: None,
+            last_resolution: None,
+            codecs: HashMap::new(),
+            retag: false,
         };
         Arc::new(Live {
             host,
@@ -162,6 +213,9 @@ impl Live {
             programs,
             inner: Mutex::new(inner),
             gate: tokio::sync::Mutex::new(()),
+            frame: tokio::sync::Mutex::new(None),
+            #[cfg(test)]
+            sent: Mutex::new(Vec::new()),
         })
     }
 

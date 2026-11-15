@@ -6,6 +6,7 @@ use kroma_module_sdk::http::Fetch;
 
 use crate::catalogue::Catalogue;
 use crate::config::Settings;
+use crate::failover::coverage::CoverageRow;
 use crate::db::{self, Pool};
 use crate::loader;
 use crate::model::{Channel, ProviderId};
@@ -113,6 +114,33 @@ impl Providers {
     pub fn mapped(&self, channel: &Channel, to: ProviderId, rules: &Rules) -> Option<Channel> {
         let source = self.catalogue(channel.provider);
         self.catalogue(to).equivalents(&channel.name, Some(&source), 1, rules).first().map(|c| (*c).clone())
+    }
+
+    pub fn equivalents(&self, channel: &Channel, to: ProviderId, limit: usize, rules: &Rules) -> Vec<Channel> {
+        let source = self.catalogue(channel.provider);
+        let found = if channel.provider == to {
+            self.catalogue(to).equivalents(&channel.name, Some(&source), limit, rules)
+        } else {
+            self.catalogue(to).equivalents(&channel.name, Some(&source), limit, rules)
+        };
+        found.into_iter().cloned().collect()
+    }
+
+    pub fn coverage(&self, favourites: &[String], rules: &Rules) -> Vec<CoverageRow> {
+        let primary = self.catalogue(ProviderId::Primary);
+        let backup = self.catalogue(ProviderId::Backup);
+        favourites
+            .iter()
+            .map(|favourite| {
+                let main = primary.find(favourite, rules).cloned();
+                let backups: Vec<Channel> = match &main {
+                    Some(main) => backup.equivalents(&main.name, Some(&primary), 3, rules).into_iter().cloned().collect(),
+                    None => backup.find(favourite, rules).cloned().into_iter().collect(),
+                };
+                let guide = main.as_ref().is_some_and(|c| c.epg_id.is_some()) || backups.iter().any(|c| c.epg_id.is_some());
+                CoverageRow { favourite: favourite.clone(), primary: main.map(|c| c.name), backup: backups.into_iter().map(|c| c.name).collect(), guide }
+            })
+            .collect()
     }
 
     pub fn forget(&self) {

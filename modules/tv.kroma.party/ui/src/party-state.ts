@@ -17,6 +17,7 @@ export interface Model {
   floating: Floating[];
   lastClosed: (VoteClosed & { at: number }) | null;
   kicked: string | null;
+  kickedAt: number;
   goLiveAt: number;
   fineSyncAt: number;
   ideasSeq: number;
@@ -29,6 +30,7 @@ export const EMPTY: Model = {
   floating: [],
   lastClosed: null,
   kicked: null,
+  kickedAt: 0,
   goLiveAt: 0,
   fineSyncAt: 0,
   ideasSeq: 0,
@@ -75,7 +77,7 @@ function patch(state: PartyState, event: PartyEvent): PartyState {
  *  events carry no sequence and always apply. */
 export function applyEvent(model: Model, event: PartyEvent, now: number): Model {
   if (!model.state) return model;
-  if (event.type === 'party.sync.kicked') return { ...model, kicked: event.reason };
+  if (event.type === 'party.sync.kicked') return { ...model, kicked: event.reason, kickedAt: now };
   if (event.seq <= model.seq) return model;
   const gap = model.seq > 0 && event.seq > model.seq + 1;
   const base: Model = { ...model, seq: event.seq, stale: model.stale || gap };

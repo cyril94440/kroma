@@ -1,5 +1,7 @@
 import Hls from 'hls.js';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { box } from './box';
+import { createPlayerHandle, type PlayerHandle } from './player-handle';
 import {
   HLS_CONFIG,
   isBehindLive,
@@ -20,6 +22,7 @@ export interface HlsState {
   failed: boolean;
   goLive: () => void;
   toggle: () => void;
+  handle: PlayerHandle | null;
 }
 
 function kindOf(type: string): FatalKind {
@@ -32,17 +35,32 @@ export function useHls(
   element: HTMLVideoElement | null,
   url: string | null,
   onLost: () => void,
+  channelId: string | null = null,
 ): HlsState {
   const [behind, setBehind] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const hlsRef = useRef<Hls | null>(null);
+  const [live] = useState(() => box<Hls | null>(null));
   const lost = useRef(onLost);
+  const [channel] = useState(() => box(channelId));
   useEffect(() => {
     lost.current = onLost;
+    channel.set(channelId);
   });
+  const handle = useMemo(
+    () =>
+      element
+        ? createPlayerHandle({
+            element,
+            playingDate: () => control.programmeTime(element, live.get()?.playingDate ?? null),
+            liveSyncPosition: () => live.get()?.liveSyncPosition ?? null,
+            channelId: () => channel.get(),
+          })
+        : null,
+    [element],
+  );
 
   useEffect(() => {
     if (!element || !url) return;
@@ -58,7 +76,7 @@ export function useHls(
       return detach;
     }
     const hls = new Hls({ ...HLS_CONFIG });
-    hlsRef.current = hls;
+    live.set(hls);
     hls.attachMedia(element);
     hls.loadSource(url);
     hls.on(Hls.Events.MANIFEST_PARSED, () => void start());
@@ -81,7 +99,7 @@ export function useHls(
     });
     return () => {
       hls.destroy();
-      hlsRef.current = null;
+      live.set(null);
     };
   }, [element, url, attempt]);
 
@@ -89,7 +107,7 @@ export function useHls(
     if (!element) return;
     let stalledAt: number | null = null;
     const timer = setInterval(() => {
-      const hls = hlsRef.current;
+      const hls = live.get();
       setBehind(isBehindLive(control.position(element), hls?.liveSyncPosition ?? null));
       if (!control.isStalled(element)) {
         stalledAt = null;
@@ -114,8 +132,8 @@ export function useHls(
 
   const goLive = useCallback(() => {
     if (!element) return;
-    const live = hlsRef.current?.liveSyncPosition;
-    if (live) control.seek(element, live);
+    const edge = live.get()?.liveSyncPosition;
+    if (edge) control.seek(element, edge);
     void control.play(element);
   }, [element]);
 
@@ -125,5 +143,5 @@ export function useHls(
     else control.pause(element);
   }, [element]);
 
-  return { behind, playing, blocked, failed, goLive, toggle };
+  return { behind, playing, blocked, failed, goLive, toggle, handle };
 }

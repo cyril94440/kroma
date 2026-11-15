@@ -69,6 +69,10 @@ impl<S: kroma_module_sdk::host::HostStorage + Clone + Send + Sync + 'static> kro
         store::MIGRATIONS
     }
 
+    fn admin_routes(&self, host: &S) -> Option<axum::Router<S>> {
+        service::<Agent>(host).map(routes::<S>)
+    }
+
     fn jobs(&self) -> Vec<kroma_module_sdk::host::ModuleJob<S>> {
         vec![kroma_module_sdk::host::ModuleJob { key: "hermes.maintenance", category: "maintenance", schedule: Some("30 4 * * *"), run: maintenance_job::<S> }]
     }

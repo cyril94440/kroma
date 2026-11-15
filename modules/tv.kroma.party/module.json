@@ -67,5 +67,6 @@
       "bodyKey": "notifications.ideaUpdated.body"
     }
   ],
-  "storage": {}
+  "storage": {},
+  "permissions": {}
 }

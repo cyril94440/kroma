@@ -19,6 +19,7 @@ pub struct Source {
     pub user_agent: Option<String>,
     pub realtime: bool,
     pub audio: Option<AudioMode>,
+    pub hevc: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +80,9 @@ pub fn build(source: &Source, options: &Options, folder: &str) -> Vec<String> {
     cmd.extend(input_args(source, options));
     cmd.extend(["-i".to_string(), source.url.clone()]);
     cmd.extend(["-map", "0:v:0", "-map", "0:a:0?", "-c:v", "copy"].map(String::from));
+    if source.hevc {
+        cmd.extend(["-tag:v", "hvc1"].map(String::from));
+    }
     match options.audio_for(source) {
         AudioMode::Copy => cmd.extend(["-c:a", "copy"].map(String::from)),
         AudioMode::Aac => cmd.extend(["-c:a", "aac", "-b:a", "160k", "-ac", "2"].map(String::from)),
@@ -126,7 +130,7 @@ mod tests {
     const PRIMARY: &str = "http://portal.test:80/TESTUSER/TESTPASS42/1.ts";
 
     fn source(url: &str, provider: Option<ProviderId>) -> Source {
-        Source { name: "a".into(), url: url.into(), provider, user_agent: None, realtime: false, audio: None }
+        Source { name: "a".into(), url: url.into(), provider, user_agent: None, realtime: false, audio: None, hevc: false }
     }
 
     fn value<'a>(cmd: &'a [String], flag: &str) -> &'a str {
@@ -202,6 +206,20 @@ mod tests {
 
         assert_eq!(value(&build(&own, &Options::default(), "/p"), "-user_agent"), "IPTVSmartersPro");
         assert_eq!(value(&build(&source(PRIMARY, None), &Options::default(), "/p"), "-user_agent"), DEFAULT_USER_AGENT);
+    }
+
+    #[test]
+    fn hevc_video_is_tagged_hvc1_for_apple_players_and_h264_is_left_alone() {
+        let mut hevc = source(PRIMARY, None);
+        hevc.hevc = true;
+
+        let tagged = build(&hevc, &Options::default(), "/p");
+        let plain = build(&source(PRIMARY, None), &Options::default(), "/p");
+
+        let at = tagged.iter().position(|a| a == "-tag:v").unwrap();
+        assert_eq!(tagged[at + 1], "hvc1");
+        assert_eq!(tagged[at - 2..at], ["-c:v", "copy"]);
+        assert!(!plain.contains(&"-tag:v".to_string()));
     }
 
     #[test]

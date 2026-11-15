@@ -1,7 +1,6 @@
-import { KromaEvents } from '@kromatv/client/events';
-import type { KromaHost } from '@kromatv/module-sdk';
+import { useServerEvents, useViewerApi } from '@kromatv/module-sdk';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiOrigin, bearer, createPartyApi } from './party-api';
+import { createPartyApi } from './party-api';
 import { adopt, applyEvent, EMPTY, expireFloating, type Model } from './party-state';
 import { PartyEvent } from './schemas';
 
@@ -17,8 +16,9 @@ export function useNow(everyMs: number): number {
   return now;
 }
 
-export function useParty(host: KromaHost) {
-  const api = useMemo(() => createPartyApi(host), [host]);
+export function useParty() {
+  const viewer = useViewerApi();
+  const api = useMemo(() => createPartyApi(viewer), [viewer]);
   const [model, setModel] = useState<Model>(EMPTY);
   const [failed, setFailed] = useState(false);
 
@@ -38,22 +38,10 @@ export function useParty(host: KromaHost) {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  useEffect(() => {
-    const events = new KromaEvents<{ type: string }>(apiOrigin(), {
-      token: bearer,
-      refresh: async () => {
-        await host.api.get('/modules').catch(() => undefined);
-        return bearer();
-      },
-      onOpen: refresh,
-      onEvent: (raw) => {
-        const parsed = PartyEvent.safeParse(raw);
-        if (parsed.success) setModel((m) => applyEvent(m, parsed.data, Date.now()));
-      },
-    });
-    events.connect();
-    return () => events.close();
-  }, [host, refresh]);
+  useServerEvents<{ type: string }>((raw) => {
+    const parsed = PartyEvent.safeParse(raw);
+    if (parsed.success) setModel((m) => applyEvent(m, parsed.data, Date.now()));
+  }, refresh);
 
   useEffect(() => {
     if (model.stale) refresh();

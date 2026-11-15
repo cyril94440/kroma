@@ -1,6 +1,5 @@
 use std::time::{Duration, Instant};
 
-use kroma_module_sdk::host::Event;
 use serde_json::json;
 
 use super::snapshot::{TOPIC_FAILOVER, TOPIC_PROPOSAL};
@@ -76,7 +75,7 @@ impl Live {
         self.lock().last_ping = Some(Instant::now());
         let ok = self.providers.ping(ProviderId::Primary, &self.settings());
         if self.lock().policy.probe_primary(ok) {
-            self.host.publish(Event::new(TOPIC_FAILOVER, json!({ "kind": "primaryBack" })));
+            self.emit(TOPIC_FAILOVER, json!({ "kind": "primaryBack" }));
         }
     }
 
@@ -96,12 +95,12 @@ impl Live {
             Action::Failover => self.move_to(&current, ProviderId::Backup, "failover", "deadPrimary", false).await,
             Action::Failback => self.move_to(&current, ProviderId::Primary, "failback", "deadBackup", false).await,
             Action::ReturnIdle => self.move_to(&current, ProviderId::Primary, "returnIdle", "primaryBack", true).await,
-            Action::BothDown => self.host.publish(Event::new(TOPIC_FAILOVER, json!({ "kind": "bothDown", "channel": current.name }))),
-            Action::Recovered => self.host.publish(Event::new(TOPIC_FAILOVER, json!({ "kind": "recovered", "channel": current.name }))),
+            Action::BothDown => self.emit(TOPIC_FAILOVER, json!({ "kind": "bothDown", "channel": current.name })),
+            Action::Recovered => self.emit(TOPIC_FAILOVER, json!({ "kind": "recovered", "channel": current.name })),
             Action::SuggestBackup => self.propose("switchToBackup", &current, ProviderId::Backup, "unstable").await,
             Action::SuggestReturn => self.propose("returnToPrimary", &current, ProviderId::Primary, "programmeEnded").await,
             Action::ProposeTrial => self.propose("switchToBackup", &current, current.provider.other(), "trialBetter").await,
-            Action::ReportTrial => self.host.publish(Event::new(TOPIC_FAILOVER, json!({ "kind": "trialNotBetter", "channel": current.name }))),
+            Action::ReportTrial => self.emit(TOPIC_FAILOVER, json!({ "kind": "trialNotBetter", "channel": current.name })),
             Action::TrialBackup | Action::TrialPrimary => self.launch_trial(&current, observation.channel.clone()),
         }
     }
@@ -110,7 +109,7 @@ impl Live {
         let rules = self.rules();
         let Some(mapped) = self.providers.mapped(current, to, &rules) else {
             self.lock().policy.skip_failover(now_seconds());
-            self.host.publish(Event::new(TOPIC_FAILOVER, json!({ "kind": "noEquivalent", "channel": current.name, "to": to })));
+            self.emit(TOPIC_FAILOVER, json!({ "kind": "noEquivalent", "channel": current.name, "to": to }));
             return;
         };
         let outcome = self.switch(SwitchRequest { channel_id: mapped.id(), skip_if_same: true, only_if_paused, reason: reason.into(), ..SwitchRequest::default() }).await;
@@ -118,7 +117,7 @@ impl Live {
             &self.pool,
             &ProviderEvent { at: now_ms(), kind: kind.into(), from: Some(current.provider.as_str().into()), to: Some(to.as_str().into()), channel: Some(current.name.clone()), detail: outcome.status.clone(), ..ProviderEvent::default() },
         );
-        self.host.publish(Event::new(TOPIC_FAILOVER, json!({ "kind": kind, "from": current.provider, "to": to, "channel": current.name, "status": outcome.status })));
+        self.emit(TOPIC_FAILOVER, json!({ "kind": kind, "from": current.provider, "to": to, "channel": current.name, "status": outcome.status }));
     }
 
     async fn propose(&self, kind: &str, current: &Channel, to: ProviderId, why: &str) {
@@ -134,11 +133,11 @@ impl Live {
         };
         if self.party_present() {
             self.lock().proposals.insert(proposal.id.clone(), proposal.clone());
-            self.host.publish(Event::new(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": false, "viewers": self.viewer_count() })));
+            self.emit(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": false, "viewers": self.viewer_count() }));
             return;
         }
         let accept = self.viewer_count() <= 1;
-        self.host.publish(Event::new(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": true, "accepted": accept, "default": "noVote" })));
+        self.emit(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": true, "accepted": accept, "default": "noVote" }));
         if accept {
             self.apply_proposal(&proposal).await;
         }
@@ -151,7 +150,7 @@ impl Live {
 
     pub async fn answer_proposal(&self, id: &str, accept: bool) -> bool {
         let Some(proposal) = self.lock().proposals.remove(id) else { return false };
-        self.host.publish(Event::new(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": true, "accepted": accept, "default": "vote" })));
+        self.emit(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": true, "accepted": accept, "default": "vote" }));
         accept && self.apply_proposal(&proposal).await
     }
 
@@ -163,7 +162,7 @@ impl Live {
             ids.iter().filter_map(|id| inner.proposals.remove(id)).collect()
         };
         for proposal in expired {
-            self.host.publish(Event::new(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": true, "accepted": false, "default": "timeout" })));
+            self.emit(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": true, "accepted": false, "default": "timeout" }));
         }
     }
 }

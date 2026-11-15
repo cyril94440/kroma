@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use kroma_module_sdk::host::process::Command;
-use kroma_module_sdk::host::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -73,11 +72,11 @@ impl Live {
                 }
                 let (now, _) = super::now_next(&live.pool, candidate.channel.epg_id.as_deref(), &candidate.channel.name, super::now_ms());
                 item.now = now.map(|p| p.title);
-                live.host.publish(Event::new(TOPIC_SCAN, json!({ "id": scan_id, "item": item })));
+                live.emit(TOPIC_SCAN, json!({ "id": scan_id, "item": item }));
                 live.lock().scan.items.push(item);
             }
             live.lock().scan.running = false;
-            live.host.publish(Event::new(TOPIC_SCAN, json!({ "id": scan_id, "done": true })));
+            live.emit(TOPIC_SCAN, json!({ "id": scan_id, "done": true }));
         });
         Ok(token)
     }

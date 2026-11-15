@@ -1,4 +1,3 @@
-use kroma_module_sdk::host::Event;
 use serde_json::json;
 
 use super::guide::now_next;
@@ -61,20 +60,20 @@ impl Live {
             }
             inner.last_status_json = json;
         }
-        self.host.publish(Event::new(TOPIC_STATUS, serde_json::to_value(&status).unwrap_or_default()));
+        self.emit(TOPIC_STATUS, serde_json::to_value(&status).unwrap_or_default());
     }
 
     pub fn publish_channel(&self) {
         let status = self.status();
-        self.host.publish(Event::new(
+        self.emit(
             TOPIC_CHANNEL,
             json!({ "channel": status.channel, "provider": status.provider, "onBackup": status.on_backup, "now": status.now, "next": status.next, "playlist": status.playlist }),
-        ));
+        );
     }
 
     pub fn publish_presence(&self) {
         let viewers = self.lock().presence.viewers();
-        self.host.publish(Event::new(TOPIC_PRESENCE, json!({ "viewers": viewers })));
+        self.emit(TOPIC_PRESENCE, json!({ "viewers": viewers }));
     }
 
     pub fn publish_health(&self, force: bool) {
@@ -87,7 +86,7 @@ impl Live {
             }
             inner.last_health_json = json;
         }
-        self.host.publish(Event::new(TOPIC_HEALTH, serde_json::to_value(&view).unwrap_or_default()));
+        self.emit(TOPIC_HEALTH, serde_json::to_value(&view).unwrap_or_default());
     }
 }
 

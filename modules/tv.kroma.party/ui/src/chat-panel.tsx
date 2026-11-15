@@ -1,3 +1,4 @@
+import { KromaApiError } from '@kromatv/client';
 import { useT } from '@kromatv/module-sdk';
 import { Box, Button, EmptyState, Row, Surface, Text } from '@kromatv/ui/kit';
 import { useEffect, useRef, useState } from 'react';
@@ -5,7 +6,7 @@ import { ScrollView } from 'react-native';
 import { ChatLine } from './chat-line';
 import { Entry } from './entry';
 import type { Floating } from './party-state';
-import { PartyError, type PartyApi } from './party-api';
+import type { PartyApi } from './party-api';
 import type { PartyState } from './schemas';
 
 interface ChatPanelProps {
@@ -35,7 +36,7 @@ export function ChatPanel({ api, state, floating }: Readonly<ChatPanelProps>) {
     } catch (e) {
       setText(body);
       setError(
-        e instanceof PartyError && e.status === 429 ? 'party.chat.rateLimited' : 'party.error',
+        e instanceof KromaApiError && e.status === 429 ? 'party.chat.rateLimited' : 'party.error',
       );
     }
   };

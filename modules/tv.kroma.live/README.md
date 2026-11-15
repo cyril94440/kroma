@@ -80,7 +80,7 @@ addresses.
 | `POST /pause` `POST /resume` `POST /scan` `GET /scan` `POST /trial` `GET /history` `GET /metrics` `GET /overview` `POST /refresh` | settings.manage | administration |
 
 The playlist to hand to a player is `status.playlist`, relative to the module's
-files: `client.modules.fileUrl('tv.kroma.live', status.playlist)` builds the URL
+files: `useModuleFileUrl()` (the SDK) builds the URL
 with the media ticket.
 
 ## Events (on `/api/events`)
@@ -97,3 +97,14 @@ with the media ticket.
 `tv.kroma.live/control`, answered under `/_port/tv.kroma.live/control/<method>`:
 `status`, `resolve`, `switch`, `presence`, `proposal`, `epg`. The JSON of each is
 pinned by a test (`src/it_points.rs`).
+
+## Slots the watch page opens
+
+The page defines two slots (`ModuleSlot`, filled by any module through `defineModule({ slots })`), each given the same props:
+
+| Slot | Where | Props |
+| --- | --- | --- |
+| `tv.kroma.live/player.aside` | beside the player on a wide screen, under it on a narrow one; no room is taken when nothing fills it | `player`, `channel`, `playing` |
+| `tv.kroma.live/player.overlay` | over the picture, so it stays visible in the full screen overlay | `player`, `channel`, `playing`, `immersive` |
+
+`channel` is `{ id, name } | null`, `playing` a boolean, and `player` a stable object of functions: `getPositionMs()` (wall-clock ms of the frame on screen from the playlist's programme date time, `null` when unknown), `isReady()`, `getBufferAheadMs()`, `getMoveRange()` (`{ backMs, forwardMs }` a seek may travel inside the safe zone of the window, `forwardMs` negative when already past it), `seekToLiveEdge()`, `seekByMs(deltaMs)` (negative goes back, no clamp), `setPlaybackRate(rate)` and `subscribe(listener)` (snapshots `{ positionMs, playing, channelId }` every 250 ms and on play, pause and seek). The filler owns its own types and validates what it receives.

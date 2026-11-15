@@ -21,7 +21,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useAdminHost } from './context';
+import { useOptionalAdminHost } from './context';
+import { useOptionalViewerHost } from '../viewer';
 import { useAsyncAction } from './hooks';
 
 /** A contribution the add-picker can offer: it names the instance an added row
@@ -36,10 +37,11 @@ function hasAddFlow(c: EngineContribution): c is EngineChoice {
 // `GET /api/modules` query instead of opening a second cache entry; the
 // host's enable/disable invalidation keeps it live.
 function useModules(): ModuleInfo[] {
-  const { client } = useAdminHost();
+  const admin = useOptionalAdminHost();
+  const viewer = useOptionalViewerHost();
   const { data } = useQuery({
     queryKey: ['modules'],
-    queryFn: () => client.modules.list(),
+    queryFn: () => (admin ? admin.client.modules.list() : (viewer?.listModules() ?? [])),
     staleTime: 30_000,
   });
   return data ?? [];

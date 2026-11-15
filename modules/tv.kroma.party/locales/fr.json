@@ -110,5 +110,21 @@
   "config.instabilityAlerts": "Prévenir le salon quand le flux reste instable",
   "notifications.ideaUpdated.label": "Vos idées",
   "notifications.ideaUpdated.title": "Votre idée a avancé",
-  "notifications.ideaUpdated.body": "Votre idée « {text} » a été mise à jour."
+  "notifications.ideaUpdated.body": "Votre idée « {text} » a été mise à jour.",
+  "party.sync.title": "Regarder ensemble",
+  "party.sync.join": "Se caler sur le groupe",
+  "party.sync.leave": "Quitter la synchro",
+  "party.sync.status.off": "Votre lecteur n'est pas synchronisé.",
+  "party.sync.status.alone": "Synchronisé, personne d'autre pour l'instant.",
+  "party.sync.status.group": "Synchronisé avec {count} spectateurs",
+  "party.sync.toast.joined": "Calage sur le groupe",
+  "party.sync.toast.left": "Vous avez quitté la watch party",
+  "party.sync.toast.kicked": "Retiré·e de la watch party : {reason}. Vous pouvez la rejoindre quand vous voulez.",
+  "party.sync.toast.allLive": "Toute la watch party revient au direct",
+  "party.sync.toast.recalibrated": "Recalé sur {name}",
+  "party.sync.fine.running": "Recalage fin en cours, quelques saccades possibles (45 s au plus)",
+  "party.sync.fine.done": "Synchro fine réussie : à {ms} ms près",
+  "party.sync.fine.budget": "Synchro fine : à {ms} ms près (budget de temps épuisé)",
+  "party.sync.fine.outOfWindow": "Synchro fine : à {ms} ms près (cible hors de ma fenêtre)",
+  "party.sync.fine.noMeasure": "Synchro fine interrompue : aucune mesure disponible"
 }

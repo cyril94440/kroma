@@ -40,9 +40,11 @@ fn nobody_watching_or_a_recent_alert_means_no_message() {
 #[test]
 fn a_running_channel_is_only_measured_and_failover_events_are_logged() {
     let rig = Rig::new();
-    rig.agent.on_event("live.status", &json!({ "state": "running", "channel": { "id": "tf1", "name": "TF1" }, "health": { "sourceKbps": 4000 } }));
+    for kbps in [4000, 4100, 4200] {
+        rig.agent.on_event("live.status", &json!({ "state": "running", "channel": { "id": "tf1", "name": "TF1" }, "health": { "sourceKbps": kbps } }));
+    }
     rig.agent.on_event("live.failover", &json!({ "kind": "bothDown", "channel": "TF1" }));
     assert!(rig.room.texts().is_empty());
     let events: Vec<String> = rig.deps.store.audit_rows(Some("sources"), None, 5).unwrap().into_iter().map(|r| r.event).collect();
-    assert_eq!(events, vec!["live_failover".to_string(), "live_status".to_string()]);
+    assert_eq!(events, vec!["live_failover".to_string(), "live_status".to_string()], "a status that only moved its bitrate is not logged again");
 }

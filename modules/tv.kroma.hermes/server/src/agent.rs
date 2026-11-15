@@ -35,6 +35,7 @@ struct Live {
     last_spoke: i64,
     last_reconcile: i64,
     last_offair: i64,
+    last_status: String,
     names: Vec<String>,
     warned_unconfigured: bool,
 }

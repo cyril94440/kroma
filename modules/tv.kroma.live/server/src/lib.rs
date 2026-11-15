@@ -5,6 +5,7 @@ extern crate kroma_sqlite_guest as rusqlite;
 
 
 mod catalogue;
+mod clipbuf;
 mod cmd;
 mod config;
 #[cfg(test)]

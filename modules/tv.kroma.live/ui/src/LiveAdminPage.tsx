@@ -1,13 +1,13 @@
-import { type KromaHost, ModuleFailed, ModuleLoading, useT } from '@kromatv/module-sdk';
+import { ModuleFailed, ModuleLoading, useT } from '@kromatv/module-sdk';
 import { Box, PageHeader } from '@kromatv/ui/kit';
 import { AdminHealth } from './admin-health';
 import { AdminProviders } from './admin-providers';
 import { AdminScan } from './admin-scan';
 import { useAdmin } from './use-admin';
 
-export default function LiveAdminPage({ host }: Readonly<{ host: KromaHost }>) {
+export default function LiveAdminPage() {
   const t = useT();
-  const { api, overview, history, metrics, failed, load } = useAdmin(host);
+  const { api, overview, history, metrics, failed, load } = useAdmin();
   if (!overview || !history || !metrics)
     return failed ? <ModuleFailed /> : <ModuleLoading panels={3} />;
   return (

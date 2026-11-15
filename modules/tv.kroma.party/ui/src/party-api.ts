@@ -1,6 +1,4 @@
-import { loadSession } from '@kromatv/client/accounts';
-import type { KromaHost } from '@kromatv/module-sdk';
-import type { z } from 'zod';
+import type { ModuleApi } from '@kromatv/module-sdk';
 import {
   Candidates,
   Created,
@@ -13,67 +11,9 @@ import {
   SwitchOutcome,
 } from './schemas';
 
-export const MODULE_ID = 'tv.kroma.party';
-
-export class PartyError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-  ) {
-    super(code);
-  }
-}
-
-export function apiOrigin(): string {
-  const configured = (globalThis as { __KROMA_API__?: string }).__KROMA_API__;
-  const origin = configured ?? globalThis.location?.origin ?? '';
-  let end = origin.length;
-  while (end > 0 && origin[end - 1] === '/') end -= 1;
-  return origin.slice(0, end);
-}
-
-export function bearer(): string | undefined {
-  return loadSession()?.accessToken;
-}
-
-/** The module's HTTP surface for a page that is not under the admin shell. The
- *  main-shell host hands a page only `host.api.get`, so the bearer comes from the
- *  stored session; a 401 triggers one authenticated host read, which makes the
- *  client refresh its token, and the call is retried once. */
-export function createPartyApi(host: Pick<KromaHost, 'api'>) {
-  async function call<S extends z.ZodType>(
-    method: 'GET' | 'POST',
-    path: string,
-    body: unknown,
-    schema: S,
-  ): Promise<z.output<S>> {
-    const send = () =>
-      fetch(`${apiOrigin()}/api/module/${MODULE_ID}${path}`, {
-        method,
-        headers: {
-          authorization: `Bearer ${bearer() ?? ''}`,
-          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-    let response = await send();
-    if (response.status === 401) {
-      await host.api.get('/modules').catch(() => undefined);
-      response = await send();
-    }
-    const json: unknown = await response.json().catch(() => null);
-    if (!response.ok) {
-      const code = (json as { error?: unknown } | null)?.error;
-      throw new PartyError(response.status, typeof code === 'string' ? code : 'unknown');
-    }
-    return schema.parse(json);
-  }
-
-  const get = <S extends z.ZodType>(path: string, schema: S) =>
-    call('GET', path, undefined, schema);
-  const post = <S extends z.ZodType>(path: string, body: unknown, schema: S) =>
-    call('POST', path, body, schema);
-
+export function createPartyApi(api: ModuleApi) {
+  const get = api.get;
+  const post = api.post;
   return {
     state: () => get('/state', PartyState),
     time: () => get('/time', ServerTime),
@@ -94,6 +34,28 @@ export function createPartyApi(host: Pick<KromaHost, 'api'>) {
       post(`/ideas/${encodeURIComponent(id)}`, { status, reply }, Ok.loose()),
     goLive: () => post('/sync/go-live', {}, Ok.loose()),
     fineSync: () => post('/sync/fine-sync', {}, Ok),
+    beat: (body: {
+      enabled: boolean;
+      delay: number;
+      paused: boolean;
+      pinned: boolean;
+      blocked: boolean;
+    }) => api.post('/sync/beat', body),
+    fineDone: (body: { ms: number; seeks: number; abandoned: boolean; solo: boolean }) =>
+      api.post('/sync/fine-done', body),
+    recalibration: (body: { gap: number; target: number; arrival: boolean; blocked: boolean }) =>
+      api.post('/sync/recalibration', body),
+    stats: (body: {
+      buffer: number;
+      bandwidthKbps: number;
+      stalls: number;
+      rebufferMs: number;
+      dropped: number;
+      resolution: string;
+      playing: boolean;
+      delay: number | null;
+      paused: boolean;
+    }) => api.post('/stats', body),
     kick: (userId: string) => post('/sync/kick', { userId, reason: '' }, Ok.loose()),
   };
 }

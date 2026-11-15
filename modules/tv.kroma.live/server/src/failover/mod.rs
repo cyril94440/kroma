@@ -1,10 +1,19 @@
+pub mod bitrate;
+pub mod coverage;
+mod state;
+pub mod trace;
 mod trial_logic;
+mod variants;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod variants_tests;
 
 use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
+
+pub use state::{ChannelDown, Family, Persisted, TrialRecord};
 
 use crate::model::ProviderId;
 use crate::trial::Outcome;
@@ -18,6 +27,11 @@ pub const TRIAL_MAX: f64 = 240.0;
 pub const PROPOSAL_VALID: f64 = 300.0;
 pub const ALERT_COOLDOWN: f64 = 600.0;
 pub const RECOVERED_AFTER: f64 = 20.0;
+pub const VARIANT_MAX_SWITCHES: usize = 2;
+pub const VARIANT_WINDOW: f64 = 600.0;
+pub const VARIANT_STABLE: f64 = 120.0;
+pub(crate) const VARIANT_MAX_FAMILY_NAMES: usize = 24;
+pub(crate) const VARIANT_MAX_SWITCHES_KEPT: usize = 12;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
@@ -50,41 +64,6 @@ pub enum Action {
     ReportTrial,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct TrialRecord {
-    pub outcome: Outcome,
-    pub reason: String,
-    pub at: f64,
-    pub live: (Option<ProviderId>, Option<String>),
-    pub proposed: bool,
-    pub reported: bool,
-}
-
-impl Default for TrialRecord {
-    fn default() -> Self {
-        TrialRecord { outcome: Outcome::Impossible, reason: String::new(), at: 0.0, live: (None, None), proposed: false, reported: false }
-    }
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase", default)]
-pub struct Persisted {
-    pub primary_down_since: Option<f64>,
-    pub last_auto_at: Option<f64>,
-    pub last_suggest_at: Option<f64>,
-    pub switched_at: Option<f64>,
-    pub channel_at_switch: Option<String>,
-    pub program_at_switch: Option<String>,
-    pub return_suggested_for: Option<String>,
-    pub both_down_alerted: bool,
-    pub last_both_down_at: Option<f64>,
-    pub last_recovered_at: Option<f64>,
-    pub last_trial_at: Option<f64>,
-    pub trial_live: Option<(Option<ProviderId>, Option<String>)>,
-    pub trial_result: Option<TrialRecord>,
-}
-
 #[derive(Debug, Clone)]
 pub struct Observation {
     pub now: f64,
@@ -102,6 +81,7 @@ pub struct FailoverPolicy {
     pub has_backup: bool,
     pub limits: Limits,
     pub saved: Persisted,
+    pub ignored_state: Vec<&'static str>,
     trial_seq: u64,
     provider: Option<ProviderId>,
     dead_since: Option<f64>,
@@ -120,7 +100,7 @@ pub fn elapsed(since: Option<f64>, now: f64, delay: f64) -> bool {
 
 impl FailoverPolicy {
     pub fn new(has_backup: bool, limits: Limits, saved: Persisted, now: f64) -> FailoverPolicy {
-        let mut saved = saved;
+        let (mut saved, ignored_state) = saved.cleaned(now);
         if saved.last_trial_at.is_some() && saved.trial_result.is_none() {
             match saved.trial_live.clone() {
                 None => saved.last_trial_at = None,
@@ -133,6 +113,7 @@ impl FailoverPolicy {
             has_backup,
             limits,
             saved,
+            ignored_state,
             trial_seq: 0,
             provider: None,
             dead_since: None,
@@ -219,6 +200,9 @@ impl FailoverPolicy {
             self.prev_obs = None;
             self.unstable_since = None;
             self.dead_since = None;
+            if self.saved.variant_family.as_ref().is_some_and(|family| obs.channel != family.to) {
+                self.saved.variant_family = None;
+            }
         }
         if obs.channel.is_some() {
             self.obs_channel = obs.channel.clone();
@@ -243,6 +227,7 @@ impl FailoverPolicy {
         let bad = live && obs.media && obs.unstable;
         self.unstable_since = if bad { self.unstable_since.or(Some(now)) } else { None };
         self.note_unstable(now, bad);
+        self.end_variant_incident(now, provider, &obs.channel);
         if self.saved.both_down_alerted && self.media_since.is_some_and(|since| now - since >= RECOVERED_AFTER) {
             self.saved.both_down_alerted = false;
             if obs.viewers > 0 && elapsed(self.saved.last_recovered_at, now, ALERT_COOLDOWN) {
@@ -261,7 +246,7 @@ impl FailoverPolicy {
         }
         let dead_long = self.dead_since.is_some_and(|since| now - since >= self.limits.dead_after);
         if provider == ProviderId::Primary {
-            if dead_long && elapsed(self.saved.last_auto_at, now, AUTO_COOLDOWN) {
+            if dead_long && elapsed(self.saved.last_auto_at, now, AUTO_COOLDOWN) && !self.channel_muted(&obs.channel, now) {
                 return Some(Action::Failover);
             }
             if let Some(action) = self.trial_action(bad, now, provider, &obs.channel, Action::TrialBackup) {
@@ -273,7 +258,7 @@ impl FailoverPolicy {
             return None;
         }
         if dead_long {
-            if self.saved.primary_down_since.is_none() && elapsed(self.saved.last_auto_at, now, AUTO_COOLDOWN) {
+            if self.saved.primary_down_since.is_none() && elapsed(self.saved.last_auto_at, now, AUTO_COOLDOWN) && !self.channel_muted(&obs.channel, now) {
                 return Some(Action::Failback);
             }
             if self.saved.primary_down_since.is_some() && !self.saved.both_down_alerted && elapsed(self.saved.last_both_down_at, now, ALERT_COOLDOWN) {

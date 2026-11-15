@@ -10,8 +10,8 @@ import { type ModuleApi, ModuleId } from '@kromatv/client/modules';
 import { useScopedT } from '@kromatv/ui';
 import { createContext, type ReactNode, useContext, useMemo, useState } from 'react';
 import { useAdminHost } from './admin/context';
+import { ModuleIdContext } from './scope-id';
 
-const ModuleIdContext = createContext<ModuleId | null>(null);
 const GateContext = createContext<(() => void) | null>(null);
 
 function gate(ready: () => Promise<void>): () => void {

@@ -33,6 +33,8 @@ export type { KromaEvents, ModuleApiRegistry } from './contracts';
 export type { DefineModuleOptions, ModuleManifestInput, ModulePage } from './define';
 export { defineModule, pageHref } from './define';
 export { useServerEvents } from './events';
+export type { ViewerEventHandlers, ViewerHostValue } from './viewer';
+export { useModuleFileUrl, useViewerApi, ViewerHostProvider } from './viewer';
 export type { HostApi, HostAuth, HostBase, HostI18n, HostNav, KromaHost } from './host';
 export { moduleIconUrl } from './icon';
 export type {
@@ -42,6 +44,8 @@ export type {
   RouteDef,
   SettingsPanel,
   SlotContribution,
+  ModuleSlotContribution,
+  ModuleSlotName,
   SlotName,
   SlotProps,
 } from './module';
@@ -67,7 +71,7 @@ export {
   sharedKey,
   WHOLE_NAMESPACE,
 } from './shared';
-export { ModuleSlot, ModuleSlotProvider, useSlotEntries } from './slot';
+export { ModuleSlot, ModuleSlotProvider, useSlotEntries, useSlotFilled } from './slot';
 export type {
   ConfigField,
   Contribution,
