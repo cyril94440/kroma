@@ -11,6 +11,7 @@ export function StatusBadges({ status }: Readonly<{ status: Status }>) {
       {badges(status).map((name) => (
         <Badge key={name}>{t(`live.badge.${name}`)}</Badge>
       ))}
+      {status.sourceResolution ? <Badge>{status.sourceResolution}</Badge> : null}
       {status.health.sourceKbps > 0 ? (
         <Text variant="meta" color="textDim">
           {t('live.health.kbps', { kbps: Math.round(status.health.sourceKbps) })}

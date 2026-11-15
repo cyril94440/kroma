@@ -7,7 +7,8 @@ use crate::blackbox::{clip, mask_json};
 use crate::model::{Allowed, Dialogue, Model, ModelError, ToolCall};
 use crate::store::Incoming;
 use crate::strings;
-use crate::tools::{run_external, Backend, Kind, ToolEnv, ToolSet, TurnCtx};
+use super::waiting::Waiting;
+use crate::tools::{run_external, Backend, Follow, Kind, ToolEnv, ToolSet, TurnCtx};
 
 const ANNOUNCED: [&str; 3] = ["switched", "vote_open", "upcoming"];
 const FINAL_MARGIN_S: f64 = 25.0;
@@ -34,6 +35,8 @@ pub struct Turn {
     grace: bool,
     last_label: Option<&'static str>,
     failure: Option<ModelError>,
+    waiting: Option<Waiting>,
+    following: Option<(Follow, String)>,
 }
 
 fn status_of(out: &Value) -> Option<&str> {
@@ -57,7 +60,7 @@ impl Turn {
     #[allow(clippy::too_many_arguments)]
     pub fn new(deps: Arc<Deps>, model: Arc<dyn Model>, tools: Arc<ToolSet>, dialogue: Box<dyn Dialogue>, message: Incoming, limits: Limits, language: String) -> Self {
         let started = deps.now();
-        Self { deps, model, tools, dialogue, message, ctx: TurnCtx::default(), limits, language, started, steps: 0, used: Vec::new(), grace: false, last_label: None, failure: None }
+        Self { deps, model, tools, dialogue, message, ctx: TurnCtx::default(), limits, language, started, steps: 0, used: Vec::new(), grace: false, last_label: None, failure: None, waiting: None, following: None }
     }
 
     pub fn message(&self) -> &Incoming {
@@ -92,13 +95,15 @@ impl Turn {
         let Some(tool) = tools.get(&call.name) else {
             return json!({ "erreur": format!("outil inconnu : {}", call.name) });
         };
-        if tool.kind == Kind::Action && self.ctx.diffusion_done {
+        let kind = tool.kind_for(&call.args);
+        if kind == Kind::Action && self.ctx.diffusion_done {
             return json!({ "status": "refus", "raison": "une seule action de diffusion par message" });
         }
-        if tool.kind == Kind::Action && self.ctx.partial_seen {
+        if kind == Kind::Action && self.ctx.partial_seen {
             return json!({ "status": "refus", "raison": "le guide n'a donné qu'une correspondance PARTIELLE : propose-la avec reply et attends la confirmation (nouveau message) avant de changer l'image de tout le monde" });
         }
         self.label(tool.activity.unwrap_or("thinking"));
+        self.ctx.left_s = Some(self.limits.budget_s + HARD_STOP_EXTRA_S - (self.deps.now() - self.started) as f64 / 1000.0);
         let deps = self.deps.clone();
         let model = self.model.clone();
         let message = self.message.clone();
@@ -107,7 +112,7 @@ impl Turn {
             Backend::Builtin(handler) => handler(&mut env, &call.args),
             Backend::External(module) => run_external(&mut env, module, &call.name, &call.args),
         };
-        if tool.kind == Kind::Action && status_of(&out).is_some_and(|s| ANNOUNCED.contains(&s)) {
+        if kind == Kind::Action && status_of(&out).is_some_and(|s| ANNOUNCED.contains(&s)) {
             self.ctx.diffusion_done = true;
         }
         if call.name == "find_program" && status_of(&out) == Some("partial_matches") {
@@ -122,7 +127,7 @@ impl Turn {
     }
 
     fn kind_of(&self, call: &ToolCall) -> Option<Kind> {
-        self.tools.get(&call.name).map(|t| t.kind)
+        self.tools.get(&call.name).map(|t| t.kind_for(&call.args))
     }
 
     fn run_batch(&mut self, calls: Vec<ToolCall>) -> (Vec<(ToolCall, Value)>, bool) {
@@ -141,6 +146,9 @@ impl Turn {
                 continue;
             }
             let out = self.execute(call);
+            if let Some(job) = self.ctx.pending.take() {
+                self.following = Some((Follow::new(job), call_key(call)));
+            }
             self.used.push(call.name.clone());
             if kind == Some(Kind::Reply) && inv {
                 self.ctx.progress_any = true;
@@ -169,6 +177,13 @@ impl Turn {
     /// Runs one step: one model call and the tools it asked for. `Some` is the
     /// reason the turn ended, `None` means another step is due.
     pub fn advance(&mut self) -> Option<&'static str> {
+        if let Some(mut waiting) = self.waiting.take() {
+            match waiting.step(&self.deps, &self.model) {
+                Some(results) => self.dialogue.answer(&results),
+                None => self.waiting = Some(waiting),
+            }
+            return None;
+        }
         let step = self.steps + 1;
         if step > self.limits.max_steps {
             return Some(self.finish("etapes"));
@@ -211,6 +226,11 @@ impl Turn {
         let (results, terminal) = self.run_batch(calls);
         if terminal {
             return Some(self.finish("terminal"));
+        }
+        if let Some((follow, key)) = self.following.take() {
+            let slot = results.iter().position(|(c, _)| call_key(c) == key).unwrap_or(0);
+            self.waiting = Some(Waiting::new(follow, slot, results));
+            return None;
         }
         self.dialogue.answer(&results);
         None

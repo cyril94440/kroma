@@ -116,7 +116,7 @@ fn collect(env: &mut ToolEnv, query: &str, full_only: bool) -> Result<(Vec<Hit>,
         let rank = match ranks.iter().find(|(id, _)| *id == p.channel_id) {
             Some((_, r)) => *r,
             None => {
-                let r = env.deps.control.resolve(&p.channel_name, 5).ok().and_then(|c| c.into_iter().find(|c| c.id == p.channel_id)).map_or(0.0, |c| c.score);
+                let r = env.deps.control.resolve(&p.channel_name, 5, None).ok().and_then(|c| c.into_iter().find(|c| c.id == p.channel_id)).map_or(0.0, |c| c.score);
                 ranks.push((p.channel_id.clone(), r));
                 r
             }
@@ -222,7 +222,7 @@ fn find_program(env: &mut ToolEnv, args: &Value) -> Value {
         let best = &entries[0];
         let (id, name, title) = (best.channel_id.clone(), best.channel_name.clone(), best.title.clone());
         let note = via_web.map_or_else(|| title.clone(), |w| format!("{title} (trouvé via le web : {w})"));
-        let mut out = request_channel(env, &id, &name, &note);
+        let mut out = request_channel(env, &id, &name, &note, false);
         out["program"] = json!(title);
         return out;
     }

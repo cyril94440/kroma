@@ -1,4 +1,3 @@
-
 use super::support::{at, direct, matches_at, named, none, programme, score, synth};
 use crate::detect::{confirms, contradicts, decide, score_compatible, Verdict};
 use crate::sport::Reading;

@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
-use super::{Candidate, Contributors, Control, ExternalTool, KickOutcome, Programme, Room, RoomMessage, Snapshot, Status, SwitchOutcome};
+use super::{Contributors, ExternalTool, KickOutcome, Room, RoomMessage, SwitchAsk, SwitchOutcome};
 
 pub type PollCall = (String, String, Vec<String>, Option<i64>);
 pub type ExternalCall = (String, String, Value, String, String);
@@ -20,6 +20,12 @@ pub struct FakeRoom {
     pub said: Mutex<Vec<Said>>,
     pub history: Mutex<Vec<RoomMessage>>,
     pub switches: Mutex<Vec<(String, String, String)>>,
+    pub switch_asks: Mutex<Vec<(Option<String>, bool)>>,
+    pub go_live_reply: Mutex<Option<Result<Value, String>>>,
+    pub fine_sync_reply: Mutex<Option<Result<Value, String>>>,
+    pub logs_reply: Mutex<Option<Result<Vec<Value>, String>>>,
+    pub logs_asks: Mutex<Vec<(Option<String>, u32, Option<u32>)>>,
+    pub party_calls: Mutex<Vec<(String, String)>>,
     pub switch_reply: Mutex<Option<SwitchOutcome>>,
     pub polls: Mutex<Vec<PollCall>>,
     pub poll_error: Mutex<Option<String>>,
@@ -57,8 +63,9 @@ impl Room for FakeRoom {
         Ok(all[skip..].to_vec())
     }
 
-    fn request_switch(&self, channel_id: &str, requested_by: &str, reason: &str) -> Result<SwitchOutcome> {
-        self.switches.lock().unwrap().push((channel_id.into(), requested_by.into(), reason.into()));
+    fn request_switch(&self, ask: &SwitchAsk) -> Result<SwitchOutcome> {
+        self.switches.lock().unwrap().push((ask.channel_id.into(), ask.requested_by.into(), ask.reason.into()));
+        self.switch_asks.lock().unwrap().push((ask.channel_name.map(str::to_string), ask.force));
         Ok(self.switch_reply.lock().unwrap().clone().unwrap_or(SwitchOutcome { outcome: "voteStarted".into(), vote_id: Some("1".into()), reason: None }))
     }
 
@@ -94,59 +101,28 @@ impl Room for FakeRoom {
         self.activity_log.lock().unwrap().push(status.map(str::to_string));
         Ok(())
     }
+
+    fn go_live(&self, requested_by: &str) -> Result<Value> {
+        self.party_calls.lock().unwrap().push(("goLive".into(), requested_by.into()));
+        answer(&self.go_live_reply)
+    }
+
+    fn fine_sync(&self, requested_by: &str) -> Result<Value> {
+        self.party_calls.lock().unwrap().push(("fineSync".into(), requested_by.into()));
+        answer(&self.fine_sync_reply)
+    }
+
+    fn client_logs(&self, user_id: Option<&str>, limit: u32, minutes: Option<u32>) -> Result<Vec<Value>> {
+        self.logs_asks.lock().unwrap().push((user_id.map(str::to_string), limit, minutes));
+        answer(&self.logs_reply)
+    }
 }
 
-#[derive(Default)]
-pub struct FakeControl {
-    pub status: Mutex<Status>,
-    pub channels: Mutex<Vec<Candidate>>,
-    pub programmes: Mutex<Vec<Programme>>,
-    pub snapshot: Mutex<Option<Result<Snapshot, String>>>,
-    pub down: Mutex<bool>,
-    pub epg_calls: Mutex<Vec<Option<String>>>,
-}
-
-impl Control for FakeControl {
-    fn status(&self) -> Result<Status> {
-        if *self.down.lock().unwrap() {
-            return Err(anyhow!("live is not running"));
-        }
-        Ok(self.status.lock().unwrap().clone())
-    }
-
-    fn resolve(&self, query: &str, limit: u32) -> Result<Vec<Candidate>> {
-        let q = query.to_lowercase();
-        let channels = self.channels.lock().unwrap();
-        let mut found: Vec<Candidate> = channels.iter().filter(|c| c.id == query || c.name.to_lowercase().contains(&q)).cloned().collect();
-        found.truncate(limit as usize);
-        Ok(found)
-    }
-
-    fn epg(&self, query: Option<&str>, from: Option<i64>, to: Option<i64>, limit: u32) -> Result<Vec<Programme>> {
-        self.epg_calls.lock().unwrap().push(query.map(str::to_string));
-        let q = query.unwrap_or_default().to_lowercase();
-        let words: Vec<&str> = q.split_whitespace().collect();
-        let mut found: Vec<Programme> = self
-            .programmes
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|p| {
-                let hay = format!("{} {}", p.title, p.description).to_lowercase();
-                words.iter().any(|w| hay.contains(w)) && from.is_none_or(|f| p.end > f) && to.is_none_or(|t| p.start < t)
-            })
-            .cloned()
-            .collect();
-        found.truncate(limit as usize);
-        Ok(found)
-    }
-
-    fn snapshot(&self) -> Result<Snapshot> {
-        match self.snapshot.lock().unwrap().clone() {
-            Some(Ok(s)) => Ok(s),
-            Some(Err(e)) => Err(anyhow!(e)),
-            None => Err(anyhow!("HTTP 404: not found")),
-        }
+pub fn answer<T: Clone>(slot: &Mutex<Option<Result<T, String>>>) -> Result<T> {
+    match slot.lock().unwrap().clone() {
+        Some(Ok(v)) => Ok(v),
+        Some(Err(e)) => Err(anyhow!(e)),
+        None => Err(anyhow!("HTTP 404: not found")),
     }
 }
 

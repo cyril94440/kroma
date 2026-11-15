@@ -17,6 +17,7 @@ mod events;
 mod gate;
 mod proactive;
 mod turn;
+mod waiting;
 
 pub use deps::Deps;
 pub use turn::{Limits, Turn};
@@ -136,7 +137,7 @@ impl Agent {
 
     fn tools_for(&self, model: &Arc<dyn Model>, now: i64) -> ToolSet {
         let settings = self.deps.settings();
-        let availability = Availability { search: model.can_search(), vision: settings.vision && self.deps.snapshot_supported(now) };
+        let availability = Availability { search: model.can_search(), vision: settings.vision, off: self.deps.unsupported_methods(now) };
         ToolSet::build(&self.deps, &availability, now)
     }
 

@@ -10,6 +10,7 @@ import { useLive, useNow } from './use-live';
 import { ViewersPanel } from './viewers-panel';
 
 const HIDDEN = { display: 'none' } as const;
+const ASIDE_COLUMN = { flexBasis: 320 } as const;
 
 export default function LivePage() {
   const t = useT();
@@ -63,9 +64,9 @@ export default function LivePage() {
             <NowNext now={status.now} next={status.next} clock={clock} />
           </Box>
         </Box>
-        <Box flex minW={280} style={{ flexBasis: 320 }}>
+        <Box flex minW={280} style={immersive ? HIDDEN : ASIDE_COLUMN}>
           {handle && hasAside ? (
-            <Box mb={20} style={immersive ? HIDDEN : undefined}>
+            <Box mb={20}>
               <ModuleSlot
                 name="tv.kroma.live/player.aside"
                 player={handle}

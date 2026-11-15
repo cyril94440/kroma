@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LiveEvent, ScanState, Status } from './schemas';
+import { ChannelView, LiveEvent, Overview, ScanItem, ScanState, Status } from './schemas';
 
 const RUNNING = {
   state: 'running',
@@ -45,5 +45,44 @@ describe('a scan', () => {
 
     expect(scan.items[0]?.black).toBe(false);
     expect(scan.items[0]?.frame).toBe('scan-x/1.jpg');
+  });
+});
+
+describe('the 0.2 additions', () => {
+  it('reads the source resolution and defaults it to unknown', () => {
+    expect(
+      Status.parse({
+        state: 'running',
+        channel: null,
+        provider: 'primary',
+        sourceResolution: '1920x1080@25',
+      }).sourceResolution,
+    ).toBe('1920x1080@25');
+    expect(
+      Status.parse({ state: 'running', channel: null, provider: 'primary' }).sourceResolution,
+    ).toBe('');
+  });
+
+  it('reads the favourites coverage and tolerates a gap code it does not know', () => {
+    const overview = Overview.parse({
+      providers: [],
+      coverage: [
+        { favourite: 'TF1', primary: 'FR: TF1', backup: ['TF1 HD'], guide: true, gap: null },
+        { favourite: 'M6', primary: null, backup: [], guide: false, gap: 'absentFromBackup' },
+        { favourite: 'Arte', primary: null, backup: [], guide: false, gap: 'somethingNew' },
+      ],
+    });
+    expect(overview.coverage.map((row) => row.gap)).toEqual([null, 'absentFromBackup', null]);
+  });
+
+  it('keeps every captured frame of a scan item and the event a channel carries', () => {
+    expect(
+      ScanItem.parse({ id: 'a', name: 'A', frames: ['x/1.jpg', 'x/2.jpg'], still: true }).frames,
+    ).toHaveLength(2);
+    expect(
+      ChannelView.parse({ id: 'a', name: 'A', event: { search: 'psg', competition: 'Ligue 1' } })
+        .event?.competition,
+    ).toBe('Ligue 1');
+    expect(ChannelView.parse({ id: 'a', name: 'A' }).event).toBeNull();
   });
 });

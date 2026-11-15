@@ -8,7 +8,8 @@ use serde_json::{json, Value};
 
 use crate::agent::{Agent, Deps};
 use crate::model::{Allowed, Dialogue, Model, ModelError, ModelSource, ScreenReading, ToolCall, ToolDecl, WebAnswer};
-use crate::peers::fakes::{FakeContributors, FakeControl, FakeRoom};
+use crate::peers::fake_control::FakeControl;
+use crate::peers::fakes::{FakeContributors, FakeRoom};
 use crate::peers::{Candidate, ChannelRef, Programme, RoomMessage, Slot, Status, Viewer};
 use crate::store::{Incoming, Store};
 

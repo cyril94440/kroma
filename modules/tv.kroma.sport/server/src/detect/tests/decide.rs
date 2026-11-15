@@ -1,4 +1,3 @@
-
 use super::support::{at, guide, label, matches_at, named, none, programme};
 use crate::detect::{decide, Verdict};
 

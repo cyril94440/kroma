@@ -122,5 +122,12 @@
   "notifications.channelDown.body": "{channel} is cut at the provider, which still answers for other channels.",
   "notifications.coverageGap.label": "Backup coverage gap",
   "notifications.coverageGap.title": "The backup does not cover a quick-access channel",
-  "notifications.coverageGap.body": "{channel} would not be saved by the backup provider."
+  "notifications.coverageGap.body": "{channel} would not be saved by the backup provider.",
+  "live.admin.coverage.title": "Favourites on the backup provider",
+  "live.admin.coverage.primary": "main: {name}",
+  "live.admin.coverage.backup": "backup: {names}",
+  "live.admin.coverage.ok": "Covered",
+  "live.admin.coverage.gap.absentFromBackup": "Missing from the backup",
+  "live.admin.coverage.gap.notFound": "Not found",
+  "live.admin.coverage.gap.noGuide": "No guide"
 }

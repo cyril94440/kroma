@@ -1,4 +1,3 @@
-
 use super::support::{at, direct, none, programme, score, synth};
 use crate::detect::{confirms, contradicts, decide, Verdict};
 

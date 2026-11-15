@@ -6,6 +6,11 @@ import type { ScanItem, ScanState } from './schemas';
 
 const POLL_MS = 3000;
 
+function framesOf(item: ScanItem): string[] {
+  if (item.frames.length > 0) return item.frames;
+  return item.frame ? [item.frame] : [];
+}
+
 function scanVerdict(item: ScanItem, t: (key: string) => string): string {
   if (item.error) return t('live.admin.scanFailed');
   if (item.black) return t('live.badge.black');
@@ -72,14 +77,15 @@ export function AdminScan({ api }: Readonly<{ api: LiveApi }>) {
       <Row gap={12} wrap mt={12}>
         {scan?.items.map((item) => (
           <Box key={item.id} style={{ width: 160 }}>
-            {item.frame ? (
+            {framesOf(item).map((path) => (
               <img
-                src={api.fileUrl(item.frame)}
+                key={path}
+                src={api.fileUrl(path)}
                 alt={item.name}
                 width={160}
-                style={{ borderRadius: 8 }}
+                style={{ borderRadius: 8, marginBottom: 4 }}
               />
-            ) : null}
+            ))}
             <Text variant="meta" lines={1}>
               {item.number ?? '-'} · {item.name}
             </Text>

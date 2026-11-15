@@ -66,7 +66,11 @@ export function ChannelPanel({ api, current, onSwitched }: Readonly<ChannelPanel
         </Text>
         {rows.map((channel) => (
           <ListRow.Root key={channel.id}>
-            <ListRow.Label>{channel.name}</ListRow.Label>
+            <ListRow.Label>
+              {channel.event?.competition
+                ? `${channel.name} - ${channel.event.competition}`
+                : channel.name}
+            </ListRow.Label>
             <ListRow.Trailing>
               <Row gap={8}>
                 {channel.now ? (

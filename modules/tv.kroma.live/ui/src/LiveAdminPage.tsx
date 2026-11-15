@@ -1,5 +1,6 @@
 import { ModuleFailed, ModuleLoading, useT } from '@kromatv/module-sdk';
 import { Box, PageHeader } from '@kromatv/ui/kit';
+import { AdminCoverage } from './admin-coverage';
 import { AdminHealth } from './admin-health';
 import { AdminProviders } from './admin-providers';
 import { AdminScan } from './admin-scan';
@@ -21,6 +22,9 @@ export default function LiveAdminPage() {
       </Box>
       <Box mt={20}>
         <AdminHealth api={api} history={history} metrics={metrics} onChanged={load} />
+      </Box>
+      <Box mt={20}>
+        <AdminCoverage overview={overview} />
       </Box>
       <Box mt={20}>
         <AdminScan api={api} />

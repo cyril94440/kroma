@@ -10,11 +10,12 @@ use crate::clock::Clock;
 use crate::model::{Model, ModelSource};
 use crate::peers::{Contributors, Control, Room};
 use crate::rules::Rules;
+use crate::scans::{LiveSeen, ScanCache};
 use crate::settings::Settings;
 use crate::store::Store;
 use crate::webcache::{TtlCache, TTL_MS};
 
-const SNAPSHOT_RETRY_MS: i64 = 600_000;
+const METHOD_RETRY_MS: i64 = 600_000;
 const HOUR_MS: i64 = 3_600_000;
 const NOTICE_COOLDOWN_MS: i64 = 600_000;
 
@@ -29,8 +30,10 @@ pub struct Deps {
     pub models: ModelSource,
     pub web_cache: TtlCache<Value>,
     pub hint_cache: TtlCache<Vec<String>>,
+    pub scans: ScanCache,
+    pub live_seen: LiveSeen,
     recent_suggestions: Mutex<HashMap<(String, String), i64>>,
-    snapshot_off_until: AtomicI64,
+    methods_off: Mutex<HashMap<&'static str, i64>>,
     notice_at: AtomicI64,
 }
 
@@ -48,8 +51,10 @@ impl Deps {
             models,
             web_cache: TtlCache::new(TTL_MS),
             hint_cache: TtlCache::new(TTL_MS),
+            scans: ScanCache::default(),
+            live_seen: LiveSeen::default(),
             recent_suggestions: Mutex::new(HashMap::new()),
-            snapshot_off_until: AtomicI64::new(0),
+            methods_off: Mutex::new(HashMap::new()),
             notice_at: AtomicI64::new(i64::MIN / 2),
         }
     }
@@ -82,12 +87,16 @@ impl Deps {
         recent.insert((kind.to_string(), title.to_lowercase()), now).is_some()
     }
 
-    pub fn mark_snapshot_unsupported(&self, now: i64) {
-        self.snapshot_off_until.store(now + SNAPSHOT_RETRY_MS, Ordering::SeqCst);
+    pub fn mark_unsupported(&self, method: &'static str, now: i64) {
+        self.methods_off.lock().unwrap_or_else(|e| e.into_inner()).insert(method, now + METHOD_RETRY_MS);
     }
 
-    pub fn snapshot_supported(&self, now: i64) -> bool {
-        now >= self.snapshot_off_until.load(Ordering::SeqCst)
+    pub fn supported(&self, method: &'static str, now: i64) -> bool {
+        self.methods_off.lock().unwrap_or_else(|e| e.into_inner()).get(method).is_none_or(|until| now >= *until)
+    }
+
+    pub fn unsupported_methods(&self, now: i64) -> Vec<&'static str> {
+        self.methods_off.lock().unwrap_or_else(|e| e.into_inner()).iter().filter(|(_, until)| now < **until).map(|(m, _)| *m).collect()
     }
 
     pub fn take_notice_slot(&self, now: i64) -> bool {

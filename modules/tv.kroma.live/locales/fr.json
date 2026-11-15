@@ -122,5 +122,12 @@
   "notifications.channelDown.body": "{channel} est coupée chez le fournisseur, qui répond pourtant pour les autres chaînes.",
   "notifications.coverageGap.label": "Chaîne favorite non couverte par le secours",
   "notifications.coverageGap.title": "Le secours ne couvre pas une chaîne favorite",
-  "notifications.coverageGap.body": "{channel} ne serait pas sauvée par le fournisseur de secours."
+  "notifications.coverageGap.body": "{channel} ne serait pas sauvée par le fournisseur de secours.",
+  "live.admin.coverage.title": "Favoris chez le fournisseur de secours",
+  "live.admin.coverage.primary": "principal : {name}",
+  "live.admin.coverage.backup": "secours : {names}",
+  "live.admin.coverage.ok": "Couvert",
+  "live.admin.coverage.gap.absentFromBackup": "Absent du secours",
+  "live.admin.coverage.gap.notFound": "Introuvable",
+  "live.admin.coverage.gap.noGuide": "Sans guide"
 }

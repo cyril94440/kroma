@@ -6,6 +6,8 @@ use serde_json::{json, Value};
 
 use kroma_module_sdk::host::{call_point, pinned_resolver, HostCtx};
 
+use super::ops::{BenchmarkStart, History, Probe, ProviderSwitch, Restart, ScanState};
+
 pub const CONTROL: &str = "tv.kroma.live/control";
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,6 +53,13 @@ pub struct Status {
     pub health: Health,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct EventInfo {
+    pub search: String,
+    pub competition: String,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Candidate {
@@ -59,6 +68,8 @@ pub struct Candidate {
     pub group: String,
     pub score: f64,
     pub now: Option<Slot>,
+    pub provider: String,
+    pub event: Option<EventInfo>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,9 +94,16 @@ pub struct Snapshot {
 /// point. It never switches channel itself: a change goes through the room's vote.
 pub trait Control: Send + Sync {
     fn status(&self) -> Result<Status>;
-    fn resolve(&self, query: &str, limit: u32) -> Result<Vec<Candidate>>;
+    fn resolve(&self, query: &str, limit: u32, provider: Option<&str>) -> Result<Vec<Candidate>>;
     fn epg(&self, query: Option<&str>, from: Option<i64>, to: Option<i64>, limit: u32) -> Result<Vec<Programme>>;
     fn snapshot(&self) -> Result<Snapshot>;
+    fn restart(&self, requested_by: &str, reason: &str) -> Result<Restart>;
+    fn switch_provider(&self, provider: &str, requested_by: &str, reason: &str) -> Result<ProviderSwitch>;
+    fn probe(&self, channel_id: &str) -> Result<Probe>;
+    fn benchmark(&self, channel_ids: &[String], requested_by: &str) -> Result<BenchmarkStart>;
+    fn scan_result(&self) -> Result<ScanState>;
+    fn history(&self, limit: u32) -> Result<History>;
+    fn scan_frame(&self, path: &str) -> Result<String>;
 }
 
 pub struct PeerControl {
@@ -115,13 +133,19 @@ struct Programmes {
     programmes: Vec<Programme>,
 }
 
+#[derive(Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct Frame {
+    jpeg_base64: String,
+}
+
 impl Control for PeerControl {
     fn status(&self) -> Result<Status> {
         self.ask("status", &json!({}))
     }
 
-    fn resolve(&self, query: &str, limit: u32) -> Result<Vec<Candidate>> {
-        Ok(self.ask::<Channels>("resolve", &json!({ "query": query, "limit": limit }))?.channels)
+    fn resolve(&self, query: &str, limit: u32, provider: Option<&str>) -> Result<Vec<Candidate>> {
+        Ok(self.ask::<Channels>("resolve", &json!({ "query": query, "limit": limit, "provider": provider }))?.channels)
     }
 
     fn epg(&self, query: Option<&str>, from: Option<i64>, to: Option<i64>, limit: u32) -> Result<Vec<Programme>> {
@@ -130,5 +154,33 @@ impl Control for PeerControl {
 
     fn snapshot(&self) -> Result<Snapshot> {
         self.ask("snapshot", &json!({}))
+    }
+
+    fn restart(&self, requested_by: &str, reason: &str) -> Result<Restart> {
+        self.ask("restart", &json!({ "requestedBy": requested_by, "reason": reason }))
+    }
+
+    fn switch_provider(&self, provider: &str, requested_by: &str, reason: &str) -> Result<ProviderSwitch> {
+        self.ask("switchProvider", &json!({ "provider": provider, "requestedBy": requested_by, "reason": reason }))
+    }
+
+    fn probe(&self, channel_id: &str) -> Result<Probe> {
+        self.ask("probe", &json!({ "channelId": channel_id }))
+    }
+
+    fn benchmark(&self, channel_ids: &[String], requested_by: &str) -> Result<BenchmarkStart> {
+        self.ask("benchmark", &json!({ "channelIds": channel_ids, "requestedBy": requested_by }))
+    }
+
+    fn scan_result(&self) -> Result<ScanState> {
+        self.ask("scanResult", &json!({}))
+    }
+
+    fn history(&self, limit: u32) -> Result<History> {
+        self.ask("history", &json!({ "limit": limit }))
+    }
+
+    fn scan_frame(&self, path: &str) -> Result<String> {
+        Ok(self.ask::<Frame>("scanFrame", &json!({ "path": path }))?.jpeg_base64)
     }
 }
