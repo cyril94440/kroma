@@ -23,6 +23,12 @@ type Panel = 'channels' | 'chat' | 'reactions' | 'match';
 
 const noStoryboard = () => null;
 
+const ZAP_MESSAGE = {
+  voteStarted: 'live.zapStarted',
+  switchedDirectly: 'live.zapDirect',
+  refused: 'live.zapRefused',
+} as const;
+
 /** The live-TV screen: the stream in the shared player chrome, with the
  *  channel list, the chat, the reactions and the match panel one press away,
  *  and the zapping vote and polls answered with the remote. A module that is
@@ -40,8 +46,8 @@ export function TvLive<E extends LiveEngine>({
   const [panel, setPanel] = useState<Panel | null>(null);
   const [dismissedVote, setDismissedVote] = useState<number | null>(null);
   const [dismissedPoll, setDismissedPoll] = useState<number | null>(null);
-  const [frameTime, setFrameTime] = useState<number | null>(null);
   const { engineRef } = live;
+  const frameTimeMs = useCallback(() => engineRef.current?.frameTimeMs() ?? null, [engineRef]);
   const { status, party, sport, now } = room;
   const me = party.state?.me.userId ?? '';
   const vote = party.state?.vote ?? null;
@@ -51,10 +57,6 @@ export function TvLive<E extends LiveEngine>({
   useEffect(() => {
     if (modulesReady && !modules.live) nav.home();
   }, [modulesReady, modules.live, nav]);
-
-  useEffect(() => {
-    setFrameTime(engineRef.current?.frameTimeMs() ?? null);
-  }, [engineRef, now]);
 
   useVerdictToasts(party.lastClosed);
 
@@ -70,15 +72,7 @@ export function TvLive<E extends LiveEngine>({
         ? client.party.requestSwitch(channel.id, channel.name).then((out) => out.outcome)
         : client.live.switchTo(channel.id).then(() => 'switchedDirectly' as const);
       run.then(
-        (outcome) =>
-          toast({
-            message:
-              outcome === 'voteStarted'
-                ? t('live.zapStarted', { name: channel.name })
-                : outcome === 'switchedDirectly'
-                  ? t('live.zapDirect', { name: channel.name })
-                  : t('live.zapRefused'),
-          }),
+        (outcome) => toast({ message: t(ZAP_MESSAGE[outcome], { name: channel.name }) }),
         () => toast({ message: t('live.zapRefused') }),
       );
     },
@@ -195,7 +189,7 @@ export function TvLive<E extends LiveEngine>({
       <MatchDrawer
         open={panel === 'match'}
         match={match}
-        frameTimeMs={frameTime}
+        frameTimeMs={frameTimeMs}
         now={now + sport.clockOffsetMs}
         onClose={closePanel}
       />

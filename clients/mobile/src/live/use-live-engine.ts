@@ -56,8 +56,6 @@ export function useLiveEngine(url: string | null): LiveEngine {
 
   useEffect(() => {
     if (!url) return;
-    setFailed(false);
-    setWaiting(true);
     player
       .replaceAsync({ uri: url, contentType: 'hls' })
       .then(() => {

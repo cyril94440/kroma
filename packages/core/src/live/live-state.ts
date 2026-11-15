@@ -55,3 +55,45 @@ export function liveStage(status: Status | null): LiveStage {
 export function playlistKey(status: Status | null): string | null {
   return status?.state === 'running' ? status.playlist : null;
 }
+
+export interface LiveNotice {
+  title:
+    | 'live.standby'
+    | 'live.paused'
+    | 'live.switching'
+    | 'live.offAir'
+    | 'live.error'
+    | 'live.lost';
+  hint: 'live.standbyHint' | 'live.errorHint' | null;
+  channelName: string;
+  spinner: boolean;
+}
+
+/** What to tell the viewer while there is no picture, or null while there is
+ *  one. A lost connection to the server outranks whatever the status last said. */
+export function liveNotice(status: Status | null, connectionLost: boolean): LiveNotice | null {
+  const stage = connectionLost ? 'error' : liveStage(status);
+  const channelName = status?.offAir?.name ?? status?.channel?.name ?? '';
+  switch (stage) {
+    case 'playing':
+      return null;
+    case 'switching':
+      return { title: 'live.switching', hint: null, channelName, spinner: true };
+    case 'offAir':
+      return { title: 'live.offAir', hint: null, channelName, spinner: false };
+    case 'error':
+      return {
+        title: connectionLost ? 'live.lost' : 'live.error',
+        hint: 'live.errorHint',
+        channelName,
+        spinner: false,
+      };
+    case 'standby':
+      return {
+        title: status?.state === 'paused' ? 'live.paused' : 'live.standby',
+        hint: 'live.standbyHint',
+        channelName,
+        spinner: true,
+      };
+  }
+}

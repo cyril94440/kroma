@@ -43,13 +43,13 @@ export function MatchDrawer({
 }: Readonly<{
   open: boolean;
   match: MatchPayload | null;
-  frameTimeMs: number | null;
+  frameTimeMs: () => number | null;
   now: number;
   onClose: () => void;
 }>) {
   const t = useT();
   const view = useMemo(
-    () => (match ? calculateMatch(match, { pdt: frameTimeMs, now, postSeenAt: null }) : null),
+    () => (match ? calculateMatch(match, { pdt: frameTimeMs(), now, postSeenAt: null }) : null),
     [match, frameTimeMs, now],
   );
   return (

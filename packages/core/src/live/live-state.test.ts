@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyLiveEvent as applyEvent,
   liveBadges as badges,
+  liveNotice,
   liveStage,
   playlistKey,
   slotProgress as progressOf,
@@ -72,5 +73,31 @@ describe('what the page shows', () => {
     expect(progressOf(50, { start: 100, end: 200 })).toBe(0);
     expect(progressOf(500, { start: 100, end: 200 })).toBe(1);
     expect(progressOf(1, null)).toBe(0);
+  });
+});
+
+describe('what to tell the viewer without a picture', () => {
+  it('says nothing while the stream plays', () => {
+    expect(liveNotice(base, false)).toBeNull();
+  });
+
+  it('says the stream is waking, or that nothing is on air when an admin paused it', () => {
+    expect(liveNotice({ ...base, playlist: null }, false)?.title).toBe('live.standby');
+    expect(liveNotice({ ...base, state: 'paused' }, false)?.title).toBe('live.paused');
+    expect(liveNotice(null, false)?.spinner).toBe(true);
+  });
+
+  it('names the channel that went off air and shows no spinner', () => {
+    const notice = liveNotice(
+      { ...base, state: 'offAir', offAir: { name: 'M6', duration: null, at: 0 } },
+      false,
+    );
+
+    expect(notice).toMatchObject({ title: 'live.offAir', channelName: 'M6', spinner: false });
+  });
+
+  it('puts a lost connection above whatever the last status said', () => {
+    expect(liveNotice(base, true)?.title).toBe('live.lost');
+    expect(liveNotice({ ...base, state: 'error' }, false)?.title).toBe('live.error');
   });
 });

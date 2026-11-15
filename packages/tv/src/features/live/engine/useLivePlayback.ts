@@ -45,10 +45,7 @@ export function useLivePlayback<E extends LiveEngine>(
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!url) {
-      setState(START);
-      return;
-    }
+    if (!url) return;
     let started = false;
     const patch = (next: Partial<LiveState>) => setState((s) => ({ ...s, ...next }));
     const listeners: LiveListeners = {
@@ -71,10 +68,10 @@ export function useLivePlayback<E extends LiveEngine>(
     const engine = backend.createLiveEngine({ url, video, listeners });
     if (!engine) return;
     engineRef.current = engine;
-    setState(START);
     return () => {
       engineRef.current = null;
       engine.destroy();
+      setState(START);
     };
   }, [backend, url, video, attempt]);
 
