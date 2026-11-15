@@ -3,8 +3,8 @@
   "schemaVersion": 3,
   "id": "tv.kroma.party",
   "name": "Watch party",
-  "version": "0.1.0",
-  "description": "A shared room around the live television: chat, majority votes to change channel, polls, reactions, an ideas box and playback sync.",
+  "version": "0.2.0",
+  "description": "A shared room around the live television: chat, majority votes to change channel, polls, reactions, an ideas box, playback sync and voice chat.",
   "engines": {
     "server": ">=0.1.39"
   },
@@ -43,21 +43,86 @@
     }
   ],
   "config": [
-    { "key": "voteSeconds", "label": "config.voteSeconds", "type": "number", "default": "30" },
+    {
+      "key": "voteSeconds",
+      "label": "config.voteSeconds",
+      "type": "number",
+      "default": "30"
+    },
     {
       "key": "presenceGraceSeconds",
       "label": "config.presenceGraceSeconds",
       "type": "number",
       "default": "45"
     },
-    { "key": "bypassUserIds", "label": "config.bypassUserIds", "type": "string", "default": "" },
-    { "key": "agentName", "label": "config.agentName", "type": "string", "default": "Hermès" },
-    { "key": "archiveDays", "label": "config.archiveDays", "type": "number", "default": "30" },
+    {
+      "key": "bypassUserIds",
+      "label": "config.bypassUserIds",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "key": "agentName",
+      "label": "config.agentName",
+      "type": "string",
+      "default": "Hermès"
+    },
+    {
+      "key": "archiveDays",
+      "label": "config.archiveDays",
+      "type": "number",
+      "default": "30"
+    },
     {
       "key": "instabilityAlerts",
       "label": "config.instabilityAlerts",
       "type": "bool",
       "default": "true"
+    },
+    {
+      "key": "voiceMaxPeers",
+      "label": "config.voiceMaxPeers",
+      "type": "number",
+      "default": "8"
+    },
+    {
+      "key": "voiceStunUrls",
+      "label": "config.voiceStunUrls",
+      "type": "string",
+      "default": "stun:stun.l.google.com:19302"
+    },
+    {
+      "key": "voiceTurnUrls",
+      "label": "config.voiceTurnUrls",
+      "type": "string",
+      "default": "",
+      "placeholder": "turn:turn.example:3478"
+    },
+    {
+      "key": "voiceTurnUsername",
+      "label": "config.voiceTurnUsername",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "key": "voiceTurnCredential",
+      "label": "config.voiceTurnCredential",
+      "type": "string",
+      "secret": true,
+      "default": ""
+    },
+    {
+      "key": "voiceCloudflareKeyId",
+      "label": "config.voiceCloudflareKeyId",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "key": "voiceCloudflareApiToken",
+      "label": "config.voiceCloudflareApiToken",
+      "type": "string",
+      "secret": true,
+      "default": ""
     }
   ],
   "notifications": [
@@ -71,5 +136,19 @@
     }
   ],
   "storage": {},
-  "permissions": {}
+  "permissions": {
+    "net": {
+      "connect": [
+        {
+          "purpose": "voice.turn",
+          "to": [
+            "rtc.live.cloudflare.com"
+          ],
+          "ports": [
+            443
+          ]
+        }
+      ]
+    }
+  }
 }

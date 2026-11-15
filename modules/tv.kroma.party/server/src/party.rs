@@ -13,6 +13,7 @@ use crate::store::Store;
 use crate::strings;
 use crate::sync::SyncGroup;
 use crate::vote::Vote;
+use crate::voice::{CloudflareTurn, IceCache, TurnSource, VoiceRoom};
 
 mod chat;
 mod govern;
@@ -24,6 +25,7 @@ mod snapshot;
 mod syncing;
 mod tick;
 mod telemetry;
+mod voicing;
 
 pub use chat::ChatError;
 pub use govern::{Request, SwitchResult};
@@ -85,6 +87,7 @@ pub(crate) struct State {
     pub last_presence_poll: i64,
     pub last_sync_tick: i64,
     pub last_status_poll: i64,
+    pub last_voice_tick: i64,
     pub last_prune: i64,
     pub last_tick: i64,
 }
@@ -95,6 +98,9 @@ pub struct Party {
     pub(crate) live: Arc<dyn Live>,
     pub(crate) clock: Clock,
     pub(crate) state: Mutex<State>,
+    pub(crate) voice: Mutex<VoiceRoom>,
+    pub(crate) ice: Mutex<IceCache>,
+    pub(crate) turn: Arc<dyn TurnSource>,
     pub(crate) started: AtomicBool,
     #[cfg(test)]
     pub(crate) tap: Mutex<Vec<(Option<String>, String, Value)>>,
@@ -110,6 +116,16 @@ impl Party {
         pool: crate::store::Pool,
         live: Arc<dyn Live>,
         clock: Clock,
+    ) -> Arc<Self> {
+        Self::with_turn(host, pool, live, clock, Arc::new(CloudflareTurn))
+    }
+
+    pub fn with_turn(
+        host: Arc<dyn HostCtx>,
+        pool: crate::store::Pool,
+        live: Arc<dyn Live>,
+        clock: Clock,
+        turn: Arc<dyn TurnSource>,
     ) -> Arc<Self> {
         let store = Store::new(pool);
         let now = clock();
@@ -148,9 +164,13 @@ impl Party {
                 last_presence_poll: 0,
                 last_sync_tick: 0,
                 last_status_poll: 0,
+                last_voice_tick: 0,
                 last_prune: 0,
                 last_tick: now,
             }),
+            voice: Mutex::new(VoiceRoom::new(now)),
+            ice: Mutex::new(IceCache::default()),
+            turn,
             started: AtomicBool::new(false),
             #[cfg(test)]
             tap: Mutex::new(Vec::new()),

@@ -128,5 +128,14 @@
   "party.sync.fine.outOfWindow": "Fine sync: within {ms} ms (target outside my window)",
   "party.sync.fine.noMeasure": "Fine sync interrupted: no measurement available",
   "party.vote.providerOpened.switchProvider": "Proposal: switch to the other provider. Vote within {seconds} s.",
-  "party.vote.provider.switchProvider": "switch to the other provider"
+  "party.vote.provider.switchProvider": "switch to the other provider",
+  "config.voiceMaxPeers": "Most people in the voice chat at once (every extra person adds a connection for everyone)",
+  "config.voiceStunUrls": "STUN servers for the voice chat (comma separated)",
+  "config.voiceTurnUrls": "TURN relay for the voice chat, for people on different networks (comma separated, optional)",
+  "config.voiceTurnUsername": "TURN user name",
+  "config.voiceTurnCredential": "TURN password",
+  "config.voiceCloudflareKeyId": "Cloudflare TURN key id (time-limited credentials, replaces the TURN fields above)",
+  "config.voiceCloudflareApiToken": "Cloudflare TURN API token",
+  "party.voice.joined": "{name} joined the voice chat",
+  "party.voice.left": "{name} left the voice chat"
 }

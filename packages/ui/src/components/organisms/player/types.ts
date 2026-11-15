@@ -36,6 +36,9 @@ export interface PlayerFlags {
   /** The subtitle and audio-track pickers. Default on; off for a clip with one
    *  sound and no subtitles, such as a trailer. */
   tracks?: boolean;
+  /** A live stream: no seek bar, no duration, no rewind or forward, and a
+   *  "back to live" bar in the seek bar's place. Needs `controller.live`. */
+  live?: boolean;
 }
 
 export const WEB_FLAGS: PlayerFlags = {
@@ -192,6 +195,13 @@ export interface PlaneRect {
  * Everything the shared chrome reads or drives. Values marked "(web)" are no-ops
  * / stable falses on TV (their flag is off, so the chrome never surfaces them).
  */
+export interface PlayerLive {
+  /** The picture is behind the live edge. */
+  behind: boolean;
+  /** Jump back to the live edge. */
+  goLive(): void;
+}
+
 export interface PlayerController {
   cur: number;
   dur: number;
@@ -278,6 +288,9 @@ export interface PlayerController {
    *  page can't be CSS-transformed. Absent for an in-page <video> surface, which
    *  the chrome shrinks with a CSS transform. */
   setPlaneRect?(rect: PlaneRect | null): void;
+
+  /** Present on a live stream, together with `flags.live`. */
+  live?: PlayerLive;
 
   getStats(): PlayerStats;
 }

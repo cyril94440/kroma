@@ -19,6 +19,7 @@ mod ideas;
 mod polls;
 mod sync;
 mod telemetry;
+mod voice;
 
 pub fn routes<S>(party: Arc<Party>) -> Router<S>
 where
@@ -36,6 +37,7 @@ where
         .merge(ideas::routes::<S>())
         .merge(sync::routes::<S>())
         .merge(telemetry::routes::<S>())
+        .merge(voice::routes::<S>())
         .layer(Extension(party))
 }
 

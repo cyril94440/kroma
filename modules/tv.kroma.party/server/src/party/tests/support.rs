@@ -77,6 +77,10 @@ pub fn rig_no_grace() -> Rig {
 }
 
 pub fn rig_with(host: StubHost) -> Rig {
+    rig_with_turn(host, Arc::new(crate::voice::CloudflareTurn))
+}
+
+pub fn rig_with_turn(host: StubHost, turn: Arc<dyn crate::voice::TurnSource>) -> Rig {
     let pool = host.store().clone();
     pool.get().unwrap().execute_batch(crate::store::MIGRATIONS).unwrap();
     let host = Arc::new(host);
@@ -84,7 +88,7 @@ pub fn rig_with(host: StubHost) -> Rig {
     let now = Arc::new(AtomicI64::new(T0));
     let clock_now = now.clone();
     let ctx: Arc<dyn HostCtx> = host.clone();
-    let party = Party::with_clock(ctx, pool, live.clone(), Arc::new(move || clock_now.load(Ordering::SeqCst)));
+    let party = Party::with_turn(ctx, pool, live.clone(), Arc::new(move || clock_now.load(Ordering::SeqCst)), turn);
     Rig { party, live, host, now }
 }
 

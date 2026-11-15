@@ -16,6 +16,7 @@ mod store;
 mod strings;
 mod sync;
 mod vote;
+mod voice;
 mod votewords;
 
 pub use clock::{system_clock, Clock};

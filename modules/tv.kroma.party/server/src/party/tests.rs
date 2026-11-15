@@ -6,3 +6,4 @@ mod provider;
 mod presence;
 mod support;
 mod syncing;
+mod voice;

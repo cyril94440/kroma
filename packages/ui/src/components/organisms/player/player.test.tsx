@@ -396,3 +396,42 @@ describe('<Player.Panel>, which takes the stage over', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+describe('a live stream', () => {
+  const liveController = (behind: boolean, goLive = vi.fn()) => ({
+    ...fakeController(),
+    live: { behind, goLive },
+  });
+
+  const livePlayer = (controller: PlayerController) => (
+    <I18nProvider locale="en">
+      <Player.Root
+        controller={controller}
+        flags={{ ...WEB_FLAGS, live: true }}
+        title="TF1"
+        onClose={() => {}}
+      >
+        <Player.Title>TF1</Player.Title>
+        <Player.Transport tileAt={() => null} />
+        {media}
+      </Player.Root>
+    </I18nProvider>
+  );
+
+  it('draws the live bar and no seek controls', () => {
+    render(livePlayer(liveController(false)));
+
+    expect(screen.getByText('Live')).toBeTruthy();
+    expect(screen.queryByLabelText('Back 10 s')).toBeNull();
+    expect(screen.queryByLabelText('Forward 10 s')).toBeNull();
+  });
+
+  it('takes the picture back to the live edge from the bar', () => {
+    const goLive = vi.fn();
+    render(livePlayer(liveController(true, goLive)));
+
+    fireEvent.click(screen.getByText('Back to live'));
+
+    expect(goLive).toHaveBeenCalledTimes(1);
+  });
+});

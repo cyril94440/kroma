@@ -218,6 +218,7 @@ function Root({
                 onSeekNudge={seekNudge}
                 onVolumeNudge={volumeNudge}
                 chromeShown={chromeShown}
+                live={flags.live}
                 bottomInset={bottomInset}
                 onLayout={onTransportLayout}
               />

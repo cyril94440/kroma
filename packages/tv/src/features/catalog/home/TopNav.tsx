@@ -17,6 +17,7 @@ import {
 import { useAuth } from '#tv/app/providers/auth';
 import { useConnection } from '#tv/app/providers/connection';
 import { useNav } from '#tv/app/router';
+import { useNavEntries } from '#tv/shared/nav/navEntries';
 import { CastRemotes } from '#tv/features/cast/CastRemotes';
 import { ConnectionStatus } from '#tv/features/catalog/home/connection-status';
 import { KromaMark, WallClock } from '#tv/shared/ui';
@@ -38,6 +39,7 @@ export function TvTopNav({ active }: Readonly<{ active?: NavKey }>) {
   const t = useT();
   const { user } = useAuth();
   const { client, online } = useConnection();
+  const entries = useNavEntries();
 
   return (
     <Box absolute left={0} right={0} top={0} z={10} px={64} py={32}>
@@ -73,6 +75,15 @@ export function TvTopNav({ active }: Readonly<{ active?: NavKey }>) {
             active={active === 'home'}
             onPress={() => nav.home()}
           />
+          {entries.map((entry) => (
+            <NavPill.Item
+              key={entry.key}
+              icon={entry.icon}
+              label={t(entry.label)}
+              active={false}
+              onPress={() => nav.reset(entry.route)}
+            />
+          ))}
           <NavPill.Item
             icon="movie"
             label={t('nav.films')}

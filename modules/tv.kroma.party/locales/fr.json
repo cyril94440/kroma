@@ -128,5 +128,14 @@
   "party.sync.fine.outOfWindow": "Synchro fine : à {ms} ms près (cible hors de ma fenêtre)",
   "party.sync.fine.noMeasure": "Synchro fine interrompue : aucune mesure disponible",
   "party.vote.providerOpened.switchProvider": "Proposition : passer à l'autre fournisseur. Votez dans les {seconds} s.",
-  "party.vote.provider.switchProvider": "passer à l'autre fournisseur"
+  "party.vote.provider.switchProvider": "passer à l'autre fournisseur",
+  "config.voiceMaxPeers": "Nombre maximal de personnes en même temps dans la voix (chaque personne de plus ajoute une connexion pour tout le monde)",
+  "config.voiceStunUrls": "Serveurs STUN de la voix (séparés par des virgules)",
+  "config.voiceTurnUrls": "Relais TURN de la voix, pour les personnes sur des réseaux différents (séparés par des virgules, facultatif)",
+  "config.voiceTurnUsername": "Nom d'utilisateur TURN",
+  "config.voiceTurnCredential": "Mot de passe TURN",
+  "config.voiceCloudflareKeyId": "Identifiant de clé TURN Cloudflare (identifiants à durée limitée, remplace les champs TURN ci-dessus)",
+  "config.voiceCloudflareApiToken": "Jeton d'API TURN Cloudflare",
+  "party.voice.joined": "{name} a rejoint la voix",
+  "party.voice.left": "{name} a quitté la voix"
 }

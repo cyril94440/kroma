@@ -9,7 +9,7 @@ import {
   useStyleScope,
 } from '@kromatv/ui/kit';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react';
 import { canExitOnBack, exitOnBack } from '#tv/app/appQuit';
 import { BrandIntro } from '#tv/app/BrandIntro';
 import { CompatBanner } from '#tv/app/CompatBanner';
@@ -50,6 +50,7 @@ import { TvProfileMenu } from '#tv/features/accounts/TvProfileMenu';
 import { TvProfiles } from '#tv/features/accounts/TvProfiles';
 import { TvQuickConnect } from '#tv/features/accounts/TvQuickConnect';
 import { CastReceiverProvider } from '#tv/features/cast/CastReceiverProvider';
+import { LiveGate } from '#tv/features/live/LiveGate';
 import { TvDiscoverDetail } from '#tv/features/catalog/discover/TvDiscoverDetail';
 import { BROWSE_CHROME } from '#tv/features/catalog/home/chrome';
 import { TvGenreGrid } from '#tv/features/catalog/TvGenreGrid';
@@ -71,6 +72,8 @@ import { createDevicePreferences, DevicePreferencesProvider } from './device-pre
 export interface TvAppProps {
   /** The player screen and the engines behind it, from the shell. */
   playback: PlaybackPlatform;
+  /** The live-TV screen on this shell's player. A shell without one never shows the Direct entry. */
+  live?: ComponentType;
   searchRequests?: SearchRequests;
   deepLinks?: DeepLinks;
   decoderFrameLimits?: DecoderFrameLimits;
@@ -132,6 +135,7 @@ export function TvApp({
   lan,
   deviceName,
   playback,
+  live,
 }: Readonly<TvAppProps>) {
   const storage = useDeviceStore();
   const inheritedTheme = useStyleScope().theme;
@@ -158,8 +162,13 @@ export function TvApp({
   const searchRequests = suppliedSearchRequests ?? ownedSearchRequests;
   const name = useDeviceName(deviceName, platform);
   const screens = useMemo(
-    () => ({ ...SCREENS, player: playback.Player, trailer: playback.Trailer }),
-    [playback.Player, playback.Trailer],
+    () => ({
+      ...SCREENS,
+      player: playback.Player,
+      trailer: playback.Trailer,
+      live: live ?? NoLive,
+    }),
+    [playback.Player, playback.Trailer, live],
   );
 
   return (
@@ -194,6 +203,7 @@ export function TvApp({
                                       fallback={crashFallback}
                                     >
                                       <CompatBanner />
+                                      <LiveGate client={client} available={live !== undefined}>
                                       <ContinueProvider>
                                         <RecommendProvider>
                                           <MyListProvider>
@@ -232,6 +242,7 @@ export function TvApp({
                                           </MyListProvider>
                                         </RecommendProvider>
                                       </ContinueProvider>
+                                      </LiveGate>
                                     </CrashBoundary>
                                   </LocaleProvider>
                                 </AuthProvider>
@@ -253,7 +264,9 @@ export function TvApp({
   );
 }
 
-const SCREENS: Omit<TvScreens, 'player' | 'trailer'> = {
+const NoLive = () => null;
+
+const SCREENS: Omit<TvScreens, 'player' | 'trailer' | 'live'> = {
   connect: TvConnect,
   profiles: TvProfiles,
   addProfile: TvAddProfile,

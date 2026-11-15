@@ -9,6 +9,7 @@ use super::Party;
 const SYNC_EVERY_MS: i64 = 2000;
 const PRESENCE_EVERY_MS: i64 = 5000;
 const STATUS_EVERY_MS: i64 = 15_000;
+const VOICE_EVERY_MS: i64 = 2000;
 const PRUNE_EVERY_MS: i64 = 3_600_000;
 const ACTIVITY_EXPIRES_MS: i64 = 120_000;
 const UNSTABLE_MIN_MS: i64 = 120_000;
@@ -46,7 +47,7 @@ impl Party {
         let now = self.now();
         self.expire_vote();
         self.expire_poll();
-        let (sync_due, presence_due, status_due, prune_due) = {
+        let (sync_due, presence_due, status_due, prune_due, voice_due) = {
             let mut st = self.lock();
             st.last_tick = now;
             if st.activity.as_ref().is_some_and(|(_, at)| now - at > ACTIVITY_EXPIRES_MS) {
@@ -58,6 +59,7 @@ impl Party {
                 due(&mut st.last_presence_poll, now, PRESENCE_EVERY_MS),
                 due(&mut st.last_status_poll, now, STATUS_EVERY_MS),
                 due(&mut st.last_prune, now, PRUNE_EVERY_MS),
+                due(&mut st.last_voice_tick, now, VOICE_EVERY_MS),
             )
         };
         if sync_due {
@@ -76,6 +78,9 @@ impl Party {
         }
         if status_due {
             self.check_instability();
+        }
+        if voice_due {
+            self.voice_tick();
         }
         if prune_due {
             if let Err(e) = self.archive() {

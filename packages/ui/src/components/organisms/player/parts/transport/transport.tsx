@@ -13,6 +13,7 @@ import { endsAtClock } from '../../lib/fmt';
 import { type ChromeMetrics, GUTTER, scaler } from '../../lib/metrics';
 import type { Chapter, PlayerController } from '../../types';
 import { ControlCluster } from '../control-cluster';
+import { LiveBar } from '../live-bar';
 import { SeekBar } from '../seek-bar';
 
 interface TransportProps {
@@ -26,6 +27,8 @@ interface TransportProps {
   /** Up or Down on the focused volume pill. */
   onVolumeNudge: (dir: -1 | 1) => void;
   chromeShown: boolean;
+  /** Draw the live bar instead of the seek bar. */
+  live?: boolean;
   /** The padding the up-next peek claims under the controls, in real pixels: it
    *  is the sheet's own height and is never scaled. */
   bottomInset: number;
@@ -41,6 +44,7 @@ function Transport({
   onSeekNudge,
   onVolumeNudge,
   chromeShown,
+  live = false,
   bottomInset,
   onLayout,
 }: Readonly<TransportProps>) {
@@ -78,25 +82,35 @@ function Transport({
       {/* Measured so the skip-intro pill can sit clear of it; the layout is
         kept while the chrome fades (opacity, not display). */}
       <Box onLayout={onLayout}>
-        <SeekBar
-          cur={c.cur}
-          dur={c.dur}
-          bufEnd={c.bufEnd}
-          seekPreview={c.seekPreview}
-          chapters={chapters}
-          tileAt={tileAt}
-          elapsed={fmtTime(shown)}
-          chapterLabel={curChapter?.title || undefined}
-          total={fmtTime(c.dur)}
-          endsAt={endsAt ? t('content.endsAtShort', { time: endsAt }) : ''}
-          scale={metrics.scale}
-          onScrub={c.scrubPreview}
-          onScrubCommit={c.scrubCommit}
-          onActivate={c.togglePlay}
-          onNudge={onSeekNudge}
-          onFocus={() => nav.focus('progress')}
-          onBlur={() => nav.blur('progress')}
-        />
+        {live ? (
+          <LiveBar
+            behind={c.live?.behind ?? false}
+            scale={metrics.scale}
+            onGoLive={c.live?.goLive ?? c.togglePlay}
+            onFocus={() => nav.focus('progress')}
+            onBlur={() => nav.blur('progress')}
+          />
+        ) : (
+          <SeekBar
+            cur={c.cur}
+            dur={c.dur}
+            bufEnd={c.bufEnd}
+            seekPreview={c.seekPreview}
+            chapters={chapters}
+            tileAt={tileAt}
+            elapsed={fmtTime(shown)}
+            chapterLabel={curChapter?.title || undefined}
+            total={fmtTime(c.dur)}
+            endsAt={endsAt ? t('content.endsAtShort', { time: endsAt }) : ''}
+            scale={metrics.scale}
+            onScrub={c.scrubPreview}
+            onScrubCommit={c.scrubCommit}
+            onActivate={c.togglePlay}
+            onNudge={onSeekNudge}
+            onFocus={() => nav.focus('progress')}
+            onBlur={() => nav.blur('progress')}
+          />
+        )}
         <ControlCluster
           playing={c.playing}
           muted={c.muted}

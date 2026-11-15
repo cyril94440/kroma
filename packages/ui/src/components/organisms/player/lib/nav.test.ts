@@ -57,3 +57,13 @@ describe('controlOrder', () => {
     expect(row).toContain('fullscreen');
   });
 });
+
+describe('controlOrder on a live stream', () => {
+  it('leaves out rewind and forward and keeps the rest of the row', () => {
+    const row = controlOrder({ ...TV_FLAGS, live: true }, false);
+
+    expect(row).not.toContain('rewind');
+    expect(row).not.toContain('forward');
+    expect(row).toContain('play');
+  });
+});

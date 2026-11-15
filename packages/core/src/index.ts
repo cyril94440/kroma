@@ -36,3 +36,5 @@ export * from './source-failure';
 export * from './subtitles';
 export * from './trailer';
 export * from './watch-now';
+export * from './live';
+export * from './sync';

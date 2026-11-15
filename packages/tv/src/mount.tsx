@@ -4,6 +4,7 @@ import { lazy, StrictMode, Suspense } from 'react';
 
 import { muteTransitionEvents } from '#tv/app/mute-transition-events';
 import { TvApp, type TvAppProps } from '#tv/app/TvApp';
+import { BROWSER_LIVE_SCREEN } from '#tv/features/live/browser/browserLive';
 import { BROWSER_PLAYBACK } from '#tv/features/playback/browser/browserPlayback';
 
 const Workbench = lazy(async () => ({
@@ -17,7 +18,7 @@ function wantsWorkbench(): boolean {
 }
 
 /** Mounts the TV app as the root; `?workbench` (or `?shot`) renders the design workbench. */
-export function mountTv(props: Omit<TvAppProps, 'playback'> = {}): void {
+export function mountTv(props: Omit<TvAppProps, 'playback' | 'live'> = {}): void {
   const win = webWindow();
   if (win) {
     muteTransitionEvents(win);
@@ -29,7 +30,7 @@ export function mountTv(props: Omit<TvAppProps, 'playback'> = {}): void {
           <Workbench />
         </Suspense>
       ) : (
-        <TvApp {...props} playback={BROWSER_PLAYBACK} />
+        <TvApp {...props} playback={BROWSER_PLAYBACK} live={BROWSER_LIVE_SCREEN} />
       )}
     </StrictMode>,
   );

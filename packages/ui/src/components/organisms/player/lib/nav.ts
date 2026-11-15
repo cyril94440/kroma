@@ -38,7 +38,7 @@ export type ControlId =
 /** Build the present control row from the flags + whether there's a next episode.
  * Absent controls leave no gap and no trapped D-pad stop. */
 export function controlOrder(flags: PlayerFlags, hasNext: boolean): ControlId[] {
-  const row: ControlId[] = ['rewind', 'play', 'forward'];
+  const row: ControlId[] = flags.live ? ['play'] : ['rewind', 'play', 'forward'];
   if (hasNext) row.push('next');
   if (flags.volume) row.push('volume');
   if (flags.tracks !== false) row.push('subtitles', 'audio');

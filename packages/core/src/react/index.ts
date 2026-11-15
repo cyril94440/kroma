@@ -30,3 +30,14 @@ export type { TrailerState } from './trailer-preparation';
 export { useTrailerPreparation } from './trailer-preparation';
 export type { TitleWatchNow, WatchedTitle, WatchNowOptions, WatchNowState } from './watch-now';
 export { useWatchNow } from './watch-now';
+export type { EventHandlers, OpenEvents } from './live-events';
+export { socketEvents } from './live-events';
+export type { LiveClient, LiveRoom, LiveRoomOptions } from './use-live-room';
+export {
+  DEFAULT_HEARTBEAT_MS,
+  FLOATING_TTL_MS,
+  SAFETY_REFRESH_MS,
+  useLiveRoom,
+} from './use-live-room';
+export type { LiveModulesState } from './use-live-modules';
+export { useLiveModules } from './use-live-modules';

@@ -1,0 +1,40 @@
+import { defineStory } from '@kromatv/workbench/story';
+import { Box } from '#ui/components/atoms/box';
+import { Ground } from '#ui/components/atoms/ground';
+import { LiveBar } from './live-bar';
+
+export const story = defineStory({
+  group: 'Player',
+  viewport: 'tv',
+  args: { behind: false },
+  render: ({ behind }) => (
+    <Ground tone="dark">
+      <Box aspect={16 / 9} minH={200} bg="surface2" radius="lg" justify="flex-end" px={34}>
+        <LiveBar behind={behind} onGoLive={() => {}} />
+      </Box>
+    </Ground>
+  ),
+});
+
+What a live stream shows where a film has its seek bar. At the live edge it only says so; behind it, it is the one control that goes back. It is a stop on the navigator like the bar it replaces, and `onFocus` / `onBlur` tell the player when the remote rests on it.
+
+```tsx
+<LiveBar
+  behind={controller.live.behind}
+  onGoLive={controller.live.goLive}
+  onFocus={() => nav.focus('progress')}
+  onBlur={() => nav.blur('progress')}
+/>
+```
+
+<Scene name="Behind the edge" args={{ behind: true }}>
+  The bar turns primary and offers the way back.
+</Scene>
+
+<Do>
+- Set `flags.live` together with `controller.live`: the flag removes the seek bar, rewind and forward, and the controller carries what this bar shows.
+</Do>
+
+<Dont>
+- Put a seek bar on a live stream. There is nothing ahead of the edge to seek to.
+</Dont>
