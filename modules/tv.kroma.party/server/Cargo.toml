@@ -2,7 +2,7 @@
 
 [package]
 name = "kroma-party"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 rust-version = "1.88"
 description = "Watch party for the live television: chat, majority votes, polls, reactions, ideas and playback sync"

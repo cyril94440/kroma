@@ -2,7 +2,7 @@ import type { KromaClient } from '@kromatv/client';
 import type { ChannelView } from '@kromatv/client/live';
 import { useCallback, useEffect, useState } from 'react';
 
-export interface ChannelList {
+interface ChannelList {
   favourites: ChannelView[];
   channels: ChannelView[];
   hasMore: boolean;

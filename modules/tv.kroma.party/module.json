@@ -3,7 +3,7 @@
   "schemaVersion": 3,
   "id": "tv.kroma.party",
   "name": "Watch party",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "A shared room around the live television: chat, majority votes to change channel, polls, reactions, an ideas box, playback sync and voice chat.",
   "engines": {
     "server": ">=0.1.39"

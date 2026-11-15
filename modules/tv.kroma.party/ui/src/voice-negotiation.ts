@@ -1,7 +1,7 @@
 import type { LinkPeer } from './voice-peer';
 import type { IceCandidate, SessionDescription } from './voice-schemas';
 
-export type Applied = 'ignored' | 'resent' | 'answered' | 'accepted' | 'failed';
+type Applied = 'ignored' | 'resent' | 'answered' | 'accepted' | 'failed';
 
 /** The perfect negotiation bookkeeping of one connection: whether an offer of
  *  ours is in flight, whether we are ignoring the remote offer that collided

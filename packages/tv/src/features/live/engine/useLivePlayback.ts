@@ -1,7 +1,7 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import type { LiveBackend, LiveEngine, LiveListeners } from '#tv/features/live/engine/liveEngine';
 
-export interface LiveState {
+interface LiveState {
   playing: boolean;
   waiting: boolean;
   ready: boolean;

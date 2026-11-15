@@ -41,7 +41,7 @@ function lineup(side: Player['equipe'], rows: [string, number, string, string][]
   }));
 }
 
-export function players(): Player[] {
+function players(): Player[] {
   return [
     ...lineup('dom', HOME),
     ...lineup('ext', AWAY),

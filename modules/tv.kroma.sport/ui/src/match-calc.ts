@@ -199,7 +199,7 @@ function momentumOf(playing: Fact[]): MomentumSlice[] {
   }));
 }
 
-export interface CalcContext {
+interface CalcContext {
   pdt: number | null;
   now: number;
   postSeenAt: number | null;

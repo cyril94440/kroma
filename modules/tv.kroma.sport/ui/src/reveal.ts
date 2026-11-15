@@ -1,6 +1,6 @@
 import type { Fact, MatchPayload } from './schemas';
 
-export interface RevealContext {
+interface RevealContext {
   pdt: number | null;
   now: number;
   delay: number;

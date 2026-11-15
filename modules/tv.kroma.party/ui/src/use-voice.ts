@@ -9,7 +9,7 @@ import { VoiceEvent } from './voice-schemas';
 import { VoiceSession } from './voice-session';
 import { IDLE, type VoiceView } from './voice-view';
 
-export interface VoiceControls {
+interface VoiceControls {
   view: VoiceView;
   supported: boolean;
   join: () => void;

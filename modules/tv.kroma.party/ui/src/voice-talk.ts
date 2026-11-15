@@ -1,7 +1,7 @@
 import type { watchSpeech } from './voice-meter';
 import { SESSION_TIMING, Timers } from './voice-timing';
 
-export interface TalkDeps {
+interface TalkDeps {
   watch: typeof watchSpeech;
   report: (speaking: boolean) => void;
 }

@@ -189,7 +189,7 @@ export class FakeServer {
   }
 }
 
-export interface Client {
+interface Client {
   name: string;
   player: FakePlayer;
   engine: SyncEngine;

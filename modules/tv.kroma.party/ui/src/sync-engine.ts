@@ -10,7 +10,7 @@ export interface SyncGroupView {
   active: number;
 }
 
-export interface SyncTransport {
+interface SyncTransport {
   beat(body: {
     enabled: boolean;
     delay: number;
@@ -39,7 +39,7 @@ export interface SyncNotice {
   ms?: number;
 }
 
-export interface SyncDeps {
+interface SyncDeps {
   player: SyncPlayer;
   transport: SyncTransport;
   notify: (notice: SyncNotice) => void;

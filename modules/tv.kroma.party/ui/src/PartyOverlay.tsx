@@ -5,7 +5,7 @@ import { VoiceSpeakers } from './voice-speakers';
 import { VotePanel } from './vote-panel';
 
 const BANNER: CSSProperties = { pointerEvents: 'auto', margin: 12, maxWidth: 420 };
-const SPEAKERS: CSSProperties = { position: 'absolute', left: 12, bottom: 12 };
+export const SPEAKERS: CSSProperties = { margin: 12 };
 const FLOATS: CSSProperties = {
   position: 'absolute',
   right: 12,

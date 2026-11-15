@@ -26,7 +26,7 @@ export function availableSections(modules: {
   ];
 }
 
-export interface SectionData {
+interface SectionData {
   messages: readonly ChatMessage[];
   activity: string | null;
   currentId: string | null;
@@ -35,7 +35,7 @@ export interface SectionData {
   ideas: readonly Idea[];
 }
 
-export interface SectionActions {
+interface SectionActions {
   onSend: (text: string) => void;
   onWatchCard: (channel: string) => void;
   onZap: (channel: ChannelView) => void;

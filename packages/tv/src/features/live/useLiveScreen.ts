@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { useClient } from '#tv/app/router';
 import { useLiveModulesValue } from '#tv/shared/nav/liveModules';
 
-export interface LiveScreen {
+interface LiveScreen {
   room: LiveRoom;
   playlistUrl: string | null;
   modules: ReturnType<typeof useLiveModulesValue>['modules'];

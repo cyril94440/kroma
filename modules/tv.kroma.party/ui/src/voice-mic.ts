@@ -7,7 +7,7 @@ export class MicError extends Error {
   }
 }
 
-export interface MicEnv {
+interface MicEnv {
   secure: boolean;
   devices: Pick<MediaDevices, 'getUserMedia'> | undefined;
 }
@@ -15,7 +15,7 @@ export interface MicEnv {
 const MIC_TIMEOUT_MS = 12_000;
 const AUDIO = { echoCancellation: true, noiseSuppression: true } as const;
 
-export function browserMicEnv(): MicEnv {
+function browserMicEnv(): MicEnv {
   return { secure: globalThis.isSecureContext, devices: globalThis.navigator?.mediaDevices };
 }
 

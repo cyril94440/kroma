@@ -459,10 +459,8 @@
       "name": "@kromatv/module-hermes",
       "version": "0.0.0",
       "dependencies": {
-        "@kromatv/client": "workspace:*",
         "@kromatv/module-sdk": "workspace:*",
         "@kromatv/ui": "workspace:*",
-        "@tanstack/react-query": "^5.104.5",
         "zod": "^4.6.7",
       },
       "devDependencies": {
@@ -494,10 +492,8 @@
       "name": "@kromatv/module-live",
       "version": "0.0.0",
       "dependencies": {
-        "@kromatv/client": "workspace:*",
         "@kromatv/module-sdk": "workspace:*",
         "@kromatv/ui": "workspace:*",
-        "@tanstack/react-query": "^5.104.5",
         "hls.js": "^1.7.3",
         "zod": "^4.6.7",
       },
@@ -563,10 +559,8 @@
       "name": "@kromatv/module-sport",
       "version": "0.0.0",
       "dependencies": {
-        "@kromatv/client": "workspace:*",
         "@kromatv/module-sdk": "workspace:*",
         "@kromatv/ui": "workspace:*",
-        "@tanstack/react-query": "^5.104.5",
         "zod": "^4.6.7",
       },
       "devDependencies": {

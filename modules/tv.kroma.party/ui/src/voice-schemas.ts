@@ -75,18 +75,18 @@ export const SignalEvent = z.discriminatedUnion('kind', [
 ]);
 export type SignalEvent = z.infer<typeof SignalEvent>;
 
-export const RosterEvent = z.object({
+const RosterEvent = z.object({
   type: z.literal('party.voice.roster'),
   revision: z.number(),
   participants: z.array(VoiceMember),
 });
-export type RosterEvent = z.infer<typeof RosterEvent>;
+type RosterEvent = z.infer<typeof RosterEvent>;
 
-export const SpeakingEvent = z.object({
+const SpeakingEvent = z.object({
   type: z.literal('party.voice.speaking'),
   speaking: z.array(z.string()),
 });
-export type SpeakingEvent = z.infer<typeof SpeakingEvent>;
+type SpeakingEvent = z.infer<typeof SpeakingEvent>;
 
 export const VoiceEvent = z.union([RosterEvent, SpeakingEvent, SignalEvent]);
 export type VoiceEvent = z.infer<typeof VoiceEvent>;

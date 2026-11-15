@@ -7,7 +7,7 @@ import { PartyEvent } from './schemas';
 const SAFETY_REFRESH_MS = 30_000;
 const FLOATING_TTL_MS = 4000;
 
-export function useNow(everyMs: number): number {
+function useNow(everyMs: number): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), everyMs);

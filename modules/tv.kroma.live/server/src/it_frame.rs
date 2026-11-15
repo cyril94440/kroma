@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use kroma_module_sdk::primitives::input;
+
 use crate::it_live::{load, request, rig, Rig};
 use crate::it_stream::{playing, pump};
 use crate::runtime::{FrameError, SETTLE_FOR_TESTS};
@@ -8,7 +10,7 @@ fn jpeg_height(bytes: &[u8]) -> u32 {
     let dir = kroma_module_sdk::testing::temp_dir("live-jpeg");
     let path = dir.path().join("shot.jpg");
     std::fs::write(&path, bytes).unwrap();
-    let out = std::process::Command::new("ffprobe").args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=height", "-of", "csv=p=0"]).arg(&path).output().unwrap();
+    let out = std::process::Command::new("ffprobe").args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=height", "-of", "csv=p=0"]).args(input::file(&path)).output().unwrap();
     String::from_utf8_lossy(&out.stdout).trim().parse().unwrap_or(0)
 }
 

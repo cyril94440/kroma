@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { routeParam } from '#mobile/lib/nav';
 
-export interface ClipRoute {
+interface ClipRoute {
   uri: string;
   title: string;
   subtitle: string;

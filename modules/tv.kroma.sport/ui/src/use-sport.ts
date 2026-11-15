@@ -6,7 +6,7 @@ import { adopt, applyEvent, EMPTY, type Model } from './sport-state';
 
 const SAFETY_REFRESH_MS = 30_000;
 
-export function useNow(everyMs: number): number {
+function useNow(everyMs: number): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), everyMs);

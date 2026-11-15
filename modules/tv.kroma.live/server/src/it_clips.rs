@@ -1,11 +1,13 @@
 use std::time::Duration;
 
+use kroma_module_sdk::primitives::input;
+
 use crate::clipbuf::CLIPS_DIR;
 use crate::it_live::{load, request, rig, until, Rig};
 use crate::runtime::ClipError;
 
 fn ffprobe_duration(path: &std::path::Path) -> f64 {
-    let out = std::process::Command::new("ffprobe").args(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0"]).arg(path).output().unwrap();
+    let out = std::process::Command::new("ffprobe").args(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0"]).args(input::file(path)).output().unwrap();
     String::from_utf8_lossy(&out.stdout).trim().parse().unwrap_or(0.0)
 }
 

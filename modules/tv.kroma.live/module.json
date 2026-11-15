@@ -3,7 +3,7 @@
   "schemaVersion": 3,
   "id": "tv.kroma.live",
   "name": "Live TV",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Live television from an IPTV provider restreamed to everyone at home over one connection, with standby when nobody watches, off-air detection and an automatic backup provider.",
   "engines": {
     "server": ">=0.1.39"
@@ -14,7 +14,26 @@
   "definesPoints": [
     {
       "name": "control",
-      "methods": ["status", "resolve", "switch", "presence", "proposal", "epg", "snapshot", "clipCut", "clipBufferInfo", "restart", "switchProvider", "probe", "benchmark", "scanResult", "history", "scanFrame", "clipList", "clipDelete"]
+      "methods": [
+        "status",
+        "resolve",
+        "switch",
+        "presence",
+        "proposal",
+        "epg",
+        "snapshot",
+        "clipCut",
+        "clipBufferInfo",
+        "restart",
+        "switchProvider",
+        "probe",
+        "benchmark",
+        "scanResult",
+        "history",
+        "scanFrame",
+        "clipList",
+        "clipDelete"
+      ]
     }
   ],
   "contributes": [
@@ -79,35 +98,126 @@
     }
   ],
   "config": [
-    { "key": "primaryUrl", "label": "config.primaryUrl", "type": "string", "secret": true, "placeholder": "http://portal.example:8080/get.php?username=...&password=..." },
+    {
+      "key": "primaryUrl",
+      "label": "config.primaryUrl",
+      "type": "string",
+      "secret": true,
+      "placeholder": "http://portal.example:8080/get.php?username=...&password=..."
+    },
     { "key": "backupUrl", "label": "config.backupUrl", "type": "string", "secret": true },
-    { "key": "userAgent", "label": "config.userAgent", "type": "string", "default": "VLC/3.0.20 LibVLC/3.0.20" },
-    { "key": "backupUserAgent", "label": "config.backupUserAgent", "type": "string", "default": "IPTVSmartersPro" },
-    { "key": "epgUrl", "label": "config.epgUrl", "type": "string", "default": "" },
-    { "key": "standbySeconds", "label": "config.standbySeconds", "type": "number", "default": "90" },
+    {
+      "key": "userAgent",
+      "label": "config.userAgent",
+      "type": "string",
+      "default": "VLC/3.0.20 LibVLC/3.0.20"
+    },
+    {
+      "key": "backupUserAgent",
+      "label": "config.backupUserAgent",
+      "type": "string",
+      "default": "IPTVSmartersPro"
+    },
+    { "key": "epgUrl", "label": "config.epgUrl", "type": "string", "secret": true, "default": "" },
+    {
+      "key": "standbySeconds",
+      "label": "config.standbySeconds",
+      "type": "number",
+      "default": "90"
+    },
     { "key": "autoFailover", "label": "config.autoFailover", "type": "bool", "default": "true" },
-    { "key": "backupMaxConnections", "label": "config.backupMaxConnections", "type": "number", "default": "1" },
-    { "key": "backupScanWithLive", "label": "config.backupScanWithLive", "type": "bool", "default": "true" },
+    {
+      "key": "backupMaxConnections",
+      "label": "config.backupMaxConnections",
+      "type": "number",
+      "default": "1"
+    },
+    {
+      "key": "backupScanWithLive",
+      "label": "config.backupScanWithLive",
+      "type": "bool",
+      "default": "true"
+    },
     { "key": "audioAutoCopy", "label": "config.audioAutoCopy", "type": "string", "default": "" },
-    { "key": "defaultChannel", "label": "config.defaultChannel", "type": "string", "default": "Canal+ VIP RAW" },
-    { "key": "deadAfterSeconds", "label": "config.deadAfterSeconds", "type": "number", "default": "45" },
-    { "key": "troubleDeadSeconds", "label": "config.troubleDeadSeconds", "type": "number", "default": "20" },
-    { "key": "unstableAfterSeconds", "label": "config.unstableAfterSeconds", "type": "number", "default": "120" },
-    { "key": "unstableWindowSeconds", "label": "config.unstableWindowSeconds", "type": "number", "default": "300" },
-    { "key": "trialAfterSeconds", "label": "config.trialAfterSeconds", "type": "number", "default": "20" },
-    { "key": "trialGapSecondsPerMinute", "label": "config.trialGapSecondsPerMinute", "type": "string", "default": "2" },
+    {
+      "key": "defaultChannel",
+      "label": "config.defaultChannel",
+      "type": "string",
+      "default": "Canal+ VIP RAW"
+    },
+    {
+      "key": "deadAfterSeconds",
+      "label": "config.deadAfterSeconds",
+      "type": "number",
+      "default": "45"
+    },
+    {
+      "key": "troubleDeadSeconds",
+      "label": "config.troubleDeadSeconds",
+      "type": "number",
+      "default": "20"
+    },
+    {
+      "key": "unstableAfterSeconds",
+      "label": "config.unstableAfterSeconds",
+      "type": "number",
+      "default": "120"
+    },
+    {
+      "key": "unstableWindowSeconds",
+      "label": "config.unstableWindowSeconds",
+      "type": "number",
+      "default": "300"
+    },
+    {
+      "key": "trialAfterSeconds",
+      "label": "config.trialAfterSeconds",
+      "type": "number",
+      "default": "20"
+    },
+    {
+      "key": "trialGapSecondsPerMinute",
+      "label": "config.trialGapSecondsPerMinute",
+      "type": "string",
+      "default": "2"
+    },
     { "key": "trialRatio", "label": "config.trialRatio", "type": "string", "default": "3" },
     { "key": "minKbps", "label": "config.minKbps", "type": "number", "default": "100" },
     { "key": "allow4k", "label": "config.allow4k", "type": "bool", "default": "false" },
     { "key": "familyFilter", "label": "config.familyFilter", "type": "bool", "default": "true" },
-    { "key": "blockedTerms", "label": "config.blockedTerms", "type": "string", "default": "adult,xxx,porn,+18,18+" },
-    { "key": "homeCountry", "label": "config.homeCountry", "type": "string", "default": "fr,fra,france" },
+    {
+      "key": "blockedTerms",
+      "label": "config.blockedTerms",
+      "type": "string",
+      "default": "adult,xxx,porn,+18,18+"
+    },
+    {
+      "key": "homeCountry",
+      "label": "config.homeCountry",
+      "type": "string",
+      "default": "fr,fra,france"
+    },
     { "key": "homeBonus", "label": "config.homeBonus", "type": "number", "default": "6" },
     { "key": "foreignPenalty", "label": "config.foreignPenalty", "type": "number", "default": "8" },
-    { "key": "foreignCodes", "label": "config.foreignCodes", "type": "string", "default": "be,uk,gb,us,ca,de,at,ch,lu,nl,it,es,pt,pl,ar,tr,gr,se,no,dk,fi,cz,sk,hu,ro,bg,ru,ua,br,mx,in,qa,sa,ae,ma,dz,tn,eg,il,ir,hr,rs,si,ba,mk,al,lt,lv,ee,af,now,prime,sr,srb,ex,yu,exyu,cro,bih,mne,za,pk,iq,chile,au,nz,ie,jp,kr,cn,hk,th,vn,ph,ng,ke,lb,jo,kw,cl,co,pe,ve,uy,latam,arab" },
-    { "key": "variantWeights", "label": "config.variantWeights", "type": "string", "default": "raw:5,vip:2,fhd:0.6,hd:0.4,exact:5" },
+    {
+      "key": "foreignCodes",
+      "label": "config.foreignCodes",
+      "type": "string",
+      "default": "be,uk,gb,us,ca,de,at,ch,lu,nl,it,es,pt,pl,ar,tr,gr,se,no,dk,fi,cz,sk,hu,ro,bg,ru,ua,br,mx,in,qa,sa,ae,ma,dz,tn,eg,il,ir,hr,rs,si,ba,mk,al,lt,lv,ee,af,now,prime,sr,srb,ex,yu,exyu,cro,bih,mne,za,pk,iq,chile,au,nz,ie,jp,kr,cn,hk,th,vn,ph,ng,ke,lb,jo,kw,cl,co,pe,ve,uy,latam,arab"
+    },
+    {
+      "key": "variantWeights",
+      "label": "config.variantWeights",
+      "type": "string",
+      "default": "raw:5,vip:2,fhd:0.6,hd:0.4,exact:5"
+    },
     { "key": "canaries", "label": "config.canaries", "type": "string", "default": "" },
-    { "key": "favourites", "label": "config.favourites", "type": "string", "default": "Canal+ VIP RAW,TF1,France 2,M6,L'Équipe,beIN Sports 1" }
+    {
+      "key": "favourites",
+      "label": "config.favourites",
+      "type": "string",
+      "default": "Canal+ VIP RAW,TF1,France 2,M6,L'Équipe,beIN Sports 1"
+    }
   ],
   "component": {
     "memoryMib": 1024,

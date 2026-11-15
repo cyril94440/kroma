@@ -4,7 +4,7 @@ import { z } from 'zod';
 const method = <T extends (...args: never[]) => unknown>() =>
   z.custom<T>((value) => typeof value === 'function');
 
-export interface FramePlayer {
+interface FramePlayer {
   getPositionMs(): number | null;
 }
 

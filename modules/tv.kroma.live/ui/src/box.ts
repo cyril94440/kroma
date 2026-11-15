@@ -1,4 +1,4 @@
-export interface Box<T> {
+interface Box<T> {
   get(): T;
   set(next: T): void;
 }

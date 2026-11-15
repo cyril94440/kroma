@@ -14,7 +14,7 @@ const ZAP_MESSAGE = {
   refused: 'live.zapRefused',
 } as const satisfies Record<ZapOutcome, string>;
 
-export interface LiveHandlers {
+interface LiveHandlers {
   zapByName: (name: string) => void;
   reply: (text: string) => void;
   react: (emoji: string) => void;

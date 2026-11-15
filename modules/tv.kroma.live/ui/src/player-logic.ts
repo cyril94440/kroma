@@ -1,7 +1,6 @@
-export const BEHIND_LIVE_SECONDS = 6;
+const BEHIND_LIVE_SECONDS = 6;
 export const STALL_RECOVERY_MS = 4000;
-export const MAX_NETWORK_RETRIES = 6;
-export const SEEK_AFTER_SECONDS = 1.5;
+const MAX_NETWORK_RETRIES = 6;
 
 export const HLS_CONFIG = {
   liveSyncDurationCount: 4,

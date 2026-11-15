@@ -2,7 +2,7 @@ import { Chip, FocusRegion, styles, useStyles } from '@kromatv/ui/kit';
 
 const sDefinition = styles({ row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 } });
 
-export interface Tab<T extends string> {
+interface Tab<T extends string> {
   id: T;
   label: string;
 }

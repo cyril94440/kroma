@@ -3,7 +3,7 @@ import type { LinkState, PeerFactory, Send } from './voice-peer';
 import type { IceServer, SignalEvent, VoiceMember } from './voice-schemas';
 import { SESSION_TIMING, Timers } from './voice-timing';
 
-export interface MeshDeps {
+interface MeshDeps {
   self: { peerId: string; userId: string };
   createPeer: PeerFactory;
   send: Send;

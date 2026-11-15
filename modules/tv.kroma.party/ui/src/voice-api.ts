@@ -12,7 +12,7 @@ import {
   VoiceState,
 } from './voice-schemas';
 
-export type VoiceRequestFailure = 'full' | 'rateLimited' | 'failed';
+type VoiceRequestFailure = 'full' | 'rateLimited' | 'failed';
 
 export class VoiceRequestError extends Error {
   constructor(readonly failure: VoiceRequestFailure) {

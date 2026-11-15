@@ -6,7 +6,7 @@ describe('hermesModule', () => {
     expect(hermesModule.id).toBe('tv.kroma.hermes');
     expect(hermesModule.dependencies).toEqual({
       'tv.kroma.party': '>=0.1.0',
-      'tv.kroma.live': '>=0.1.0',
+      'tv.kroma.live': '>=0.3.0',
     });
   });
 

@@ -1,12 +1,12 @@
 const SAMPLE_EVERY_MS = 60;
 
-export interface SpeechGateOptions {
+interface SpeechGateOptions {
   threshold: number;
   attackMs: number;
   releaseMs: number;
 }
 
-export const SPEECH_GATE: SpeechGateOptions = { threshold: 0.045, attackMs: 80, releaseMs: 550 };
+const SPEECH_GATE: SpeechGateOptions = { threshold: 0.045, attackMs: 80, releaseMs: 550 };
 
 /** Turns a stream of RMS samples into speaking on and off, with a fast attack
  *  and a slow release so a pause between words does not flicker the indicator.
@@ -56,7 +56,7 @@ export interface MeterAudio {
   createContext: () => AudioContext;
 }
 
-export interface PrimedAudio extends MeterAudio {
+interface PrimedAudio extends MeterAudio {
   prime: () => void;
 }
 

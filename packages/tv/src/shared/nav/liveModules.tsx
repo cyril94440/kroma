@@ -1,7 +1,7 @@
 import { type LiveModules, NO_LIVE_MODULES } from '@kromatv/core';
 import { createContext, type ReactNode, useContext } from 'react';
 
-export interface LiveModulesValue {
+interface LiveModulesValue {
   modules: LiveModules;
   ready: boolean;
 }

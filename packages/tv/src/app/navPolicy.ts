@@ -50,12 +50,12 @@ export const AUTH_SCREENS: readonly RouteName[] = screensFor('signedOut');
 export const APP_SCREENS: readonly RouteName[] = screensFor('signedIn');
 export const ALL_SCREENS: readonly RouteName[] = Object.keys(ACCESS) as RouteName[];
 
-export interface GuardState {
+interface GuardState {
   signedIn: boolean;
 }
 
 /** The screens a rule may redirect *to*: both are param-less roots. */
-export type GuardTarget = 'profiles' | 'home';
+type GuardTarget = 'profiles' | 'home';
 
 export const GUARD: readonly RedirectRule<GuardState, RouteName, GuardTarget>[] = [
   { when: (s) => !s.signedIn, to: 'profiles', allow: AUTH_SCREENS },

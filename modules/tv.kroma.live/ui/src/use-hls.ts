@@ -15,7 +15,7 @@ import * as control from './video-control';
 
 const RELOAD_DELAY_MS = 1500;
 
-export interface HlsState {
+interface HlsState {
   behind: boolean;
   playing: boolean;
   blocked: boolean;

@@ -33,7 +33,7 @@ export interface PlayerHandle {
   subscribe(listener: (snapshot: PlayerSnapshot) => void): () => void;
 }
 
-export interface HandleSource {
+interface HandleSource {
   element: HTMLVideoElement;
   playingDate: () => number | null;
   liveSyncPosition: () => number | null;

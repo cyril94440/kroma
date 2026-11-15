@@ -13,7 +13,7 @@ const ZAP_MESSAGE = {
   refused: 'live.zapRefused',
 } as const satisfies Record<ZapOutcome, string>;
 
-export interface LiveHandlers {
+interface LiveHandlers {
   zap: (channel: ChannelView) => void;
   zapByName: (name: string) => void;
   reply: (text: string) => void;

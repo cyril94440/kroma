@@ -22,7 +22,7 @@ const TAB_LABEL: Record<Tab, MessageKey> = {
   prono: 'live.prono',
 };
 
-export interface MatchPanelData {
+interface MatchPanelData {
   match: MatchPayload | null;
   prono: PronoPayload | null;
   clips: readonly Clip[];

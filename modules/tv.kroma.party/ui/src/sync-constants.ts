@@ -3,7 +3,6 @@ export const CONTROL_EVERY_MS = 1000;
 export const CLOCK_REFRESH_MS = 300_000;
 export const CLOCK_BURST = 8;
 export const CLOCK_BURST_GAP_MS = 250;
-export const CLOCK_SETTLE_MS = 300;
 export const LATENCY_CACHE_MS = 10_000;
 export const BUFFER_PINNED_MS = 4000;
 export const SNAP_TOLERANCE_S = 0.35;

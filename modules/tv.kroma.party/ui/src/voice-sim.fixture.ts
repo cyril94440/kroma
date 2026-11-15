@@ -11,7 +11,7 @@ import {
 } from './voice-schemas';
 import { VoiceSession } from './voice-session';
 
-export interface SimUser {
+interface SimUser {
   userId: string;
   name: string;
 }
@@ -132,7 +132,7 @@ export class SimServer {
   }
 }
 
-export interface Rig {
+interface Rig {
   server: SimServer;
   net: SimNet;
   session: VoiceSession;
