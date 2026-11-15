@@ -19,7 +19,6 @@ describe('the reactions drawer', () => {
     const goal = await screen.findByRole('button', { name: 'Goal' });
     clearPressGuard();
     fireEvent.click(goal);
-    void (await screen.findByRole('button', { name: 'Goal' }));
 
     expect(onReact).toHaveBeenCalledWith('⚽');
     expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(
