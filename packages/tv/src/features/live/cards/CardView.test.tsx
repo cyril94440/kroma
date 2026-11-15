@@ -36,7 +36,11 @@ describe('a Hermès card', () => {
   it('draws a table with its title, rows and note', () => {
     show(table);
 
-    expect(['Classement Ligue 1', 'PSG', '28', 'Lens', 'après la 11e journée'].map((text) => screen.queryByText(text) !== null)).toEqual([true, true, true, true, true]);
+    expect(
+      ['Classement Ligue 1', 'PSG', '28', 'Lens', 'après la 11e journée'].map(
+        (text) => screen.queryByText(text) !== null,
+      ),
+    ).toEqual([true, true, true, true, true]);
   });
 
   it('draws a match with its score and asks to watch its channel', () => {
@@ -44,7 +48,10 @@ describe('a Hermès card', () => {
 
     fireEvent.click(screen.getByLabelText('Mettre cette chaîne'));
 
-    expect([screen.getByText('1 - 0') !== null, onWatch.mock.calls]).toEqual([true, [['Canal+ Foot']]]);
+    expect([screen.getByText('1 - 0') !== null, onWatch.mock.calls]).toEqual([
+      true,
+      [['Canal+ Foot']],
+    ]);
   });
 
   it('draws nothing for a card outside the catalogue', () => {

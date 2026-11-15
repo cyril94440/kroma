@@ -29,7 +29,10 @@ export function TableCardView({ card }: Readonly<{ card: TableCard }>) {
           <Box key={row.join('|')} row gap={16} bg={tone ? 'accentSoft' : undefined}>
             {row.map((cell, column) => (
               <Box key={card.columns[column]} flex>
-                <Text variant="bodyTv" color={tone && column === card.live?.points_col ? TONE_INK[tone] : 'text'}>
+                <Text
+                  variant="bodyTv"
+                  color={tone && column === card.live?.points_col ? TONE_INK[tone] : 'text'}
+                >
                   {String(cell)}
                 </Text>
               </Box>

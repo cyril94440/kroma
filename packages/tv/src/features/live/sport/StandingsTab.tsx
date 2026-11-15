@@ -30,7 +30,12 @@ export function StandingsTab({ client }: Readonly<{ client: Pick<LiveClient, 'sp
             {t('live.standings.provisional', { count: table.matchs_comptes })}
           </Text>
           {table.lignes.slice(0, ROWS).map((row) => (
-            <Box key={row.club} row justify="space-between" bg={row.outcome ? 'accentSoft' : undefined}>
+            <Box
+              key={row.club}
+              row
+              justify="space-between"
+              bg={row.outcome ? 'accentSoft' : undefined}
+            >
               <Text variant="bodyTv" flex>{`${row.rang}  ${row.club}`}</Text>
               <Text variant="bodyTv">{`${row.pts}  ${row.diff > 0 ? '+' : ''}${row.diff}  ${row.match}`}</Text>
             </Box>

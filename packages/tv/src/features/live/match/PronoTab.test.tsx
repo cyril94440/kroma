@@ -91,7 +91,10 @@ describe('the prono tab', () => {
       }),
     );
 
-    expect([screen.getByText('Ana 2-1') !== null, screen.getByText('+3') !== null]).toEqual([true, true]);
+    expect([screen.getByText('Ana 2-1') !== null, screen.getByText('+3') !== null]).toEqual([
+      true,
+      true,
+    ]);
   });
 
   it('says a cancelled prediction is cancelled', () => {

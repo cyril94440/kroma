@@ -63,7 +63,9 @@ export function ChatDrawer({
               {t('live.chatEmpty')}
             </Text>
           ) : (
-            shown.map((message) => <ChatEntry key={message.id} message={message} onWatch={onWatch} />)
+            shown.map((message) => (
+              <ChatEntry key={message.id} message={message} onWatch={onWatch} />
+            ))
           )}
           {activity ? (
             <Text variant="labelTv" color="accentText">

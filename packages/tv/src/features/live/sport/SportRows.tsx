@@ -8,7 +8,8 @@ const sDefinition = styles({ column: { gap: 12 } });
 function eventLabel(event: SportEvent): string {
   const [home, away] = event.lignes;
   if (!home || !away) return event.compet;
-  const score = event.masquer_score || event.statut === 'pre' ? 'vs' : `${home.score} - ${away.score}`;
+  const score =
+    event.masquer_score || event.statut === 'pre' ? 'vs' : `${home.score} - ${away.score}`;
   return `${home.nom} ${score} ${away.nom}`;
 }
 

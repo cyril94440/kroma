@@ -7,7 +7,12 @@ export function ScoreStepper({
   value,
   autoFocus,
   onChange,
-}: Readonly<{ team: string; value: number; autoFocus?: boolean; onChange: (next: number) => void }>) {
+}: Readonly<{
+  team: string;
+  value: number;
+  autoFocus?: boolean;
+  onChange: (next: number) => void;
+}>) {
   const t = useT();
   return (
     <Box row align="center" justify="space-between" gap={16}>

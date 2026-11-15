@@ -107,7 +107,6 @@ export function TvLive<E extends LiveEngine>({
     }),
     [match, sportState, me, sport.postSeen],
   );
-  const hasMatch = match !== null || sportState?.prono != null || (sportState?.clips.length ?? 0) > 0;
   const agent = party.state?.config.agentName ?? '';
   const activity = party.state?.activity
     ? t('live.activity', { name: agent, label: party.state.activity })
@@ -127,7 +126,7 @@ export function TvLive<E extends LiveEngine>({
         {subtitle ? <Player.Subtitle>{subtitle}</Player.Subtitle> : null}
         {badge ? <Player.Warning>{t(`live.badge.${badge}`)}</Player.Warning> : null}
         <Player.Actions>
-          <LiveActionsBar modules={modules} hasMatch={hasMatch} sync={sync} onOpen={setPanel} />
+          <LiveActionsBar modules={modules} sync={sync} onOpen={setPanel} />
         </Player.Actions>
         <Player.Transport tileAt={noStoryboard} />
         <Player.Media>
@@ -141,9 +140,14 @@ export function TvLive<E extends LiveEngine>({
             </Text>
             {sync.on ? (
               <Text variant="labelTv" color="accentText">
-                {t(group && group.members.length > 1 ? 'live.sync.status.group' : 'live.sync.status.alone', {
-                  count: group?.members.length ?? 0,
-                })}
+                {t(
+                  group && group.members.length > 1
+                    ? 'live.sync.status.group'
+                    : 'live.sync.status.alone',
+                  {
+                    count: group?.members.length ?? 0,
+                  },
+                )}
               </Text>
             ) : null}
           </Box>

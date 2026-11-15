@@ -9,21 +9,29 @@ export type Panel = 'channels' | 'chat' | 'reactions' | 'match' | 'sport' | 'ide
  *  a module that is absent leaves its buttons out. */
 export function LiveActionsBar({
   modules,
-  hasMatch,
   sync,
   onOpen,
 }: Readonly<{
   modules: LiveModules;
-  hasMatch: boolean;
   sync: LiveSync;
   onOpen: (panel: Panel) => void;
 }>) {
   const t = useT();
   return (
     <>
-      <Button icon="list" label={t('live.channels')} variant="scrim" onPress={() => onOpen('channels')} />
+      <Button
+        icon="list"
+        label={t('live.channels')}
+        variant="scrim"
+        onPress={() => onOpen('channels')}
+      />
       {modules.party ? (
-        <Button icon="message" label={t('live.chat')} variant="scrim" onPress={() => onOpen('chat')} />
+        <Button
+          icon="message"
+          label={t('live.chat')}
+          variant="scrim"
+          onPress={() => onOpen('chat')}
+        />
       ) : null}
       {modules.party ? (
         <Button
@@ -42,14 +50,29 @@ export function LiveActionsBar({
           onPress={sync.on ? sync.leave : sync.join}
         />
       ) : null}
-      {modules.sport && hasMatch ? (
-        <Button icon="ball-football" label={t('live.match')} variant="scrim" onPress={() => onOpen('match')} />
-      ) : null}
       {modules.sport ? (
-        <Button icon="trophy" label={t('live.sport')} variant="scrim" onPress={() => onOpen('sport')} />
+        <Button
+          icon="trophy"
+          label={t('live.sport')}
+          variant="scrim"
+          onPress={() => onOpen('sport')}
+        />
       ) : null}
       {modules.party ? (
-        <Button icon="bulb" label={t('live.ideas')} variant="scrim" onPress={() => onOpen('ideas')} />
+        <Button
+          icon="bulb"
+          label={t('live.ideas')}
+          variant="scrim"
+          onPress={() => onOpen('ideas')}
+        />
+      ) : null}
+      {modules.sport ? (
+        <Button
+          icon="ball-football"
+          label={t('live.match')}
+          variant="scrim"
+          onPress={() => onOpen('match')}
+        />
       ) : null}
     </>
   );

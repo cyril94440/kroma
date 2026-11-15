@@ -24,11 +24,15 @@ export function ReactionButton({
       autoFocus={autoFocus}
       onPress={onPress}
       focusScale={1.08}
-      style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2, alignItems: 'center', justifyContent: 'center' }}
+      style={{
+        width: SIZE,
+        height: SIZE,
+        borderRadius: SIZE / 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
-      <Text variant="headingTv">
-        {emoji}
-      </Text>
+      <Text variant="headingTv">{emoji}</Text>
     </Focusable>
   );
 }

@@ -31,7 +31,12 @@ export function SportDrawer({
     <Drawer.Root open={open} onClose={onClose} title={t('live.sport')} width="xl" floating>
       <Drawer.Panel>
         <Box gap={18}>
-          <SegmentGroup.Root<Tab> value={tab} onValueChange={setTab} label={t('live.sport')} stretch>
+          <SegmentGroup.Root<Tab>
+            value={tab}
+            onValueChange={setTab}
+            label={t('live.sport')}
+            stretch
+          >
             <SegmentGroup.Item value="rows">
               <SegmentGroup.Label>{t('live.sport.live')}</SegmentGroup.Label>
             </SegmentGroup.Item>

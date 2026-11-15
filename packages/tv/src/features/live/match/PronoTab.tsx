@@ -10,7 +10,10 @@ const ROWS_MAX = 6;
 function Standings({
   rows,
   me,
-}: Readonly<{ rows: { user_id: string; pseudo: string; prono: string; right: string }[]; me: string }>) {
+}: Readonly<{
+  rows: { user_id: string; pseudo: string; prono: string; right: string }[];
+  me: string;
+}>) {
   return (
     <Box gap={6}>
       {rows.slice(0, ROWS_MAX).map((row) => (
@@ -63,12 +66,23 @@ export function PronoTab({
           <Text variant="labelTv" color="accentText">
             {t('live.prono.closesIn', { seconds: prono.ferme_dans_s })}
           </Text>
-          <ScoreStepper team={prono.home_abbr || prono.home} value={home} autoFocus onChange={setHome} />
+          <ScoreStepper
+            team={prono.home_abbr || prono.home}
+            value={home}
+            autoFocus
+            onChange={setHome}
+          />
           <ScoreStepper team={prono.away_abbr || prono.away} value={away} onChange={setAway} />
-          <Button label={t('live.prono.submit')} onPress={() => onVote(prono.id, `${home}-${away}`)} />
+          <Button
+            label={t('live.prono.submit')}
+            onPress={() => onVote(prono.id, `${home}-${away}`)}
+          />
           {mine ? <Text variant="labelTv">{t('live.prono.yours', { score: mine })}</Text> : null}
           <Text variant="labelTv" color="textDim">
-            {t('live.prono.voted', { count: Object.keys(prono.votes).length, total: prono.requis.length })}
+            {t('live.prono.voted', {
+              count: Object.keys(prono.votes).length,
+              total: prono.requis.length,
+            })}
           </Text>
         </FocusColumn>
       ) : (
@@ -83,7 +97,11 @@ export function PronoTab({
             {t('live.prono.season')}
           </Text>
           <Standings
-            rows={prono.saison.map((r) => ({ ...r, prono: '', right: `${r.points} (${r.gagnes})` }))}
+            rows={prono.saison.map((r) => ({
+              ...r,
+              prono: '',
+              right: `${r.points} (${r.gagnes})`,
+            }))}
             me={me}
           />
         </Box>

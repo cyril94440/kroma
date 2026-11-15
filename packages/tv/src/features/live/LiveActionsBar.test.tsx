@@ -21,7 +21,6 @@ describe('the live action bar', () => {
       onScreen(
         <LiveActionsBar
           modules={{ live: true, party: false, sport: false }}
-          hasMatch={false}
           sync={sync(false)}
           onOpen={vi.fn()}
         />,
@@ -36,7 +35,6 @@ describe('the live action bar', () => {
       onScreen(
         <LiveActionsBar
           modules={{ live: true, party: true, sport: true }}
-          hasMatch
           sync={sync(false)}
           onOpen={vi.fn()}
         />,
@@ -48,9 +46,9 @@ describe('the live action bar', () => {
       'Chat',
       'Reactions',
       'Sync with the group',
-      'Match',
       'Live sport',
       'Ideas box',
+      'Match',
     ]);
   });
 
@@ -60,7 +58,6 @@ describe('the live action bar', () => {
       onScreen(
         <LiveActionsBar
           modules={{ live: true, party: true, sport: false }}
-          hasMatch={false}
           sync={idle}
           onOpen={vi.fn()}
         />,
@@ -73,7 +70,6 @@ describe('the live action bar', () => {
       onScreen(
         <LiveActionsBar
           modules={{ live: true, party: true, sport: false }}
-          hasMatch={false}
           sync={joined}
           onOpen={vi.fn()}
         />,
