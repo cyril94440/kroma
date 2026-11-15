@@ -17,6 +17,8 @@ export interface ModuleApi {
   put(path: string, body?: unknown): Promise<void>;
   delete<S extends z.ZodType>(path: string, response: S): Promise<z.output<S>>;
   delete(path: string): Promise<void>;
+  /** A POST that survives the page unloading, for a goodbye sent on `pagehide`. Nothing is read from the answer. */
+  beacon(path: string, body?: unknown): void;
   /** Raw bytes rather than JSON, for a file a module accepts directly. */
   upload<S extends z.ZodType>(
     path: string,
@@ -46,6 +48,8 @@ export function moduleApi(
     put: send('put') as ModuleApi['put'],
     delete: ((path: string, response?: z.ZodType) =>
       response ? ctx.delete(at(path), response) : ctx.delete(at(path))) as ModuleApi['delete'],
+    beacon: (path, body) =>
+      void ctx.post(at(path), { body, keepalive: true }).catch(() => undefined),
     upload: (path, file, response, headers) => ctx.upload(at(path), file, response, { headers }),
   };
 }

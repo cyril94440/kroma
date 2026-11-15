@@ -10,6 +10,7 @@ interface LivePlayerProps {
   channel?: PlayerChannel | null;
   onHandle?: (handle: PlayerHandle | null) => void;
   onPlaying?: (playing: boolean) => void;
+  onImmersive?: (immersive: boolean) => void;
 }
 
 const FRAME: CSSProperties = {
@@ -64,6 +65,7 @@ export function LivePlayer({
   channel = null,
   onHandle,
   onPlaying,
+  onImmersive,
 }: Readonly<LivePlayerProps>) {
   const t = useT();
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
@@ -75,6 +77,9 @@ export function LivePlayer({
     onHandle?.(handle);
     return () => onHandle?.(null);
   }, [handle, onHandle]);
+  useEffect(() => {
+    onImmersive?.(immersive);
+  }, [immersive, onImmersive]);
   useEffect(() => {
     onPlaying?.(playing);
   }, [playing, onPlaying]);

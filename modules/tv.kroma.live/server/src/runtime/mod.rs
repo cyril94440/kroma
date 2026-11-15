@@ -9,6 +9,7 @@ mod frame;
 mod guide;
 mod media;
 mod notify;
+mod ops;
 mod outage;
 mod probing;
 mod process;
@@ -43,14 +44,25 @@ use crate::providers::Providers;
 use crate::rules::Rules;
 use crate::status::{OffAirView, Phase, Proposal};
 
-pub use clips::{ClipCut, ClipError};
+#[cfg(test)]
+pub use clips::ClipError;
 pub use connections::Refusal;
 pub use coverage::CoverageState;
-pub use frame::{Frame, FrameError};
+#[cfg(test)]
+pub use frame::FrameError;
+#[cfg(test)]
+pub use frame::SETTLE_FOR_TESTS;
 #[cfg(test)]
 pub use connections::Use;
 pub use guide::{now_next, to_programme};
-pub use scan::ScanState;
+#[cfg(test)]
+pub use actions::Proposed;
+#[cfg(test)]
+pub use codec::VideoCodec;
+pub use ops::{ProbeReport, ProviderSwitch, Restart};
+#[cfg(test)]
+pub use media::READ_BUDGET_BYTES;
+pub use scan::{ScanState, BENCHMARK_MAX_IDS};
 pub use switch::{SwitchOutcome, SwitchRequest};
 
 pub const KV_CURRENT: &str = "current";
@@ -120,6 +132,8 @@ pub struct Inner {
     pub trace: ProviderTrace,
     pub coverage: CoverageState,
     pub action_busy: bool,
+    pub recheck_busy: bool,
+    pub last_restart: Option<Instant>,
     pub buffer: Buffer,
     pub last_buffer_purge: Option<Instant>,
     pub last_clip_purge: Option<Instant>,
@@ -196,6 +210,8 @@ impl Live {
             trace: ProviderTrace::new(root.join(TRACE_DIR).join(TRACE_FILE)),
             coverage: CoverageState::default(),
             action_busy: false,
+            recheck_busy: false,
+            last_restart: None,
             buffer: Buffer::default(),
             last_buffer_purge: None,
             last_clip_purge: None,

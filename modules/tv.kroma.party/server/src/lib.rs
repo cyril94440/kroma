@@ -23,7 +23,7 @@ pub use live::{Live, PeerLive, CONTROL};
 pub use module::MODULE;
 pub use party::{Actor, Party, Request, SwitchResult};
 pub use room::ROOM;
-pub use routes::routes;
+pub use routes::{point_routes, routes};
 
 pub const MODULE_ID: &str = "tv.kroma.party";
 
@@ -46,6 +46,10 @@ impl<S: kroma_module_sdk::host::HostStorage + Clone + Send + Sync + 'static>
 
     fn migrations(&self) -> &'static str {
         store::MIGRATIONS
+    }
+
+    fn admin_routes(&self, host: &S) -> Option<axum::Router<S>> {
+        kroma_module_sdk::host::service::<Party>(host).map(routes::<S>)
     }
 
     fn jobs(&self) -> Vec<kroma_module_sdk::host::ModuleJob<S>> {

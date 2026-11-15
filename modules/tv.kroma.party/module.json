@@ -25,7 +25,10 @@
         "closePoll",
         "kick",
         "activity",
-        "votePoll"
+        "votePoll",
+        "goLive",
+        "fineSync",
+        "clientLogs"
       ]
     }
   ],

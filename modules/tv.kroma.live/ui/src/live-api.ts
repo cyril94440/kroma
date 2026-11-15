@@ -31,7 +31,7 @@ export function createLiveApi(api: ModuleApi, fileUrl: (path: string) => string)
       api.get(withQuery('/channels', { ...query, perPage: 48 }), ChannelPage),
     favourites: () => api.get('/favourites', Favourites),
     beat: (companion = false) => api.post('/presence', { companion }, BeatAnswer),
-    leave: () => api.post('/presence/leave'),
+    leave: () => api.beacon('/presence/leave'),
     switchTo: (channelId: string) => api.post('/switch', { channelId }, SwitchOutcome),
     pause: () => api.post('/pause'),
     resume: () => api.post('/resume', undefined, SwitchOutcome),

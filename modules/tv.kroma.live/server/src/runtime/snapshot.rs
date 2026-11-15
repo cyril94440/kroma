@@ -47,6 +47,7 @@ impl Live {
             off_air: inner.off_air.clone(),
             backup_configured: settings.has_backup(),
             primary_down: inner.policy.primary_is_down(),
+            source_resolution: inner.resolution.clone(),
         }
     }
 

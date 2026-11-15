@@ -56,6 +56,7 @@ export const Status = z.object({
   offAir: OffAir.nullable().default(null),
   backupConfigured: z.boolean().default(false),
   primaryDown: z.boolean().default(false),
+  sourceResolution: z.string().default(''),
 });
 export type Status = z.infer<typeof Status>;
 
@@ -66,6 +67,11 @@ export const ChannelView = z.object({
   provider: Provider.nullable().default(null),
   score: z.number().default(0),
   now: Slot.nullable().default(null),
+  event: z
+    .object({ search: z.string().default(''), competition: z.string().default('') })
+    .nullable()
+    .catch(null)
+    .default(null),
 });
 export type ChannelView = z.infer<typeof ChannelView>;
 
@@ -100,6 +106,17 @@ export const SourceView = z.object({
   singleConnection: z.boolean().default(false),
 });
 
+export const GAPS = ['absentFromBackup', 'notFound', 'noGuide'] as const;
+
+export const CoverageRow = z.object({
+  favourite: z.string(),
+  primary: z.string().nullable().default(null),
+  backup: z.array(z.string()).default([]),
+  guide: z.boolean().default(false),
+  gap: z.enum(GAPS).nullable().catch(null).default(null),
+});
+export type CoverageRow = z.infer<typeof CoverageRow>;
+
 export const Overview = z.object({
   providers: z.array(SourceView),
   guideProgrammes: z.number().default(0),
@@ -109,6 +126,8 @@ export const Overview = z.object({
   ffmpegHttps: z.boolean().default(false),
   favourites: z.array(z.string()).default([]),
   standbySeconds: z.number().default(90),
+  coverage: z.array(CoverageRow).default([]),
+  coverageAt: z.number().default(0),
 });
 export type Overview = z.infer<typeof Overview>;
 
@@ -158,6 +177,8 @@ export const ScanItem = z.object({
   ok: z.boolean().default(false),
   black: z.boolean().default(false),
   frame: z.string().nullable().default(null),
+  frames: z.array(z.string()).default([]),
+  still: z.boolean().default(false),
   error: z.string().nullable().default(null),
   now: z.string().nullable().default(null),
 });

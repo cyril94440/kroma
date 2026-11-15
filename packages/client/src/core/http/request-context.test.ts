@@ -17,10 +17,15 @@ function transport(
   reply: Reply | ((url: string) => Reply) = {},
   config?: Partial<TransportConfig>,
 ) {
-  const calls: { url: string; headers: Headers; method: string }[] = [];
+  const calls: { url: string; headers: Headers; method: string; keepalive?: boolean }[] = [];
   const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    calls.push({ url, headers: new Headers(init?.headers), method: init?.method ?? 'GET' });
+    calls.push({
+      url,
+      headers: new Headers(init?.headers),
+      method: init?.method ?? 'GET',
+      keepalive: init?.keepalive,
+    });
     const r = typeof reply === 'function' ? reply(url) : reply;
     const chunks = r.stream;
     return {
@@ -80,6 +85,15 @@ describe('the request itself', () => {
 
     expect(calls[0]?.headers.get('content-type')).toBe('application/json');
     expect(calls[1]?.headers.get('content-type')).toBeNull();
+  });
+
+  it('lets a request outlive the page when asked, and not otherwise', async () => {
+    const { ctx, calls } = transport();
+
+    await ctx.post('/presence/leave', { keepalive: true });
+    await ctx.post('/presence/leave');
+
+    expect(calls.map((c) => c.keepalive)).toEqual([true, undefined]);
   });
 
   it('builds the absolute URL a video element fetches for itself', () => {

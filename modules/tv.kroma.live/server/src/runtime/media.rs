@@ -2,6 +2,23 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 pub const STALE_AFTER: Duration = Duration::from_secs(6);
+pub const READ_CAP: u32 = 1 << 16;
+pub const MAX_READS_PER_TICK: usize = 16;
+#[cfg(test)]
+pub const READ_BUDGET_BYTES: usize = READ_CAP as usize * MAX_READS_PER_TICK;
+
+pub fn drain_with(mut read: impl FnMut(u32) -> Vec<u8>) -> Vec<u8> {
+    let mut out = Vec::new();
+    for _ in 0..MAX_READS_PER_TICK {
+        let chunk = read(READ_CAP);
+        let full = chunk.len() >= READ_CAP as usize;
+        out.extend(chunk);
+        if !full {
+            break;
+        }
+    }
+    out
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Window {
@@ -104,6 +121,28 @@ mod tests {
         assert!((window.kbps - 500.0).abs() < 0.01, "{}", window.kbps);
         assert!(newest_segment_age(dir.path()).is_none());
         assert_eq!(read_window(&dir.path().join("nope")), None);
+    }
+
+    #[test]
+    fn a_tick_reads_at_most_the_budget_however_much_the_child_wrote() {
+        let mut calls = 0;
+
+        let bytes = drain_with(|cap| {
+            calls += 1;
+            vec![b'x'; cap as usize]
+        });
+
+        assert_eq!(calls, MAX_READS_PER_TICK);
+        assert_eq!(bytes.len(), MAX_READS_PER_TICK * READ_CAP as usize);
+    }
+
+    #[test]
+    fn a_short_read_ends_the_drain() {
+        let mut queue = vec![vec![b'a'; READ_CAP as usize], vec![b'b'; 10]];
+
+        let bytes = drain_with(|_| queue.remove(0));
+
+        assert_eq!(bytes.len(), READ_CAP as usize + 10);
     }
 
     #[test]

@@ -69,14 +69,11 @@ impl ProviderTrace {
         ProviderTrace { path, max_bytes: MAX_BYTES, sample_seconds: SAMPLE_SECONDS, last: None, last_at: 0.0 }
     }
 
+    #[cfg(test)]
     pub fn with_limits(mut self, max_bytes: u64, sample_seconds: f64) -> ProviderTrace {
         self.max_bytes = max_bytes;
         self.sample_seconds = sample_seconds;
         self
-    }
-
-    pub fn path(&self) -> &std::path::Path {
-        &self.path
     }
 
     pub fn record(&mut self, now: f64, record: &TraceRecord, trouble: bool) -> bool {
@@ -140,6 +137,22 @@ fn replay_step(policy: &mut FailoverPolicy, now: f64, record: &TraceRecord) -> O
         }
     }
     action
+}
+
+pub const MATCH_WITHIN: f64 = 15.0;
+
+pub fn divergence(replay: &[Replayed]) -> usize {
+    let mut replayed: Vec<(f64, Action)> = replay.iter().filter_map(|r| r.replayed.map(|a| (r.at, a))).collect();
+    let mut unmatched = 0;
+    for (at, action) in replay.iter().filter_map(|r| r.recorded.map(|a| (r.at, a))) {
+        match replayed.iter().position(|(when, what)| *what == action && (when - at).abs() <= MATCH_WITHIN) {
+            Some(found) => {
+                replayed.remove(found);
+            }
+            None => unmatched += 1,
+        }
+    }
+    unmatched + replayed.len()
 }
 
 pub fn replay<'a>(lines: impl IntoIterator<Item = &'a str>) -> Vec<Replayed> {
@@ -211,6 +224,18 @@ mod tests {
         assert_eq!(decided, [(1070.0, Action::Failover)]);
         let recorded: Vec<_> = replayed.iter().filter(|r| r.recorded.is_some()).map(|r| (r.at, r.recorded.unwrap())).collect();
         assert_eq!(recorded, [(1070.0, Action::Failover)]);
+    }
+
+    #[test]
+    fn a_decision_replayed_a_few_seconds_off_is_not_a_divergence_but_a_missing_one_is() {
+        let step = |at, replayed, recorded| Replayed { at, replayed, recorded };
+
+        let close = [step(1556.0, Some(Action::Failover), None), step(1558.1, None, Some(Action::Failover))];
+        let missing = [step(2000.0, None, Some(Action::Failback)), step(2100.0, Some(Action::BothDown), None)];
+
+        assert_eq!(divergence(&close), 0);
+        assert_eq!(divergence(&missing), 2);
+        assert_eq!(divergence(&[]), 0);
     }
 
     #[test]

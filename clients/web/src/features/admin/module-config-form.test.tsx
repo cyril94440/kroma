@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { I18nProvider } from '@kromatv/ui';
 import { createInputTestHost } from '@kromatv/ui/testing';
-import { cleanup, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ModuleConfigForm } from '#web/features/admin/module-config-form';
 
+const H = vi.hoisted(() => ({ adminApi: vi.fn() }));
+
 vi.mock('#web/shared/lib/web-runtime', () => ({
-  useWebRuntime: () => ({ moduleApi: { adminApi: vi.fn() } }),
+  useWebRuntime: () => ({ moduleApi: { adminApi: H.adminApi } }),
 }));
 
 const { render } = createInputTestHost();
@@ -63,4 +65,29 @@ it('renders a label no catalog knows exactly as the module wrote it', () => {
   show('en', [{ key: 'region', label: 'Preferred region', type: 'string' }]);
 
   expect(screen.getAllByText('Preferred region').length).toBeGreaterThan(0);
+});
+
+it('never renders a stored secret back, and an untouched secret is left out of the save', async () => {
+  const fields = [
+    { key: 'primaryUrl', label: 'Portal', type: 'string', secret: true },
+    { key: 'agent', label: 'Agent', type: 'string' },
+  ] as const;
+  const { container } = render(
+    <I18nProvider locale="en">
+      <ModuleConfigForm
+        moduleId="tv.kroma.live"
+        fields={[...fields]}
+        values={{ primaryUrl: 'http://portal/get.php?password=hunter2', agent: 'VLC' }}
+        onSaved={() => {}}
+      />
+    </I18nProvider>,
+  );
+
+  expect(container.innerHTML).not.toContain('hunter2');
+
+  fireEvent.click(screen.getByText('Save'));
+  await Promise.resolve();
+
+  const body = JSON.parse(H.adminApi.mock.calls.at(-1)?.[1].body as string);
+  expect(body).toEqual({ agent: 'VLC' });
 });

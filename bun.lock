@@ -559,6 +559,24 @@
         "react": "^19.3.0",
       },
     },
+    "modules/tv.kroma.sport": {
+      "name": "@kromatv/module-sport",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kromatv/client": "workspace:*",
+        "@kromatv/module-sdk": "workspace:*",
+        "@kromatv/ui": "workspace:*",
+        "@tanstack/react-query": "^5.104.5",
+        "zod": "^4.6.7",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "typescript": "^7.0.2",
+      },
+      "peerDependencies": {
+        "react": "^19.3.0",
+      },
+    },
     "modules/tv.kroma.torrents": {
       "name": "@kromatv/module-torrents",
       "version": "0.0.0",
@@ -1793,6 +1811,8 @@
     "@kromatv/module-roku": ["@kromatv/module-roku@workspace:modules/tv.kroma.roku"],
 
     "@kromatv/module-sdk": ["@kromatv/module-sdk@workspace:packages/module-sdk"],
+
+    "@kromatv/module-sport": ["@kromatv/module-sport@workspace:modules/tv.kroma.sport"],
 
     "@kromatv/module-torrents": ["@kromatv/module-torrents@workspace:modules/tv.kroma.torrents"],
 

@@ -137,4 +137,15 @@ describe('a file a module published', () => {
 
     expect(calls[0]?.path).toBe('/module/tv.kroma.live/status');
   });
+
+  it('sends a goodbye on the same mount without waiting for an answer', async () => {
+    const { client, calls } = recordingClient(() => ({ json: {} }));
+
+    client.modules.viewerApi(live).beacon('/presence/leave');
+    await Promise.resolve();
+
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      'POST /module/tv.kroma.live/presence/leave',
+    ]);
+  });
 });

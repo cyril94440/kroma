@@ -60,8 +60,10 @@ describe('clampMove', () => {
     expect(clampMove(-9000, range)).toBe(-5000);
   });
 
-  it('reverses a forward move when already past the safe zone, so the caller can see it', () => {
-    expect(clampMove(1000, { backMs: 5000, forwardMs: -1500 })).toBe(-1500);
+  it('forbids a forward move past the safe zone but never turns a backward one into a bigger jump', () => {
+    const past = { backMs: 5000, forwardMs: -1500 };
+    expect(clampMove(1000, past)).toBe(0);
+    expect(clampMove(-150, past)).toBe(-150);
   });
 
   it('trusts the move when the window is unknown', () => {

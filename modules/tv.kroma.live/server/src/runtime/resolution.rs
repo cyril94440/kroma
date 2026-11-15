@@ -88,6 +88,26 @@ impl Live {
         }
     }
 
+    pub(crate) async fn retag_step(&self) {
+        let channel = {
+            let mut inner = self.lock();
+            if !inner.retag || inner.phase != Phase::Running {
+                return;
+            }
+            inner.retag = false;
+            inner.current.clone()
+        };
+        let Some(channel) = channel else { return };
+        let Ok(_gate) = self.gate.try_lock() else {
+            self.lock().retag = true;
+            return;
+        };
+        self.stop_run().await;
+        if let Err(error) = self.start_run(&channel, true) {
+            tracing::warn!(error = %error, "relaunch for the hvc1 tag failed");
+        }
+    }
+
     fn start_resolution(&self) {
         let Some(playlist) = self.lock().run.as_ref().map(|run| self.folder_path(&run.folder).join(PLAYLIST_FILE)) else { return };
         let Ok(child) = Command::new(self.programs.ffprobe.clone()).args(probe_args(&playlist.to_string_lossy())).spawn() else { return };
@@ -138,7 +158,7 @@ mod tests {
     fn a_fractional_rate_keeps_two_decimals_and_an_unknown_one_is_left_out() {
         let json = |rate: &str| format!(r#"{{"streams":[{{"width":1280,"height":720,"avg_frame_rate":"{rate}","codec_name":"hevc","codec_tag_string":"hev1"}}]}}"#);
 
-        assert_eq!(parse_picture(&json("30000/1001")).unwrap().resolution, "1280x720@29.97");
+        assert_eq!(parse_picture(&json("51/2")).unwrap().resolution, "1280x720@25.50");
         assert_eq!(parse_picture(&json("0/0")).unwrap().resolution, "1280x720");
         assert_eq!(parse_picture(&json("1/1")).unwrap().resolution, "1280x720");
         assert_eq!(parse_picture(&json("50/1")).unwrap().codec, VideoCodec::Hevc);

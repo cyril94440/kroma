@@ -18,6 +18,11 @@ pub const MIN_SECONDS: u64 = 20;
 pub const MAX_SECONDS: u64 = 120;
 
 impl Live {
+    fn live_health(&self) -> LiveHealth {
+        let inner = self.lock();
+        LiveHealth { state: inner.health.state.as_str().to_string(), loss_60s: inner.health.recent_loss(), restarts: inner.restarts }
+    }
+
     pub(crate) fn stop_trial_marker(&self) {
         let mut inner = self.lock();
         if inner.tests_running > 0 {
@@ -79,12 +84,10 @@ impl Live {
             return;
         };
         let live = self.clone();
+        let at_decision = live.live_health();
         tokio::spawn(async move {
             let summary = live.trial(&target, TRIAL_SECONDS).await;
-            let live_health = {
-                let inner = live.lock();
-                LiveHealth { state: inner.health.state.as_str().to_string(), loss_60s: inner.health.recent_loss(), restarts: inner.restarts }
-            };
+            let live_health = at_decision.worst(&live.live_health());
             let thresholds = {
                 let settings = live.settings();
                 Thresholds { gap_seconds_per_minute: settings.trial_gap, ratio: settings.trial_ratio }

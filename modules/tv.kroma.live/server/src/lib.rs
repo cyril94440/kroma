@@ -6,6 +6,8 @@ extern crate kroma_sqlite_guest as rusqlite;
 
 mod catalogue;
 mod clipbuf;
+#[cfg(test)]
+mod clipbuf_tests;
 mod cmd;
 mod config;
 #[cfg(test)]
@@ -30,7 +32,19 @@ mod probe;
 mod providers;
 mod module;
 #[cfg(all(test, not(target_family = "wasm")))]
+mod it_clips;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_failover;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_frame;
+#[cfg(all(test, not(target_family = "wasm")))]
 mod it_live;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_ops;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_robust;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_scan;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_stream;
 #[cfg(all(test, not(target_family = "wasm")))]
@@ -41,6 +55,7 @@ mod routes;
 mod rules;
 mod runtime;
 mod status;
+mod scanframe;
 mod score;
 mod trial;
 

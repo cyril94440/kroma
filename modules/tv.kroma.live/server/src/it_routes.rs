@@ -23,6 +23,10 @@ fn user(id: &str, name: &str, admin: bool) -> kroma_module_sdk::domain::User {
     }
 }
 
+fn guest() -> kroma_module_sdk::domain::User {
+    kroma_module_sdk::domain::User { permissions: Vec::new(), ..user("u0", "Nobody", false) }
+}
+
 struct Api {
     app: axum::Router,
     rig: Rig,
@@ -30,7 +34,7 @@ struct Api {
 
 fn api(party: bool) -> Api {
     let rig = rig();
-    let mut host = rig.host.clone().with_session("ann", user("u1", "Ann", false)).with_session("bob", user("u2", "Bob", false)).with_session("root", user("u9", "Root", true));
+    let mut host = rig.host.clone().with_session("ann", user("u1", "Ann", false)).with_session("bob", user("u2", "Bob", false)).with_session("root", user("u9", "Root", true)).with_session("nobody", guest());
     host = host.with_service(rig.live.clone());
     if party {
         host = host.with_point("tv.kroma.party/room", None, "http://127.0.0.1:1", "t");
@@ -78,7 +82,7 @@ async fn the_status_has_a_stable_shape_when_nothing_has_ever_played() {
             "state": "paused", "channel": null, "provider": "primary", "onBackup": false, "now": null, "next": null, "viewers": [],
             "health": { "sourceKbps": 0.0, "stutter": false, "black": false, "frozen": false, "trouble": false, "state": "starting", "lossSeconds": 0.0 },
             "playlist": null, "startedAt": null, "restarts": 0, "standbyInSeconds": null, "lastError": null, "offAir": null,
-            "backupConfigured": true, "primaryDown": false
+            "backupConfigured": true, "primaryDown": false, "sourceResolution": ""
         })
     );
 }
@@ -171,4 +175,41 @@ async fn the_admin_routes_answer_history_metrics_overview_and_scan_state() {
     assert_eq!(scan["running"], false);
     assert_eq!(paused, StatusCode::OK);
     let _ = request("p:1");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn every_administration_route_refuses_a_viewer_who_may_only_watch() {
+    let api = api(false);
+
+    for (method, path) in [("POST", "/pause"), ("POST", "/resume"), ("POST", "/scan"), ("GET", "/scan"), ("POST", "/trial"), ("GET", "/history"), ("GET", "/metrics"), ("GET", "/overview"), ("POST", "/refresh"), ("GET", "/trace")] {
+        let (status, _) = call(&api, method, path, Some("ann"), Some(json!({}))).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{method} {path}");
+        let (status, _) = call(&api, method, path, Some("root"), Some(json!({}))).await;
+        assert_ne!(status, StatusCode::FORBIDDEN, "{method} {path} for an administrator");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_signed_in_user_without_the_playback_permission_cannot_watch() {
+    let api = api(false);
+
+    for (method, path) in [("GET", "/status"), ("GET", "/channels"), ("POST", "/presence"), ("POST", "/switch")] {
+        let (status, _) = call(&api, method, path, Some("nobody"), Some(json!({}))).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{method} {path}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_trace_and_the_overview_show_what_the_administrator_needs_to_read_a_failover_afterwards() {
+    let api = api(false);
+    load(&api.rig);
+
+    let (status, overview) = call(&api, "GET", "/overview", Some("root"), None).await;
+    let (_, trace) = call(&api, "GET", "/trace", Some("root"), None).await;
+
+    assert_eq!(status, StatusCode::OK);
+    let row = overview["coverage"].as_array().unwrap().iter().find(|r| r["favourite"] == "TF1").unwrap().clone();
+    assert_eq!((row["primary"].clone(), row["backup"][0].clone(), row["guide"].clone(), row["gap"].clone()), (json!("FR: TF1 FHD"), json!("FR: TF1 FHD"), json!(true), Value::Null));
+    assert!(overview["coverageAt"].as_i64().unwrap() > 0);
+    assert_eq!(trace, json!({ "records": [], "replay": [], "diverging": 0 }));
 }

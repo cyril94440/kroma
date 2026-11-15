@@ -45,6 +45,8 @@ impl Live for Live1 {
 
 pub struct App {
     pub router: Router,
+    pub user_routes: Router,
+    pub point_routes: Router,
     pub live: Arc<Live1>,
     pub party: Arc<Party>,
 }
@@ -74,8 +76,12 @@ pub fn app() -> App {
     let live = Arc::new(Live1::default());
     let ctx: Arc<dyn HostCtx> = Arc::new(host.clone());
     let party = Party::new(ctx, host.store().clone(), live.clone());
-    let router = crate::routes::<StubHost>(party.clone()).with_state(host);
-    App { router, live, party }
+    let user_routes = crate::routes::<StubHost>(party.clone()).with_state(host.clone());
+    let point_routes = crate::point_routes::<StubHost>(party.clone()).with_state(host.clone());
+    let router = crate::routes::<StubHost>(party.clone())
+        .merge(crate::point_routes::<StubHost>(party.clone()))
+        .with_state(host);
+    App { router, user_routes, point_routes, live, party }
 }
 
 impl App {

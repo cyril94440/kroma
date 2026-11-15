@@ -12,6 +12,8 @@ use crate::model::ProviderId;
 use crate::runtime::{now_ms, ScanState, SwitchOutcome};
 use crate::trial::TrialSummary;
 
+const TRACE_LINES: usize = 500;
+
 pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/pause", post(pause::<S>))
@@ -22,6 +24,7 @@ pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/metrics", get(metrics::<S>))
         .route("/overview", get(overview::<S>))
         .route("/refresh", post(refresh::<S>))
+        .route("/trace", get(trace::<S>))
 }
 
 async fn pause<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S>, AuthUser(user): AuthUser) -> Result<Json<serde_json::Value>, Response> {
@@ -129,6 +132,35 @@ struct OverviewAnswer {
     ffmpeg_https: bool,
     favourites: Vec<String>,
     standby_seconds: u64,
+    coverage: Vec<CoverageView>,
+    coverage_at: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CoverageView {
+    favourite: String,
+    primary: Option<String>,
+    backup: Vec<String>,
+    guide: bool,
+    gap: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TraceAnswer {
+    records: Vec<serde_json::Value>,
+    replay: Vec<crate::failover::trace::Replayed>,
+    diverging: usize,
+}
+
+async fn trace<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S>, AuthUser(user): AuthUser) -> Result<Json<TraceAnswer>, Response> {
+    admin_only(&host, &user)?;
+    let lines = live(&host)?.trace_lines(TRACE_LINES);
+    let replay = crate::failover::trace::replay(lines.iter().map(String::as_str));
+    let diverging = crate::failover::trace::divergence(&replay);
+    let records = lines.iter().filter_map(|line| serde_json::from_str(line).ok()).collect();
+    Ok(Json(TraceAnswer { records, replay, diverging }))
 }
 
 async fn overview<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S>, AuthUser(user): AuthUser) -> Result<Json<OverviewAnswer>, Response> {
@@ -144,7 +176,9 @@ async fn overview<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State
         .collect();
     let guide = db::epg_state(live.pool()).unwrap_or_default();
     let ffmpeg_https = live.ffmpeg_supports_https();
-    Ok(Json(OverviewAnswer { providers, guide_programmes: guide.programmes, guide_fetched_at: guide.fetched_at, guide_source: guide.source, guide_error: guide.error, ffmpeg_https, favourites: rules.favourites, standby_seconds: settings.standby_seconds }))
+    let state = live.coverage();
+    let coverage = state.rows.unwrap_or_default().into_iter().map(|row| CoverageView { gap: state.gaps.get(&row.favourite).map(|gap| gap.as_str()), favourite: row.favourite, primary: row.primary, backup: row.backup, guide: row.guide }).collect();
+    Ok(Json(OverviewAnswer { providers, guide_programmes: guide.programmes, guide_fetched_at: guide.fetched_at, guide_source: guide.source, guide_error: guide.error, ffmpeg_https, favourites: rules.favourites, standby_seconds: settings.standby_seconds, coverage, coverage_at: state.at }))
 }
 
 async fn refresh<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S>, AuthUser(user): AuthUser) -> Result<Json<serde_json::Value>, Response> {

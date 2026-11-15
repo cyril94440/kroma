@@ -18,9 +18,10 @@ pub fn point_routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/_port/tv.kroma.live/control/presence", post(presence::<S>))
         .route("/_port/tv.kroma.live/control/proposal", post(proposal::<S>))
         .route("/_port/tv.kroma.live/control/epg", post(epg::<S>))
+        .merge(super::points_ops::routes::<S>())
 }
 
-fn live_of<S: HostCtx>(host: &S) -> anyhow::Result<std::sync::Arc<Live>> {
+pub(super) fn live_of<S: HostCtx>(host: &S) -> anyhow::Result<std::sync::Arc<Live>> {
     kroma_module_sdk::host::service::<Live>(host).ok_or_else(|| anyhow::anyhow!("live is not running"))
 }
 
@@ -75,6 +76,7 @@ async fn status<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S
 struct ResolveCall {
     query: String,
     limit: u32,
+    provider: Option<ProviderId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
@@ -85,6 +87,9 @@ pub struct ResolvedChannel {
     pub group: String,
     pub score: f64,
     pub now: Option<Slot>,
+    pub provider: Option<ProviderId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event: Option<crate::norm::EventInfo>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
@@ -96,7 +101,7 @@ pub struct ResolveReply {
 async fn resolve<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S>, Json(call): Json<ResolveCall>) -> Json<Result<ResolveReply, String>> {
     let limit = if call.limit == 0 { 5 } else { call.limit as usize };
     Json(live_of(&host).map(|live| ResolveReply {
-        channels: live.resolve(&call.query, limit).into_iter().map(|c| ResolvedChannel { id: c.id, name: c.name, group: c.group, score: c.score, now: c.now }).collect(),
+        channels: live.resolve_in(&call.query, limit, call.provider).into_iter().map(|c| ResolvedChannel { id: c.id, name: c.name, group: c.group, score: c.score, now: c.now, provider: c.provider, event: c.event }).collect(),
     }).map_err(|e| e.to_string()))
 }
 

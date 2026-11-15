@@ -126,5 +126,7 @@
   "party.sync.fine.done": "Fine sync done: within {ms} ms",
   "party.sync.fine.budget": "Fine sync: within {ms} ms (time budget used up)",
   "party.sync.fine.outOfWindow": "Fine sync: within {ms} ms (target outside my window)",
-  "party.sync.fine.noMeasure": "Fine sync interrupted: no measurement available"
+  "party.sync.fine.noMeasure": "Fine sync interrupted: no measurement available",
+  "party.vote.providerOpened.switchProvider": "Proposal: switch to the other provider. Vote within {seconds} s.",
+  "party.vote.provider.switchProvider": "switch to the other provider"
 }

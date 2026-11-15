@@ -3,7 +3,7 @@
   "schemaVersion": 3,
   "id": "tv.kroma.live",
   "name": "Live TV",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Live television from an IPTV provider restreamed to everyone at home over one connection, with standby when nobody watches, off-air detection and an automatic backup provider.",
   "engines": {
     "server": ">=0.1.39"
@@ -14,7 +14,7 @@
   "definesPoints": [
     {
       "name": "control",
-      "methods": ["status", "resolve", "switch", "presence", "proposal", "epg"]
+      "methods": ["status", "resolve", "switch", "presence", "proposal", "epg", "snapshot", "clipCut", "clipBufferInfo", "restart", "switchProvider", "probe", "benchmark", "scanResult", "history"]
     }
   ],
   "contributes": [
@@ -26,6 +26,56 @@
     {
       "point": "tv.kroma.party/room",
       "optional": true
+    }
+  ],
+  "notifications": [
+    {
+      "type": "tv.kroma.live/failover",
+      "category": "system",
+      "push": false,
+      "labelKey": "notifications.failover.label",
+      "titleKey": "notifications.failover.title",
+      "bodyKey": "notifications.failover.body"
+    },
+    {
+      "type": "tv.kroma.live/failback",
+      "category": "system",
+      "push": false,
+      "labelKey": "notifications.failback.label",
+      "titleKey": "notifications.failback.title",
+      "bodyKey": "notifications.failback.body"
+    },
+    {
+      "type": "tv.kroma.live/both-down",
+      "category": "system",
+      "push": false,
+      "labelKey": "notifications.bothDown.label",
+      "titleKey": "notifications.bothDown.title",
+      "bodyKey": "notifications.bothDown.body"
+    },
+    {
+      "type": "tv.kroma.live/recovered",
+      "category": "system",
+      "push": false,
+      "labelKey": "notifications.recovered.label",
+      "titleKey": "notifications.recovered.title",
+      "bodyKey": "notifications.recovered.body"
+    },
+    {
+      "type": "tv.kroma.live/channel-down",
+      "category": "system",
+      "push": false,
+      "labelKey": "notifications.channelDown.label",
+      "titleKey": "notifications.channelDown.title",
+      "bodyKey": "notifications.channelDown.body"
+    },
+    {
+      "type": "tv.kroma.live/coverage-gap",
+      "category": "system",
+      "push": false,
+      "labelKey": "notifications.coverageGap.label",
+      "titleKey": "notifications.coverageGap.title",
+      "bodyKey": "notifications.coverageGap.body"
     }
   ],
   "config": [
@@ -56,6 +106,7 @@
     { "key": "foreignPenalty", "label": "config.foreignPenalty", "type": "number", "default": "8" },
     { "key": "foreignCodes", "label": "config.foreignCodes", "type": "string", "default": "be,uk,gb,us,ca,de,at,ch,lu,nl,it,es,pt,pl,ar,tr,gr,se,no,dk,fi,cz,sk,hu,ro,bg,ru,ua,br,mx,in,qa,sa,ae,ma,dz,tn,eg,il,ir,hr,rs,si,ba,mk,al,lt,lv,ee,af,now,prime,sr,srb,ex,yu,exyu,cro,bih,mne,za,pk,iq,chile,au,nz,ie,jp,kr,cn,hk,th,vn,ph,ng,ke,lb,jo,kw,cl,co,pe,ve,uy,latam,arab" },
     { "key": "variantWeights", "label": "config.variantWeights", "type": "string", "default": "raw:5,vip:2,fhd:0.6,hd:0.4,exact:5" },
+    { "key": "canaries", "label": "config.canaries", "type": "string", "default": "" },
     { "key": "favourites", "label": "config.favourites", "type": "string", "default": "Canal+ VIP RAW,TF1,France 2,M6,L'Équipe,beIN Sports 1" }
   ],
   "component": {

@@ -117,6 +117,21 @@ pub struct LiveHealth {
     pub restarts: u32,
 }
 
+fn rank(state: &str) -> u8 {
+    match state {
+        "severe" => 2,
+        "degraded" => 1,
+        _ => 0,
+    }
+}
+
+impl LiveHealth {
+    pub fn worst(&self, other: &LiveHealth) -> LiveHealth {
+        let state = if rank(&self.state) >= rank(&other.state) { &self.state } else { &other.state };
+        LiveHealth { state: state.clone(), loss_60s: self.loss_60s.max(other.loss_60s), restarts: self.restarts.max(other.restarts) }
+    }
+}
+
 pub struct Thresholds {
     pub gap_seconds_per_minute: f64,
     pub ratio: f64,
@@ -258,5 +273,16 @@ mod tests {
 
         assert!(quiet.outcome == Outcome::Impossible && quiet.nothing_to_compare);
         assert_eq!(verdict(&degraded(), &summarize(&flowing(30), &[], false), &Thresholds::default()).outcome, Outcome::Impossible);
+    }
+
+    #[test]
+    fn the_worst_of_the_health_at_the_decision_and_at_the_end_is_what_the_verdict_sees() {
+        let at_decision = LiveHealth { state: "severe".into(), loss_60s: 12.0, restarts: 0 };
+        let at_end = LiveHealth { state: "healthy".into(), loss_60s: 0.0, restarts: 2 };
+
+        let worst = at_decision.worst(&at_end);
+
+        assert_eq!((worst.state.as_str(), worst.loss_60s, worst.restarts), ("severe", 12.0, 2));
+        assert_eq!(at_end.worst(&at_end).state, "healthy");
     }
 }

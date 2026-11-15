@@ -1,0 +1,43 @@
+import { describe, expect, it } from 'vitest';
+import { clipUrl, clipVisible } from './clip-url';
+import type { Clip } from './schemas';
+
+const clip: Clip = {
+  id: 'g1',
+  match_id: 'm',
+  dom: 'A',
+  ext: 'B',
+  competition: 'L1',
+  minute: "9'",
+  equipe: 'dom',
+  buteur: 'X',
+  score: '1-0',
+  debut_ms: 1000,
+  fin_ms: 2000,
+  duree_s: 110,
+  ts: 5000,
+  file: { module: 'tv.kroma.live', path: 'clips/g1.mp4' },
+};
+
+describe('clipUrl', () => {
+  it('points at the live module folder with the account ticket of the own url', () => {
+    const own = (path: string) => `https://h/api/module-files/tv.kroma.sport/${path}?t=abc`;
+
+    expect(clipUrl(own, clip.file, 'tv.kroma.sport')).toBe(
+      'https://h/api/module-files/tv.kroma.live/clips/g1.mp4?t=abc',
+    );
+  });
+});
+
+describe('clipVisible', () => {
+  it('waits for the frame on screen to pass the end of the clip', () => {
+    expect([clipVisible(clip, 1999, 9e12), clipVisible(clip, 2000, 0)]).toEqual([false, true]);
+  });
+
+  it('falls back to three minutes after the cut without a frame time', () => {
+    expect([
+      clipVisible(clip, null, 5000 + 179_999),
+      clipVisible(clip, null, 5000 + 180_000),
+    ]).toEqual([false, true]);
+  });
+});

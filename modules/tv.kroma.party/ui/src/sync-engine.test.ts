@@ -93,13 +93,13 @@ describe('the beat', () => {
 
 describe('simulation: the group steers, the clients move only when truly drifting', () => {
   it('a hiccup both players share moves nobody', async () => {
-    const p = party({ A: 6, B: 6.2 });
+    const p = party({ A: 6, B: 6.2 }, 1);
     await run(120, p.server, p.clients, {
       60: () => p.clients.forEach((c) => (c.player.latency += 3)),
     });
 
     expect(p.server.recalibrations).toEqual([]);
-    expect(p.clients.every((c) => c.player.seeks.length === 0)).toBe(true);
+    expect(p.clients.every((c) => c.player.seeks.every((s) => Math.abs(s) <= 500))).toBe(true);
   });
 
   it('a return to live shared by the group sends nobody back', async () => {
@@ -246,13 +246,15 @@ describe('recalibration', () => {
     await settle(p, 20);
     const b = p.clients[1]!;
     b.player.edge = -50;
-    for (let i = 0; i < 3; i += 1) {
+    const drift = async (seconds: number) => {
       b.player.latency += 9;
       b.engine.graceAfterRestart();
-      await run(i === 0 ? 30 : 45, p.server, p.clients);
-    }
+      await run(seconds, p.server, p.clients);
+      return b.player.seeks.length;
+    };
 
-    expect(b.player.seeks.length).toBeLessThanOrEqual(2);
+    const counts = [await drift(30), await drift(30), await drift(8), await drift(15)];
+    expect(counts).toEqual([1, 2, 2, 3]);
   });
 });
 

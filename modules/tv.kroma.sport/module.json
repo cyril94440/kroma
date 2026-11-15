@@ -1,0 +1,136 @@
+{
+  "$schema": "https://modules.kroma.tv/schemas/3/manifest.json",
+  "schemaVersion": 3,
+  "id": "tv.kroma.sport",
+  "name": "Sport",
+  "version": "0.1.0",
+  "description": "Live sport for the family television: which matches are on and where, a live match panel with line-ups and stats shown only when your own picture has caught up, predictions with a season leaderboard, standings, cards for the chat and goal clips.",
+  "engines": {
+    "server": ">=0.1.39"
+  },
+  "dependencies": {
+    "tv.kroma.live": ">=0.1.0"
+  },
+  "feRemote": {
+    "module": "./remoteEntry.js"
+  },
+  "contributes": [
+    {
+      "point": "tv.kroma.hermes/tools"
+    }
+  ],
+  "consumes": [
+    { "point": "tv.kroma.live/control" },
+    { "point": "tv.kroma.party/room", "optional": true }
+  ],
+  "config": [
+    { "key": "enabled", "label": "config.enabled", "type": "bool", "default": "true" },
+    {
+      "key": "competitions",
+      "label": "config.competitions",
+      "type": "string",
+      "default": "fra.1,uefa.champions,fra.coupe_de_france,uefa.europa,uefa.nations,fifa.worldq.uefa,eng.1,esp.1,ita.1,ger.1,uefa.europa.conf,fra.2"
+    },
+    { "key": "includeTennis", "label": "config.includeTennis", "type": "bool", "default": "true" },
+    {
+      "key": "includeFormulaOne",
+      "label": "config.includeFormulaOne",
+      "type": "bool",
+      "default": "true"
+    },
+    { "key": "includeGolf", "label": "config.includeGolf", "type": "bool", "default": "true" },
+    {
+      "key": "pollLiveSeconds",
+      "label": "config.pollLiveSeconds",
+      "type": "number",
+      "default": "45"
+    },
+    {
+      "key": "pollKickoffSeconds",
+      "label": "config.pollKickoffSeconds",
+      "type": "number",
+      "default": "90"
+    },
+    {
+      "key": "pollQuietSeconds",
+      "label": "config.pollQuietSeconds",
+      "type": "number",
+      "default": "300"
+    },
+    {
+      "key": "pollIdleSeconds",
+      "label": "config.pollIdleSeconds",
+      "type": "number",
+      "default": "900"
+    },
+    {
+      "key": "matchPollSeconds",
+      "label": "config.matchPollSeconds",
+      "type": "number",
+      "default": "20"
+    },
+    {
+      "key": "detectionSeconds",
+      "label": "config.detectionSeconds",
+      "type": "number",
+      "default": "30"
+    },
+    {
+      "key": "spoilerDelaySeconds",
+      "label": "config.spoilerDelaySeconds",
+      "type": "number",
+      "default": "60"
+    },
+    {
+      "key": "spoilerMarginSeconds",
+      "label": "config.spoilerMarginSeconds",
+      "type": "number",
+      "default": "15"
+    },
+    {
+      "key": "revealMarginSeconds",
+      "label": "config.revealMarginSeconds",
+      "type": "number",
+      "default": "8"
+    },
+    { "key": "pronoEnabled", "label": "config.pronoEnabled", "type": "bool", "default": "true" },
+    {
+      "key": "goalAnnouncements",
+      "label": "config.goalAnnouncements",
+      "type": "bool",
+      "default": "true"
+    },
+    { "key": "clipsEnabled", "label": "config.clipsEnabled", "type": "bool", "default": "true" },
+    {
+      "key": "clipRetentionDays",
+      "label": "config.clipRetentionDays",
+      "type": "number",
+      "default": "45"
+    },
+    {
+      "key": "homeCountries",
+      "label": "config.homeCountries",
+      "type": "string",
+      "default": "fr,fra,france"
+    },
+    {
+      "key": "announceLanguage",
+      "label": "config.announceLanguage",
+      "type": "select",
+      "default": "fr",
+      "options": ["fr", "en"]
+    },
+    {
+      "key": "espnBaseUrl",
+      "label": "config.espnBaseUrl",
+      "type": "string",
+      "default": "https://site.api.espn.com"
+    }
+  ],
+  "storage": {},
+  "permissions": {
+    "net": {
+      "connect": [{ "purpose": "espn", "to": ["site.api.espn.com"], "ports": [443] }]
+    }
+  }
+}

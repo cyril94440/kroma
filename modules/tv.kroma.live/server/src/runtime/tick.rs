@@ -31,11 +31,14 @@ impl Live {
     pub async fn boot(&self) {
         let _ = std::fs::create_dir_all(self.public_dir());
         self.clear_public_except(None);
+        self.forget_buffer();
+        self.purge_clips();
         self.lock().presence.start_idle(now_ms());
         let settings = self.settings();
         if self.providers.catalogue(crate::model::ProviderId::Primary).is_empty() && !settings.primary_url.is_empty() {
             let _ = self.refresh_catalogues();
         }
+        self.recheck_coverage();
         let saved: SavedCurrent = db::kv_get_json(&self.pool, KV_CURRENT).unwrap_or_default();
         let channel = self.providers.find_by_ref(&saved.reference);
         let Some(channel) = channel else { return };
@@ -52,19 +55,25 @@ impl Live {
             }
         }
         self.publish_status();
+        self.publish_channel();
     }
 
     pub fn refresh_catalogues(&self) -> Vec<(crate::model::ProviderId, Result<usize, String>)> {
         let (settings, rules, now) = (self.settings(), self.rules(), now_ms());
-        [crate::model::ProviderId::Primary, crate::model::ProviderId::Backup]
+        let results = [crate::model::ProviderId::Primary, crate::model::ProviderId::Backup]
             .into_iter()
             .filter(|p| !settings.url_of(*p).is_empty())
             .map(|p| (p, self.providers.refresh(p, &settings, &rules, now).map_err(|e| e.to_string())))
-            .collect()
+            .collect();
+        self.recheck_coverage();
+        results
     }
 
     pub(crate) async fn tick(self: &Arc<Self>) {
         self.read_run();
+        self.buffer_step();
+        self.resolution_step();
+        self.retag_step().await;
         self.restart_if_due();
         self.check_media();
         self.decay_restarts();
@@ -83,7 +92,7 @@ impl Live {
     fn read_run(&self) {
         let mut inner = self.lock();
         let Some(run) = inner.run.as_mut() else { return };
-        let stdout = run.child.read_stdout(1 << 16);
+        let stdout = media::drain_with(|cap| run.child.read_stdout(cap));
         let stderr = run.child.read_stderr(1 << 16);
         let exited = run.child.try_wait().ok().flatten();
         let mut carry = std::mem::take(&mut run.carry);
@@ -154,6 +163,7 @@ impl Live {
         let window = media::read_window(&folder);
         let stale = media::newest_segment_age(&folder).is_none_or(|age| age > STALE_AFTER);
         let ready = window.is_some_and(|w| w.segments > 0);
+        let became_ready = ready && !inner.ready;
         inner.kbps = if ready && !stale { window.map_or(0.0, |w| w.kbps) } else { 0.0 };
         if ready && !inner.ready {
             inner.ready = true;
@@ -167,6 +177,10 @@ impl Live {
                     }
                 }
             }
+        }
+        drop(inner);
+        if became_ready {
+            self.publish_channel();
         }
     }
 

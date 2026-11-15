@@ -9,12 +9,15 @@ import { StatusBadges } from './status-badges';
 import { useLive, useNow } from './use-live';
 import { ViewersPanel } from './viewers-panel';
 
+const HIDDEN = { display: 'none' } as const;
+
 export default function LivePage() {
   const t = useT();
   const { api, status, failed, refresh } = useLive(true);
   const clock = useNow(5000);
   const [handle, setHandle] = useState<PlayerHandle | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [immersive, setImmersive] = useState(false);
   const hasAside = useSlotFilled('tv.kroma.live/player.aside');
   if (!status) return failed ? <ModuleFailed /> : <ModuleLoading panels={2} />;
   const url = status.playlist ? api.fileUrl(status.playlist) : null;
@@ -36,6 +39,7 @@ export default function LivePage() {
               channel={channel}
               onHandle={setHandle}
               onPlaying={setPlaying}
+              onImmersive={setImmersive}
             />
           ) : (
             <Callout.Root>
@@ -61,7 +65,7 @@ export default function LivePage() {
         </Box>
         <Box flex minW={280} style={{ flexBasis: 320 }}>
           {handle && hasAside ? (
-            <Box mb={20}>
+            <Box mb={20} style={immersive ? HIDDEN : undefined}>
               <ModuleSlot
                 name="tv.kroma.live/player.aside"
                 player={handle}

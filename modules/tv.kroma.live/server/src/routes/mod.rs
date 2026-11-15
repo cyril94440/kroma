@@ -1,5 +1,6 @@
 mod admin;
 mod points;
+mod points_ops;
 mod viewer;
 
 use std::sync::Arc;
@@ -21,10 +22,17 @@ pub(crate) fn live<S: HostCtx>(host: &S) -> Result<Arc<Live>, Response> {
     service::<Live>(host).ok_or_else(|| kroma_module_sdk::host::json_error(axum::http::StatusCode::SERVICE_UNAVAILABLE, "live is not running"))
 }
 
+fn permitted<S: HostCtx>(host: &S, user: &User, permission: Permission) -> Result<(), Response> {
+    if !user.can(permission) {
+        return Err(kroma_module_sdk::host::json_error(axum::http::StatusCode::FORBIDDEN, "forbidden"));
+    }
+    host.require(user, permission)
+}
+
 pub(crate) fn watcher<S: HostCtx>(host: &S, user: &User) -> Result<(), Response> {
-    host.require(user, Permission::Playback)
+    permitted(host, user, Permission::Playback)
 }
 
 pub(crate) fn admin_only<S: HostCtx>(host: &S, user: &User) -> Result<(), Response> {
-    host.require(user, Permission::SettingsManage)
+    permitted(host, user, Permission::SettingsManage)
 }

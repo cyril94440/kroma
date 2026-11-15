@@ -126,5 +126,7 @@
   "party.sync.fine.done": "Synchro fine réussie : à {ms} ms près",
   "party.sync.fine.budget": "Synchro fine : à {ms} ms près (budget de temps épuisé)",
   "party.sync.fine.outOfWindow": "Synchro fine : à {ms} ms près (cible hors de ma fenêtre)",
-  "party.sync.fine.noMeasure": "Synchro fine interrompue : aucune mesure disponible"
+  "party.sync.fine.noMeasure": "Synchro fine interrompue : aucune mesure disponible",
+  "party.vote.providerOpened.switchProvider": "Proposition : passer à l'autre fournisseur. Votez dans les {seconds} s.",
+  "party.vote.provider.switchProvider": "passer à l'autre fournisseur"
 }

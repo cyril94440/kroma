@@ -1,4 +1,4 @@
-import { type KromaHost, ModuleFailed, ModuleLoading, useT } from '@kromatv/module-sdk';
+import { ModuleFailed, ModuleLoading, useT } from '@kromatv/module-sdk';
 import { Box, PageHeader } from '@kromatv/ui/kit';
 import { AuditPanel } from './audit-panel';
 import { MemoryPanel } from './memory-panel';
@@ -7,9 +7,9 @@ import { RulesPanel } from './rules-panel';
 import { StatusPanel } from './status-panel';
 import { useHermes } from './use-hermes';
 
-export default function HermesPage({ host }: Readonly<{ host: KromaHost }>) {
+export default function HermesPage() {
   const t = useT();
-  const { api, status, failed, load } = useHermes(host);
+  const { api, status, failed, load } = useHermes();
   if (!status) return failed ? <ModuleFailed /> : <ModuleLoading panels={3} />;
   return (
     <>

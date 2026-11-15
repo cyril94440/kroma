@@ -9,7 +9,7 @@ use serde_json::Value;
 use kroma_module_sdk::host::{port_reply, HostCtx};
 
 use crate::model::{Person, RoomMessage};
-use crate::party::{Party, Request};
+use crate::party::{Actor, Party, Request};
 
 pub const ROOM: &str = "tv.kroma.party/room";
 
@@ -47,6 +47,7 @@ pub struct SwitchRequest {
     pub channel_name: Option<String>,
     pub requested_by: String,
     pub reason: String,
+    pub force: bool,
 }
 
 #[derive(Serialize)]
@@ -100,6 +101,30 @@ pub struct KickReply {
 }
 
 #[derive(Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncActionRequest {
+    pub requested_by: String,
+}
+
+#[derive(Serialize)]
+pub struct GoLiveReply {
+    pub members: usize,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ClientLogsRequest {
+    pub user_id: Option<String>,
+    pub limit: Option<u32>,
+    pub minutes: Option<i64>,
+}
+
+#[derive(Serialize)]
+pub struct ClientLogsReply {
+    pub events: Vec<crate::store::LogEntry>,
+}
+
+#[derive(Deserialize, Default)]
 #[serde(default)]
 pub struct ActivityRequest {
     pub status: Option<String>,
@@ -127,6 +152,9 @@ where
         .route(&point("votePoll"), post(vote_poll::<S>))
         .route(&point("kick"), post(kick::<S>))
         .route(&point("activity"), post(activity::<S>))
+        .route(&point("goLive"), post(go_live::<S>))
+        .route(&point("fineSync"), post(fine_sync::<S>))
+        .route(&point("clientLogs"), post(client_logs::<S>))
 }
 
 fn viewer(party: &Party, user_id: &str) -> Option<Person> {
@@ -171,12 +199,13 @@ async fn request_switch<S: HostCtx + Clone>(
 ) -> Json<Result<SwitchReply, String>> {
     port_reply(move || {
         let requester = viewer(&party, &req.requested_by);
+        let force = req.force && party.may_bypass(&Actor { person: Person::new(&req.requested_by, ""), admin: false });
         let result = party.request_switch(Request {
             channel_id: &req.channel_id,
             channel_name: req.channel_name.as_deref(),
             requester,
             note: &req.reason,
-            force: false,
+            force,
         });
         Ok(SwitchReply { outcome: result.outcome, vote_id: result.vote_id, reason: result.reason })
     })
@@ -245,6 +274,42 @@ async fn activity<S: HostCtx + Clone>(
     port_reply(move || {
         party.set_activity(req.status.as_deref());
         Ok(Done { ok: true })
+    })
+    .await
+}
+
+async fn go_live<S: HostCtx + Clone>(
+    State(_): State<S>,
+    Extension(party): Extension<Arc<Party>>,
+    Json(req): Json<SyncActionRequest>,
+) -> Json<Result<GoLiveReply, String>> {
+    port_reply(move || {
+        let by = if req.requested_by.is_empty() { "agent" } else { &req.requested_by };
+        party.sync_go_live(by).map(|members| GoLiveReply { members }).map_err(|e| anyhow::anyhow!(e))
+    })
+    .await
+}
+
+async fn fine_sync<S: HostCtx + Clone>(
+    State(_): State<S>,
+    Extension(party): Extension<Arc<Party>>,
+    Json(req): Json<SyncActionRequest>,
+) -> Json<Result<Done, String>> {
+    port_reply(move || {
+        let by = if req.requested_by.is_empty() { "agent" } else { &req.requested_by };
+        party.sync_fine_sync(by).map(|()| Done { ok: true }).map_err(|e| anyhow::anyhow!(e))
+    })
+    .await
+}
+
+async fn client_logs<S: HostCtx + Clone>(
+    State(_): State<S>,
+    Extension(party): Extension<Arc<Party>>,
+    Json(req): Json<ClientLogsRequest>,
+) -> Json<Result<ClientLogsReply, String>> {
+    port_reply(move || {
+        let events = party.read_logs(req.minutes.unwrap_or(30), req.user_id.as_deref(), None, req.limit.unwrap_or(120));
+        Ok(ClientLogsReply { events })
     })
     .await
 }

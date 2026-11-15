@@ -63,6 +63,10 @@ struct Format {
     duration: Option<serde_json::Value>,
 }
 
+pub fn local_args(playlist: &str) -> Vec<String> {
+    ["-v", "error", "-allowed_extensions", "ALL", "-print_format", "json", "-show_streams", "-show_format", playlist].map(String::from).to_vec()
+}
+
 pub fn quick_args(url: &str, user_agent: &str) -> Vec<String> {
     ["-v", "error", "-user_agent", user_agent, "-print_format", "json", "-show_streams", "-show_format", url].map(String::from).to_vec()
 }
@@ -100,7 +104,7 @@ impl Live {
             Err(error) => return Probed::failed(redact(&error.to_string())),
         };
         self.lock().tests_running += 1;
-        let probed = self.run_quick(&source.url, source.user_agent.as_deref().unwrap_or("")).await;
+        let probed = self.run_probe(quick_args(&source.url, source.user_agent.as_deref().unwrap_or(""))).await;
         {
             let mut inner = self.lock();
             inner.tests_running = inner.tests_running.saturating_sub(1);
@@ -111,8 +115,8 @@ impl Live {
         probed
     }
 
-    async fn run_quick(&self, url: &str, user_agent: &str) -> Probed {
-        let spawned = Command::new(self.programs.ffprobe.clone()).args(quick_args(url, user_agent)).spawn();
+    pub(crate) async fn run_probe(&self, args: Vec<String>) -> Probed {
+        let spawned = Command::new(self.programs.ffprobe.clone()).args(args).spawn();
         let child = match spawned {
             Ok(child) => child,
             Err(error) => return Probed::failed(redact(&error)),

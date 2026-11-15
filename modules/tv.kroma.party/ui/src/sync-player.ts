@@ -47,5 +47,6 @@ export const OverlayProps = AsideProps.pick({ channel: true, playing: true }).ex
 
 export function clampMove(deltaMs: number, range: MoveRange | null): number {
   if (!range) return deltaMs;
-  return Math.max(-range.backMs, Math.min(deltaMs, range.forwardMs));
+  if (deltaMs >= 0) return Math.min(deltaMs, Math.max(range.forwardMs, 0));
+  return Math.max(deltaMs, -Math.max(range.backMs, 0));
 }

@@ -135,7 +135,7 @@ impl Party {
     pub fn on_proposal(&self, payload: &Value) {
         let id = payload["id"].as_str().unwrap_or_default().to_string();
         let kind = payload["kind"].as_str().unwrap_or_default().to_string();
-        if id.is_empty() || !matches!(kind.as_str(), "switchToBackup" | "returnToPrimary") {
+        if id.is_empty() || !matches!(kind.as_str(), "switchToBackup" | "returnToPrimary" | "switchProvider") {
             return;
         }
         {
@@ -179,7 +179,11 @@ impl Party {
             }
             return;
         }
-        let key = if kind == "switchToBackup" { "party.vote.providerOpened.switchToBackup" } else { "party.vote.providerOpened.returnToPrimary" };
+        let key = match kind.as_str() {
+            "switchToBackup" => "party.vote.providerOpened.switchToBackup",
+            "switchProvider" => "party.vote.providerOpened.switchProvider",
+            _ => "party.vote.providerOpened.returnToPrimary",
+        };
         let seconds = self.vote_seconds().to_string();
         self.system_message(&mut st, key, &[("seconds", &seconds)], None);
         self.publish_vote(&mut st);

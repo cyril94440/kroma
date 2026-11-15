@@ -27,7 +27,14 @@ type ConfigValue = string | number | boolean;
 const CONTROL_WIDTH = 160;
 const sDefinition = styles({ select: { width: CONTROL_WIDTH } });
 
+const KEPT_SECRET = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+
+function hasStoredSecret(field: ConfigField, stored: unknown): boolean {
+  return field.secret === true && typeof stored === 'string' && stored !== '';
+}
+
 function initial(field: ConfigField, stored: unknown): ConfigValue {
+  if (field.secret) return '';
   const raw = stored ?? field.default;
   switch (field.type) {
     case 'bool':
@@ -72,7 +79,13 @@ export function ModuleConfigForm({
     try {
       await webRuntime.moduleApi.adminApi(`/modules/${encodeURIComponent(moduleId)}/config`, {
         method: 'PUT',
-        body: JSON.stringify(draft),
+        body: JSON.stringify(
+          Object.fromEntries(
+            Object.entries(draft).filter(
+              ([key, value]) => value !== '' || !fields.find((f) => f.key === key)?.secret,
+            ),
+          ),
+        ),
       });
       onSaved();
     } finally {
@@ -92,6 +105,7 @@ export function ModuleConfigForm({
               key={f.key}
               field={f}
               value={draft[f.key]}
+              keeps={hasStoredSecret(f, values[f.key])}
               words={words}
               onChange={(v) => set(f.key, v)}
             />
@@ -115,16 +129,20 @@ export function ModuleConfigForm({
 function ConfigRow({
   field,
   value,
+  keeps,
   words,
   onChange,
 }: Readonly<{
   field: ConfigField;
   value: ConfigValue | undefined;
+  keeps: boolean;
   words: (text: string) => string;
   onChange: (v: ConfigValue) => void;
 }>) {
   const s = useStyles(sDefinition);
   const label = words(field.label);
+  const hint = field.placeholder ? words(field.placeholder) : undefined;
+  const placeholder = keeps ? KEPT_SECRET : hint;
 
   let control: ReactNode;
   if (field.type === 'bool') {
@@ -152,7 +170,7 @@ function ConfigRow({
       <Field.Root label={label} hideLabel w={CONTROL_WIDTH}>
         <Field.Input
           type={field.secret ? 'password' : 'text'}
-          placeholder={field.placeholder ? words(field.placeholder) : undefined}
+          placeholder={placeholder}
           value={String(value ?? '')}
           onValueChange={onChange}
         />

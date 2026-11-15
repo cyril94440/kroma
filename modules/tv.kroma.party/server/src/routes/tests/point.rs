@@ -82,3 +82,58 @@ fn the_manifest_declares_exactly_the_methods_the_point_answers() {
     assert_eq!(manifest["consumes"][0]["point"], "tv.kroma.live/control");
     assert_eq!(manifest["contributes"][0]["point"], "tv.kroma.party/room");
 }
+
+#[tokio::test]
+async fn go_live_and_fine_sync_answer_like_the_admin_routes() {
+    let app = app();
+    let none = app.port("goLive", json!({ "requestedBy": "cyril" })).await;
+    assert_eq!(none["Err"], "noActiveParty");
+    let (code, _) = app.post("/sync/beat", "mamie", json!({ "delay": 3.0 })).await;
+    assert_eq!(code, axum::http::StatusCode::OK);
+    let (_, _) = app.post("/sync/beat", "papi", json!({ "delay": 5.0 })).await;
+    let fine = app.port("fineSync", json!({ "requestedBy": "cyril" })).await;
+    assert_eq!(fine["Ok"], json!({ "ok": true }));
+    let live = app.port("goLive", json!({ "requestedBy": "cyril" })).await;
+    assert_eq!(live["Ok"], json!({ "members": 2 }));
+}
+
+#[tokio::test]
+async fn fine_sync_needs_two_measurable_members() {
+    let app = app();
+    let (_, _) = app.post("/sync/beat", "mamie", json!({ "delay": 3.0 })).await;
+    let fine = app.port("fineSync", json!({})).await;
+    assert_eq!(fine["Err"], "needTwoMembers");
+}
+
+#[tokio::test]
+async fn client_logs_return_the_entries_the_admin_route_returns() {
+    let app = app();
+    let (code, _) = app
+        .post("/clientlog", "mamie", json!({ "events": [{ "category": "sync", "event": "recalage", "data": { "gap": 2 } }] }))
+        .await;
+    assert_eq!(code, axum::http::StatusCode::OK);
+    let logs = app.port("clientLogs", json!({ "userId": null, "limit": 10 })).await;
+    let admin = app.get("/clientlog?limit=10", "cyril").await.1;
+    assert_eq!(logs["Ok"]["events"], admin["events"]);
+    let mine = app.port("clientLogs", json!({ "userId": "mamie", "limit": 10 })).await;
+    assert_eq!(mine["Ok"]["events"][0]["event"], "recalage");
+    let other = app.port("clientLogs", json!({ "userId": "papi", "limit": 10 })).await;
+    assert_eq!(other["Ok"]["events"], json!([]));
+}
+
+#[tokio::test]
+async fn force_is_honoured_only_for_a_bypass_user_and_otherwise_asks_for_a_vote() {
+    let app = app();
+    app.watching(&["mamie", "papi"]);
+    let denied = app.port("requestSwitch", json!({ "channelId": "m6", "requestedBy": "mamie", "reason": "", "force": true })).await;
+    assert_eq!(denied["Ok"]["outcome"], "voteStarted");
+}
+
+#[tokio::test]
+async fn a_request_names_the_channel_it_was_given_when_live_cannot_resolve_the_id() {
+    let app = app();
+    app.watching(&["mamie", "papi"]);
+    app.port("requestSwitch", json!({ "channelId": "p:3", "channelName": "TF1", "requestedBy": "mamie", "reason": "" })).await;
+    let (_, state) = app.get("/state", "papi").await;
+    assert_eq!(state["vote"]["label"], "TF1");
+}

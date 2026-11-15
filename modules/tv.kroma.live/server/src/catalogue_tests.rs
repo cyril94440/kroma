@@ -239,3 +239,36 @@ fn references_name_a_provider_and_a_stream() {
         assert_eq!(parse_ref(bad), None, "{bad}");
     }
 }
+
+const LOSC_PPV: &str = "Live | LOSC vs. RC Lens sur Ligue 1+ | Ligue 1+ | 8K EXCLUSIVE | FR: DAZN PPV 4";
+
+#[test]
+fn an_event_channel_is_named_by_its_match_and_its_competition_in_compact_form() {
+    let info = crate::norm::event_info(LOSC_PPV).unwrap();
+
+    assert_eq!(info.search, "losc vs. rc lens");
+    assert_eq!(info.competition.as_deref(), Some("ligue1+"));
+}
+
+#[test]
+fn the_competition_comes_from_the_match_segment_when_no_segment_names_it() {
+    let info = crate::norm::event_info("Next | PSG vs OM | | FR: DAZN PPV 1").unwrap();
+
+    assert_eq!(info.search, "psg vs om");
+    assert_eq!(info.competition, None);
+    let named = crate::norm::event_info("Live | PSG vs OM sur Canal Plus | | 8K | FR: DAZN PPV 2").unwrap();
+    assert_eq!(named.competition.as_deref(), Some("canal+"));
+}
+
+#[test]
+fn an_ordinary_channel_carries_no_event() {
+    assert_eq!(crate::norm::event_info("FR: TF1 FHD"), None);
+    assert_eq!(crate::norm::event_info("Live | too short"), None);
+}
+
+#[test]
+fn an_event_channel_is_a_dazn_ppv_in_france_numbered_four() {
+    let (family, number) = family_slot(&fold(LOSC_PPV));
+
+    assert_eq!((family.region.as_str(), family.head.as_str(), number), ("fr", "dazn ppv", Some(4)));
+}

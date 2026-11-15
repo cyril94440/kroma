@@ -74,6 +74,7 @@ pub struct Status {
     pub off_air: Option<OffAirView>,
     pub backup_configured: bool,
     pub primary_down: bool,
+    pub source_resolution: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

@@ -47,6 +47,8 @@ export interface RequestOptions {
   /** Send this to the configured base, never a direct route: what decides
    * whether a direct route is worth taking cannot be asked down that route. */
   canonical?: boolean;
+  /** Let the request outlive the page that sent it, for a message sent while the page unloads. */
+  keepalive?: boolean;
 }
 
 export type AuthMode = 'public' | 'bearer';
@@ -231,7 +233,12 @@ export function createRequestContext(config: TransportConfig): RequestContext {
               body: JSON.stringify(options.body),
             };
       return underPolicy(`${method} ${target}`, options, (signal) =>
-        decode(target, response, { method, ...body, signal }, options),
+        decode(
+          target,
+          response,
+          { method, ...body, signal, keepalive: options?.keepalive },
+          options,
+        ),
       );
     }) as RequestContext['post'];
 

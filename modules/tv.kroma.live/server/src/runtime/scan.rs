@@ -9,10 +9,13 @@ use super::connections::Use;
 use super::process::{drained, stop_child, wait_for_exit};
 use super::snapshot::TOPIC_SCAN;
 use super::Live;
+use crate::catalogue::SlotCandidate;
 use crate::model::ProviderId;
-use crate::probe::{analyse, SAMPLE_SECONDS};
+use crate::scanframe::{capture_args, pick_frames, black_in_report, CAPTURE_SECONDS};
 
 pub const CAPTURE_LIMIT: Duration = Duration::from_secs(25);
+pub const BENCHMARK_MAX_IDS: usize = 8;
+pub const REPEAT_WITHIN: Duration = Duration::from_secs(60);
 const MAX_CANDIDATES: usize = 12;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -23,7 +26,9 @@ pub struct ScanItem {
     pub name: String,
     pub ok: bool,
     pub black: bool,
+    pub still: bool,
     pub frame: Option<String>,
+    pub frames: Vec<String>,
     pub error: Option<String>,
     pub now: Option<String>,
 }
@@ -37,6 +42,8 @@ pub struct ScanState {
     pub provider: Option<ProviderId>,
     pub items: Vec<ScanItem>,
     pub total: usize,
+    #[serde(skip)]
+    pub finished: Option<std::time::Instant>,
 }
 
 impl Live {
@@ -53,9 +60,42 @@ impl Live {
         if candidates.is_empty() {
             return Err("noCandidate".into());
         }
+        Ok(self.launch_scan(query, provider, candidates))
+    }
+
+    pub fn start_benchmark(self: &Arc<Self>, ids: &[String]) -> Result<(String, bool), String> {
+        let mut channels = Vec::new();
+        let mut provider = None;
+        for id in ids.iter().take(BENCHMARK_MAX_IDS) {
+            let channel = self.providers.find_by_ref(id).ok_or("unknownChannel")?;
+            if provider.is_some_and(|p| p != channel.provider) {
+                return Err("mixedProviders".into());
+            }
+            provider = Some(channel.provider);
+            channels.push(channel);
+        }
+        let provider = provider.ok_or("noChannel")?;
+        let key = ids.join(",");
+        {
+            let inner = self.lock();
+            if inner.scan.running {
+                return Err("scanRunning".into());
+            }
+            if inner.scan.query == key && inner.scan.finished.is_some_and(|at| at.elapsed() < REPEAT_WITHIN) {
+                return Ok((inner.scan.id.clone(), true));
+            }
+        }
+        let candidates = channels
+            .into_iter()
+            .map(|channel| SlotCandidate { family: crate::norm::family_slot(&crate::norm::fold(&channel.name)).0, number: channel.slot.1, channel, alternatives: Vec::new() })
+            .collect();
+        Ok((self.launch_scan(&key, provider, candidates), false))
+    }
+
+    fn launch_scan(self: &Arc<Self>, query: &str, provider: ProviderId, candidates: Vec<SlotCandidate>) -> String {
         let token = kroma_module_sdk::primitives::random_token();
         self.clear_scans();
-        self.lock().scan = ScanState { id: token.clone(), query: query.into(), running: true, provider: Some(provider), items: Vec::new(), total: candidates.len() };
+        self.lock().scan = ScanState { id: token.clone(), query: query.into(), running: true, provider: Some(provider), items: Vec::new(), total: candidates.len(), finished: None };
         let live = self.clone();
         let scan_id = token.clone();
         tokio::spawn(async move {
@@ -75,10 +115,14 @@ impl Live {
                 live.emit(TOPIC_SCAN, json!({ "id": scan_id, "item": item }));
                 live.lock().scan.items.push(item);
             }
-            live.lock().scan.running = false;
+            {
+                let mut inner = live.lock();
+                inner.scan.running = false;
+                inner.scan.finished = Some(std::time::Instant::now());
+            }
             live.emit(TOPIC_SCAN, json!({ "id": scan_id, "done": true }));
         });
-        Ok(token)
+        token
     }
 
     fn clear_scans(&self) {
@@ -102,13 +146,9 @@ impl Live {
             }
         };
         let folder = self.public_dir().join(format!("scan-{scan_id}"));
-        let _ = std::fs::create_dir_all(&folder);
-        let file = format!("{}.jpg", folder.join(channel.stream_id.to_string()).to_string_lossy());
-        let args: Vec<String> = [
-            "-hide_banner", "-loglevel", "info", "-nostdin", "-user_agent", source.user_agent.as_deref().unwrap_or(""), "-rw_timeout", "15000000", "-analyzeduration", "3000000", "-probesize", "5000000", "-skip_frame", "nokey", "-i", &source.url, "-t", &SAMPLE_SECONDS.to_string(), "-an", "-vf", "blackdetect=d=2.4:pix_th=0.10,scale=320:-2", "-update", "1", "-f", "image2", "-y", &file,
-        ]
-        .map(String::from)
-        .to_vec();
+        let work = folder.join(format!("work-{}", channel.stream_id));
+        let _ = std::fs::create_dir_all(&work);
+        let args = capture_args(&source.url, source.user_agent.as_deref().unwrap_or(""), &work.to_string_lossy());
         self.lock().tests_running += 1;
         let spawned = Command::new(self.programs.ffmpeg.clone()).args(args).spawn();
         let report = match spawned {
@@ -127,12 +167,23 @@ impl Live {
             let mut inner = self.lock();
             inner.tests_running = inner.tests_running.saturating_sub(1);
         }
-        let exists = std::path::Path::new(&file).exists();
-        item.ok = exists;
-        if exists {
-            item.frame = Some(format!("scan-{scan_id}/{}.jpg", channel.stream_id));
-            item.black = analyse(&report, SAMPLE_SECONDS, 1, true).is_some_and(|v| v.black);
-        } else if item.error.is_none() {
+        let mut shots: Vec<std::path::PathBuf> = std::fs::read_dir(&work).into_iter().flatten().flatten().map(|e| e.path()).collect();
+        shots.sort();
+        let blobs: Vec<Vec<u8>> = shots.iter().filter_map(|path| std::fs::read(path).ok()).collect();
+        item.black = black_in_report(&report, CAPTURE_SECONDS);
+        let picks = pick_frames(&blobs);
+        item.ok = !picks.is_empty();
+        item.still = picks.len() == 1 && blobs.len() > 1;
+        let last = picks.len();
+        for (n, index) in picks.into_iter().enumerate() {
+            let name = if n + 1 == last { format!("{}.jpg", channel.stream_id) } else { format!("{}-first.jpg", channel.stream_id) };
+            if std::fs::write(folder.join(&name), &blobs[index]).is_ok() {
+                item.frames.push(format!("scan-{scan_id}/{name}"));
+            }
+        }
+        item.frame = item.frames.last().cloned();
+        let _ = std::fs::remove_dir_all(&work);
+        if !item.ok && item.error.is_none() {
             item.error = Some("noPicture".into());
         }
         item

@@ -35,7 +35,7 @@ A module has no socket, so every client message is an HTTP call and every push i
 
 Deterministic, never decided by the assistant. 30 seconds (`voteSeconds`), for against against; a blank counts for nothing; the request counts as a vote for; a tie or a minority stays. One person is one voice (the KROMA account). Only viewers present in the live module's presence list take part; someone who arrives after the vote opens may vote. The vote closes as soon as the outcome is certain. A voter who is away longer than `presenceGraceSeconds` leaves the quorum, and the vote is cancelled when the requester and all voters are gone. A request is refused while another vote is open, when the channel is already on, or when presence cannot be read. Administrators and the ids in `bypassUserIds` may switch without a vote.
 
-A provider proposal raised by the live module (`live.proposal`) is voted the same way and answered with the control point's `proposal` method.
+A provider proposal raised by the live module (`live.proposal`, kinds `switchToBackup`, `returnToPrimary` and `switchProvider`) is voted the same way and answered with the control point's `proposal` method.
 
 ## Points
 
@@ -53,8 +53,11 @@ Defines `tv.kroma.party/room`, for the assistant module that comes later. Every 
 | `kick` | `{userId, requestedBy, reason}` | `{outcome: "kicked"\|"refused", reason, disruptions}` |
 | `activity` | `{status}` | `{ok}` |
 | `votePoll` (added) | `{userId, value}` | `{ok}` |
+| `goLive` | `{requestedBy}` | `{members}`, or `Err("noActiveParty")` |
+| `fineSync` | `{requestedBy}` | `{ok}`, or `Err("needTwoMembers")` |
+| `clientLogs` | `{userId: string\|null, limit, minutes?}` | `{events: [{at, userId, name, device, category, event, data}]}`, the entries `GET clientlog` returns |
 
-`requestedBy` is the user id on whose behalf the request is made; any id that is not a present viewer (for example `agent`) is a proposal without a voice of its own. Every message published to the room, user or assistant, is also a `party.message` event; a user message carries `mentionsAgent`, `isQuestion` and `keywordHit`, the lexical signals only. The decision to answer belongs to the assistant.
+`requestSwitch` also takes an optional `channelName`, used to name the channel in the vote announcement when the live module cannot resolve the id, and an optional `force`, honoured only when `requestedBy` is listed in `bypassUserIds` (an administrator must be listed to be forced on behalf of); otherwise the request goes to a vote. `requestedBy` is the user id on whose behalf the request is made; any id that is not a present viewer (for example `agent`) is a proposal without a voice of its own. Every message published to the room, user or assistant, is also a `party.message` event; a user message carries `mentionsAgent`, `isQuestion` and `keywordHit`, the lexical signals only. The decision to answer belongs to the assistant.
 
 ## Storage
 

@@ -85,3 +85,55 @@ impl Live {
         inner.frozen = frozen;
     }
 }
+
+#[cfg(all(test, not(target_family = "wasm")))]
+mod tests {
+    use std::time::Duration;
+
+    use crate::it_live::{load, rig, until, Rig};
+    use crate::it_stream::playing;
+
+    async fn probed(rig: &Rig) {
+        rig.live.start_probe(false, None);
+        assert!(until(Duration::from_secs(30), || rig.live.lock().probe.as_ref().is_none_or(|p| p.child.try_wait().ok().flatten().is_some())).await);
+        rig.live.finish_probe();
+    }
+
+    async fn two_probes_of(id: &str) -> (bool, bool) {
+        let rig = rig();
+        load(&rig);
+        playing(&rig, id).await;
+        tokio::time::sleep(Duration::from_secs(8)).await;
+        probed(&rig).await;
+        probed(&rig).await;
+        let inner = rig.live.lock();
+        let verdict = (inner.black, inner.frozen);
+        drop(inner);
+        rig.live.shutdown();
+        verdict
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_black_picture_is_confirmed_by_two_real_probes_of_the_local_playlist() {
+        assert_eq!(two_probes_of("p:6").await, (true, false));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_motionless_picture_is_confirmed_frozen_and_a_moving_one_is_neither() {
+        assert_eq!(two_probes_of("p:3").await, (false, true));
+        assert_eq!(two_probes_of("p:1").await, (false, false));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_single_reading_confirms_nothing() {
+        let rig = rig();
+        load(&rig);
+        playing(&rig, "p:6").await;
+        tokio::time::sleep(Duration::from_secs(8)).await;
+
+        probed(&rig).await;
+
+        assert!(!rig.live.lock().black);
+        rig.live.shutdown();
+    }
+}

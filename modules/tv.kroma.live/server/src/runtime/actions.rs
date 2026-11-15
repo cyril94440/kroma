@@ -1,146 +1,219 @@
-use std::time::{Duration, Instant};
+use std::sync::Arc;
 
 use serde_json::json;
 
+use super::notify::{BOTH_DOWN, FAILBACK, FAILOVER, RECOVERED};
 use super::snapshot::{TOPIC_FAILOVER, TOPIC_PROPOSAL};
 use super::switch::SwitchRequest;
-use super::{now_ms, now_seconds, Live, KV_POLICY};
+use super::{now_ms, Live};
 use crate::db::{self, ProviderEvent};
 use crate::failover::{Action, Observation};
-use crate::health::State;
 use crate::model::{Channel, ProviderId};
-use crate::status::{Phase, Proposal};
+use crate::status::Proposal;
 
-const OBSERVE_EVERY: Duration = Duration::from_secs(10);
 pub const PROPOSAL_SECONDS: i64 = 30;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Proposed {
+    Voting,
+    Applied,
+    Declined,
+}
+
+fn all_busy(reasons: &[String]) -> bool {
+    !reasons.is_empty() && reasons.iter().all(|r| r == "busy" || r == "liveAtThisProvider")
+}
+
 impl Live {
-    fn observation(&self) -> Option<Observation> {
-        let inner = self.lock();
-        let channel = inner.current.clone()?;
-        let media = inner.run.as_ref().is_some_and(|r| r.child.try_wait().ok().flatten().is_none()) && inner.kbps >= self.settings().min_kbps;
-        let unstable = matches!(inner.health.state, State::Degraded | State::Severe) || inner.restarts >= 2;
-        let (program, _) = super::now_next(&self.pool, channel.epg_id.as_deref(), &channel.name, now_ms());
-        Some(Observation {
-            now: now_seconds(),
-            provider: Some(channel.provider),
-            paused: inner.phase == Phase::Paused,
-            media,
-            unstable,
-            viewers: inner.presence.count(),
-            program: program.map(|p| p.title),
-            channel: Some(channel.name),
-        })
-    }
-
-    pub(crate) async fn failover_step(self: &std::sync::Arc<Self>) {
-        {
-            let mut inner = self.lock();
-            if inner.last_observe.is_some_and(|at| at.elapsed() < OBSERVE_EVERY) || inner.phase == Phase::Switching {
-                return;
-            }
-            inner.last_observe = Some(Instant::now());
-        }
-        self.expire_proposals();
-        self.check_primary_recovery();
-        let Some(observation) = self.observation() else { return };
-        let settings = self.settings();
-        let action = {
-            let mut inner = self.lock();
-            inner.policy.has_backup = settings.has_backup();
-            inner.policy.limits = super::limits_of(&settings);
-            let action = inner.policy.observe(&observation);
-            if let Some(action) = action {
-                inner.policy.acknowledge(action, &observation);
-            }
-            action
-        };
-        if let Some(action) = action {
-            if settings.backup_enabled_failover || !matches!(action, Action::Failover) {
-                self.run_action(action, &observation).await;
-            }
-        }
-        self.save_policy();
-    }
-
-    fn check_primary_recovery(&self) {
-        let waiting = {
-            let inner = self.lock();
-            let on_backup = inner.current.as_ref().is_some_and(|c| c.provider == ProviderId::Backup);
-            inner.policy.primary_is_down() && on_backup && inner.last_ping.is_none_or(|at| at.elapsed() >= Duration::from_secs(30))
-        };
-        if !waiting {
+    pub(crate) async fn run_action(self: &Arc<Self>, action: Action, observation: &Observation, began: Option<f64>) {
+        let Some(current) = self.current() else { return };
+        let now = observation.now;
+        let idle_action = matches!(action, Action::ReturnIdle | Action::Recovered | Action::BothDown);
+        if !idle_action && !self.still_live(&current) {
             return;
         }
-        self.lock().last_ping = Some(Instant::now());
-        let ok = self.providers.ping(ProviderId::Primary, &self.settings());
-        if self.lock().policy.probe_primary(ok) {
-            self.emit(TOPIC_FAILOVER, json!({ "kind": "primaryBack" }));
+        if !matches!(action, Action::Failover | Action::Failback) {
+            self.lock().policy.acknowledge(action, observation);
         }
-    }
-
-    fn save_policy(&self) {
-        let mut inner = self.lock();
-        let Ok(json) = serde_json::to_string(&inner.policy.saved) else { return };
-        if inner.saved_policy_json != json {
-            inner.saved_policy_json = json.clone();
-            drop(inner);
-            let _ = db::kv_set(&self.pool, KV_POLICY, &json);
-        }
-    }
-
-    pub(crate) async fn run_action(self: &std::sync::Arc<Self>, action: Action, observation: &Observation) {
-        let Some(current) = self.current() else { return };
         match action {
-            Action::Failover => self.move_to(&current, ProviderId::Backup, "failover", "deadPrimary", false).await,
-            Action::Failback => self.move_to(&current, ProviderId::Primary, "failback", "deadBackup", false).await,
-            Action::ReturnIdle => self.move_to(&current, ProviderId::Primary, "returnIdle", "primaryBack", true).await,
-            Action::BothDown => self.emit(TOPIC_FAILOVER, json!({ "kind": "bothDown", "channel": current.name })),
-            Action::Recovered => self.emit(TOPIC_FAILOVER, json!({ "kind": "recovered", "channel": current.name })),
-            Action::SuggestBackup => self.propose("switchToBackup", &current, ProviderId::Backup, "unstable").await,
-            Action::SuggestReturn => self.propose("returnToPrimary", &current, ProviderId::Primary, "programmeEnded").await,
-            Action::ProposeTrial => self.propose("switchToBackup", &current, current.provider.other(), "trialBetter").await,
+            Action::Failover => self.do_failover(&current, now, began).await,
+            Action::Failback => self.do_failback(&current, now, began).await,
+            Action::ReturnIdle => self.return_idle(&current).await,
+            Action::BothDown => {
+                self.emit(TOPIC_FAILOVER, json!({ "kind": "bothDown", "channel": current.name }));
+                self.notify_people(BOTH_DOWN, &current.name, None);
+            }
+            Action::Recovered => {
+                self.emit(TOPIC_FAILOVER, json!({ "kind": "recovered", "channel": current.name }));
+                self.notify_people(RECOVERED, &current.name, None);
+            }
+            Action::SuggestBackup => self.suggest_backup(&current).await,
+            Action::SuggestReturn => self.propose_for("returnToPrimary", &current, ProviderId::Primary, "programmeEnded").await,
+            Action::ProposeTrial => self.propose_for("switchToBackup", &current, current.provider.other(), "trialBetter").await,
             Action::ReportTrial => self.emit(TOPIC_FAILOVER, json!({ "kind": "trialNotBetter", "channel": current.name })),
             Action::TrialBackup | Action::TrialPrimary => self.launch_trial(&current, observation.channel.clone()),
         }
     }
 
-    async fn move_to(&self, current: &Channel, to: ProviderId, kind: &str, reason: &str, only_if_paused: bool) {
-        let rules = self.rules();
-        let Some(mapped) = self.providers.mapped(current, to, &rules) else {
-            self.lock().policy.skip_failover(now_seconds());
-            self.emit(TOPIC_FAILOVER, json!({ "kind": "noEquivalent", "channel": current.name, "to": to }));
+    async fn do_failover(self: &Arc<Self>, current: &Channel, now: f64, began: Option<f64>) {
+        self.stop_trial_marker();
+        if self.canary_alive(Some(current)).await {
+            return self.channel_down_locally(current, now, began).await;
+        }
+        let (settings, rules) = (self.settings(), self.rules());
+        let candidates = self.providers.equivalents(current, ProviderId::Backup, 3, &rules);
+        let reachable = !candidates.is_empty() && self.providers.ping(ProviderId::Backup, &settings);
+        let mut found = None;
+        let mut reasons = Vec::new();
+        if reachable {
+            match self.working_equivalent(current, ProviderId::Backup).await {
+                Ok(channel) => found = Some(channel),
+                Err(tried) => reasons = tried,
+            }
+        }
+        if found.is_none() && all_busy(&reasons) {
+            return;
+        }
+        let Some(target) = found else {
+            let returned = {
+                let mut inner = self.lock();
+                let returned = inner.policy.media_returned(began);
+                if !returned {
+                    inner.policy.skip_failover(now);
+                    if !candidates.is_empty() && !reachable {
+                        inner.policy.did_alert_both_down(now);
+                    }
+                }
+                returned
+            };
+            if returned {
+                return;
+            }
+            let kind = if candidates.is_empty() {
+                "noEquivalent"
+            } else if !reachable {
+                "backupUnreachable"
+            } else {
+                "backupDead"
+            };
+            let _ = db::add_provider_event(&self.pool, &ProviderEvent { at: now_ms(), kind: "failoverSkipped".into(), channel: Some(current.name.clone()), detail: kind.into(), ..ProviderEvent::default() });
+            self.emit(TOPIC_FAILOVER, json!({ "kind": kind, "channel": current.name, "to": ProviderId::Backup }));
+            if kind == "backupUnreachable" {
+                self.notify_people(BOTH_DOWN, &current.name, None);
+            }
             return;
         };
-        let outcome = self.switch(SwitchRequest { channel_id: mapped.id(), skip_if_same: true, only_if_paused, reason: reason.into(), ..SwitchRequest::default() }).await;
-        let _ = db::add_provider_event(
-            &self.pool,
-            &ProviderEvent { at: now_ms(), kind: kind.into(), from: Some(current.provider.as_str().into()), to: Some(to.as_str().into()), channel: Some(current.name.clone()), detail: outcome.status.clone(), ..ProviderEvent::default() },
-        );
-        self.emit(TOPIC_FAILOVER, json!({ "kind": kind, "from": current.provider, "to": to, "channel": current.name, "status": outcome.status }));
+        if !self.still_live(current) {
+            return;
+        }
+        let returned = {
+            let mut inner = self.lock();
+            let returned = inner.policy.media_returned(began);
+            if !returned {
+                inner.policy.did_failover(now);
+            }
+            returned
+        };
+        if !returned {
+            self.apply_move(current, &target, "failover", "deadPrimary", false).await;
+        }
     }
 
-    async fn propose(&self, kind: &str, current: &Channel, to: ProviderId, why: &str) {
+    async fn do_failback(self: &Arc<Self>, current: &Channel, now: f64, began: Option<f64>) {
+        let before = {
+            let mut inner = self.lock();
+            let before = inner.policy.saved.last_auto_at;
+            inner.policy.did_failback(now);
+            before
+        };
+        let (settings, rules) = (self.settings(), self.rules());
+        let absent = self.providers.equivalents(current, ProviderId::Primary, 1, &rules).is_empty();
+        let target = if self.providers.ping(ProviderId::Primary, &settings) { self.working_equivalent(current, ProviderId::Primary).await.ok() } else { None };
+        let restore = |live: &Live| live.lock().policy.saved.last_auto_at = before;
+        if !self.still_live(current) || self.lock().policy.media_returned(began) {
+            return restore(self);
+        }
+        let Some(target) = target else {
+            if !self.canary_alive(None).await {
+                self.lock().policy.mark_primary_down(now);
+                return;
+            }
+            let returned = {
+                let mut inner = self.lock();
+                let returned = inner.policy.media_returned(began);
+                inner.policy.saved.last_auto_at = before;
+                if !returned {
+                    inner.policy.did_channel_down(now, Some(&current.name), None);
+                }
+                returned
+            };
+            if !returned {
+                let reason = if absent { "absentFromPrimary" } else { "cutAtPrimaryToo" };
+                self.emit(TOPIC_FAILOVER, json!({ "kind": "failbackRefused", "channel": current.name, "reason": reason }));
+            }
+            return;
+        };
+        self.apply_move(current, &target, "failback", "deadBackup", false).await;
+    }
+
+    async fn return_idle(self: &Arc<Self>, current: &Channel) {
+        let settings = self.settings();
+        if !self.providers.ping(ProviderId::Primary, &settings) {
+            return;
+        }
+        let Ok(target) = self.working_equivalent(current, ProviderId::Primary).await else { return };
+        self.apply_move(current, &target, "returnIdle", "primaryBack", true).await;
+    }
+
+    pub(crate) async fn apply_move(&self, current: &Channel, target: &Channel, kind: &str, reason: &str, only_if_paused: bool) {
+        let outcome = self.switch(SwitchRequest { channel_id: target.id(), skip_if_same: true, only_if_paused, reason: reason.into(), ..SwitchRequest::default() }).await;
+        if only_if_paused && outcome.status != "deferred" {
+            return;
+        }
+        let _ = db::add_provider_event(
+            &self.pool,
+            &ProviderEvent { at: now_ms(), kind: kind.into(), from: Some(current.provider.as_str().into()), to: Some(target.provider.as_str().into()), channel: Some(current.name.clone()), detail: outcome.status.clone(), ..ProviderEvent::default() },
+        );
+        self.emit(TOPIC_FAILOVER, json!({ "kind": kind, "from": current.provider, "to": target.provider, "channel": current.name, "status": outcome.status }));
+        match kind {
+            "failover" => self.notify_people(FAILOVER, &current.name, Some(reason)),
+            "failback" => self.notify_people(FAILBACK, &current.name, Some(reason)),
+            _ => {}
+        }
+    }
+
+    async fn suggest_backup(&self, current: &Channel) {
+        match self.working_equivalent(current, ProviderId::Backup).await {
+            Ok(target) => {
+                self.propose_channel("switchToBackup", &target, "unstable").await;
+            }
+            Err(_) => self.emit(TOPIC_FAILOVER, json!({ "kind": "noWorkingEquivalent", "channel": current.name })),
+        }
+    }
+
+    async fn propose_for(&self, kind: &str, current: &Channel, to: ProviderId, why: &str) {
         let rules = self.rules();
         let Some(mapped) = self.providers.mapped(current, to, &rules) else { return };
+        self.propose_channel(kind, &mapped, why).await;
+    }
+
+    pub(crate) async fn propose_channel(&self, kind: &str, target: &Channel, why: &str) -> Proposed {
         let proposal = Proposal {
             id: kroma_module_sdk::primitives::random_token(),
             kind: kind.into(),
             text: why.into(),
-            channel: Some(mapped.id()),
+            channel: Some(target.id()),
             created_at: now_ms(),
             expires_at: now_ms() + PROPOSAL_SECONDS * 1000,
         };
         if self.party_present() {
             self.lock().proposals.insert(proposal.id.clone(), proposal.clone());
             self.emit(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": false, "viewers": self.viewer_count() }));
-            return;
+            return Proposed::Voting;
         }
         let accept = self.viewer_count() <= 1;
         self.emit(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": true, "accepted": accept, "default": "noVote" }));
-        if accept {
-            self.apply_proposal(&proposal).await;
-        }
+        if accept && self.apply_proposal(&proposal).await { Proposed::Applied } else { Proposed::Declined }
     }
 
     async fn apply_proposal(&self, proposal: &Proposal) -> bool {
@@ -154,7 +227,7 @@ impl Live {
         accept && self.apply_proposal(&proposal).await
     }
 
-    fn expire_proposals(&self) {
+    pub(crate) fn expire_proposals(&self) {
         let now = now_ms();
         let expired: Vec<Proposal> = {
             let mut inner = self.lock();

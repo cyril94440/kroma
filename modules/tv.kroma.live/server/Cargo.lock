@@ -566,10 +566,11 @@ dependencies = [
 
 [[package]]
 name = "kroma-live"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
+ "base64",
  "flate2",
  "kroma-module-runtime",
  "kroma-module-sdk",

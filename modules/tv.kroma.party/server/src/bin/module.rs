@@ -9,7 +9,7 @@ kroma_module_runtime::module_main!(
         let ctx: Arc<dyn HostCtx> = Arc::new(host.clone());
         let party = Party::new(ctx.clone(), host.store().clone(), Arc::new(PeerLive::new(ctx)));
         host.register_service(party.clone());
-        kroma_party::routes::<RemoteHost>(party)
+        kroma_party::point_routes::<RemoteHost>(party)
     },
     vec![kroma_party::server_module::<RemoteHost>()],
 );

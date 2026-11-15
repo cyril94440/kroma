@@ -60,7 +60,7 @@ export function useLive(watching: boolean) {
         });
     };
     beat();
-    const leave = () => void api.leave().catch(() => undefined);
+    const leave = () => api.leave();
     window.addEventListener('pagehide', leave);
     return () => {
       clearTimeout(timer);

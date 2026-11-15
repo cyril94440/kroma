@@ -7,7 +7,7 @@ use crate::it_live::{load, playlist_of, request, rig, rig_with, until, Rig};
 use crate::runtime::{now_ms, Programs};
 use crate::status::Phase;
 
-async fn pump(rig: &Rig, limit: Duration, mut check: impl FnMut(&Rig) -> bool) -> bool {
+pub(crate) async fn pump(rig: &Rig, limit: Duration, mut check: impl FnMut(&Rig) -> bool) -> bool {
     let end = Instant::now() + limit;
     while Instant::now() < end {
         rig.live.tick().await;
@@ -19,11 +19,11 @@ async fn pump(rig: &Rig, limit: Duration, mut check: impl FnMut(&Rig) -> bool) -
     check(rig)
 }
 
-fn serving(rig: &Rig) -> bool {
+pub(crate) fn serving(rig: &Rig) -> bool {
     rig.live.status().playlist.is_some() && playlist_of(rig).is_some_and(|p| p.contains("seg0"))
 }
 
-async fn playing(rig: &Rig, id: &str) {
+pub(crate) async fn playing(rig: &Rig, id: &str) {
     let outcome = rig.live.switch(request(id)).await;
     assert_eq!(outcome.status, "switched", "{outcome:?}");
     assert!(pump(rig, Duration::from_secs(30), serving).await, "no segment appeared: {:?}", rig.live.status());

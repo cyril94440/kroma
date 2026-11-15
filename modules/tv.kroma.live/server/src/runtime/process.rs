@@ -60,7 +60,7 @@ impl Live {
             if keep.is_some_and(|k| entry.file_name() == k) {
                 continue;
             }
-            if keep.is_some() && entry.file_name().to_string_lossy().starts_with("scan-") {
+            if entry.file_name() == crate::clipbuf::CLIPS_DIR || (keep.is_some() && entry.file_name().to_string_lossy().starts_with("scan-")) {
                 continue;
             }
             let _ = std::fs::remove_dir_all(entry.path());
@@ -77,6 +77,7 @@ impl Live {
             user_agent: Some(settings.user_agent_of(channel.provider).to_string()),
             realtime: false,
             audio: None,
+            hevc: self.is_hevc(channel),
         })
     }
 
@@ -104,6 +105,9 @@ impl Live {
         inner.kbps = 0.0;
         inner.last_segment_at = None;
         inner.health.on_start();
+        inner.resolution.clear();
+        inner.last_resolution = None;
+        inner.resolution_probe = None;
         if !relaunch {
             inner.restarts = 0;
         }
@@ -174,6 +178,7 @@ impl Live {
         if let Some(probe) = self.lock().probe.take() {
             probe.child.kill();
         }
-        let _ = std::fs::remove_dir_all(self.public_dir());
+        self.clear_public_except(None);
+        self.forget_buffer();
     }
 }

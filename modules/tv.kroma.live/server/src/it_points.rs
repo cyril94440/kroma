@@ -6,7 +6,7 @@ use tower::ServiceExt;
 
 use crate::it_live::{load, rig, Rig};
 
-async fn ask(rig: &Rig, method: &str, body: Value) -> Value {
+pub(crate) async fn ask(rig: &Rig, method: &str, body: Value) -> Value {
     let host = rig.host.clone().with_service(rig.live.clone());
     let app = crate::routes::point_routes::<StubHost>().with_state(host);
     let request = Request::builder().method("POST").uri(format!("/_port/tv.kroma.live/control/{method}")).header("content-type", "application/json").body(Body::from(body.to_string())).unwrap();

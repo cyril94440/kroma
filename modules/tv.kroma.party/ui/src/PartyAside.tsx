@@ -6,20 +6,14 @@ import { PresencePanel } from './presence-panel';
 import { REACTIONS } from './reactions';
 import { SwitchPanel } from './switch-panel';
 import { SyncPanel } from './sync-panel';
-import { AsideProps } from './sync-player';
+import { AsideProps, type SyncPlayer } from './sync-player';
 import { useParty } from './use-party';
 import { useSyncSession } from './use-sync-session';
 import { VotePanel } from './vote-panel';
 
-function Panel({ props }: Readonly<{ props: AsideProps }>) {
+function Panel({ props, player }: Readonly<{ props: AsideProps; player: SyncPlayer }>) {
   const { api, model, now } = useParty();
-  const session = useSyncSession(
-    props.player,
-    props.playing,
-    props.channel?.id ?? null,
-    api,
-    model,
-  );
+  const session = useSyncSession(player, props.playing, props.channel?.id ?? null, api, model);
   const state = model.state;
   if (!state) return <ModuleLoading panels={1} />;
   return (
@@ -70,5 +64,5 @@ function Panel({ props }: Readonly<{ props: AsideProps }>) {
 
 export default function PartyAside(props: Readonly<Record<string, unknown>>) {
   const parsed = AsideProps.safeParse(props);
-  return parsed.success ? <Panel props={parsed.data} /> : null;
+  return parsed.success ? <Panel props={parsed.data} player={props.player as SyncPlayer} /> : null;
 }

@@ -21,6 +21,7 @@ static CLOCK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b\d{1,2}[:h]\d{2}
 static NAME_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d{3,}$").unwrap());
 static WORDS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[a-z0-9+]+").unwrap());
 static ISOLATED_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?:^|\s)(\d{1,2})(?:\s|$)").unwrap());
+static ON_COMPETITION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+sur\s+(.+)$").unwrap());
 static COMPACT: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
     [
         (r"ligue\s*1\s*\+", "ligue1+"),
@@ -73,6 +74,29 @@ pub fn event_split(normalised: &str) -> Option<Vec<String>> {
     }
     let segments: Vec<String> = normalised.split('|').map(|s| s.trim().to_string()).collect();
     (segments.len() >= 4 && !segments.last().is_some_and(String::is_empty)).then_some(segments)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventInfo {
+    pub search: String,
+    pub competition: Option<String>,
+}
+
+pub fn event_info(name: &str) -> Option<EventInfo> {
+    let segments = event_split(&fold(name))?;
+    let mut search = segments[1].clone();
+    let mut competition = String::new();
+    if let Some(found) = ON_COMPETITION.captures(&search) {
+        let start = found.get(0).map_or(search.len(), |m| m.start());
+        competition = found[1].trim().to_string();
+        search = search[..start].trim().to_string();
+    }
+    if segments.len() > 2 && !segments[2].is_empty() {
+        competition = segments[2].clone();
+    }
+    let competition = compact(&competition).trim().to_string();
+    Some(EventInfo { search, competition: (!competition.is_empty()).then_some(competition) })
 }
 
 pub fn is_tag(token: &str) -> bool {

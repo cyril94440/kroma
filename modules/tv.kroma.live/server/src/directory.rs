@@ -17,6 +17,8 @@ pub struct ChannelView {
     pub provider: Option<ProviderId>,
     pub score: f64,
     pub now: Option<Slot>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event: Option<crate::norm::EventInfo>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -40,7 +42,7 @@ pub struct ChannelQuery {
 impl Live {
     fn view(&self, channel: &Channel, score: f64, with_now: bool) -> ChannelView {
         let now = with_now.then(|| now_next(self.pool(), channel.epg_id.as_deref(), &channel.name, now_ms()).0).flatten();
-        ChannelView { id: channel.id(), name: channel.name.clone(), group: channel.group.clone(), provider: Some(channel.provider), score, now: now.as_ref().map(Slot::of) }
+        ChannelView { id: channel.id(), name: channel.name.clone(), group: channel.group.clone(), provider: Some(channel.provider), score, now: now.as_ref().map(Slot::of), event: crate::norm::event_info(&channel.name) }
     }
 
     pub fn list_channels(&self, query: &ChannelQuery) -> ChannelPage {
@@ -81,6 +83,16 @@ impl Live {
     pub fn resolve(&self, query: &str, limit: usize) -> Vec<ChannelView> {
         let rules = self.rules();
         let catalogue = self.providers.catalogue(ProviderId::Primary);
+        catalogue.find_all(query, limit.clamp(1, MAX_PER_PAGE), true, &rules).into_iter().map(|(c, score)| self.view(c, score, true)).collect()
+    }
+
+    pub fn resolve_in(&self, query: &str, limit: usize, provider: Option<ProviderId>) -> Vec<ChannelView> {
+        if crate::model::parse_ref(query.trim()).is_some() {
+            return self.providers.find_by_ref(query.trim()).filter(|c| provider.is_none_or(|p| p == c.provider)).map(|c| vec![self.view(&c, 1.0, true)]).unwrap_or_default();
+        }
+        let Some(provider) = provider else { return self.resolve(query, limit) };
+        let rules = self.rules();
+        let catalogue = self.providers.catalogue(provider);
         catalogue.find_all(query, limit.clamp(1, MAX_PER_PAGE), true, &rules).into_iter().map(|(c, score)| self.view(c, score, true)).collect()
     }
 

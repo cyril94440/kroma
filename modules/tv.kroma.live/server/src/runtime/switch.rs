@@ -21,6 +21,7 @@ pub struct SwitchRequest {
     pub only_if_paused: bool,
     pub requested_by: Option<String>,
     pub reason: String,
+    pub only_if_current: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -48,12 +49,12 @@ impl SwitchOutcome {
 }
 
 impl Live {
-    pub async fn probe_live(&self, url: &str, user_agent: &str) -> (bool, Option<f64>) {
+    pub async fn probe_live(&self, channel: &Channel, url: &str, user_agent: &str) -> (bool, Option<f64>) {
         if !url.starts_with("http") {
             return (true, None);
         }
         let spawned = Command::new(self.programs.ffprobe.clone())
-            .args(["-v", "error", "-user_agent", user_agent, "-show_entries", "format=duration", "-of", "json", url])
+            .args(["-v", "error", "-user_agent", user_agent, "-show_entries", "format=duration:stream=codec_type,codec_name", "-of", "json", url])
             .spawn();
         let Ok(child) = spawned else { return (true, None) };
         let finished = wait_for_exit(&child, PROBE_LIMIT).await;
@@ -62,9 +63,12 @@ impl Live {
             return (true, None);
         }
         let (stdout, _) = drained(&child);
-        let duration = serde_json::from_str::<serde_json::Value>(&stdout)
-            .ok()
-            .and_then(|v| v.pointer("/format/duration").and_then(|d| d.as_str().and_then(|s| s.trim().parse::<f64>().ok()).or_else(|| d.as_f64())));
+        let report = serde_json::from_str::<serde_json::Value>(&stdout).ok();
+        let video = report.as_ref().and_then(|v| v.pointer("/streams")).and_then(|s| s.as_array()).and_then(|streams| streams.iter().find(|s| s["codec_type"] == "video")).and_then(|s| s["codec_name"].as_str().map(str::to_string));
+        if let Some(name) = video {
+            self.note_codec(channel, super::codec::VideoCodec::named(&name));
+        }
+        let duration = report.and_then(|v| v.pointer("/format/duration").and_then(|d| d.as_str().and_then(|s| s.trim().parse::<f64>().ok()).or_else(|| d.as_f64())));
         match duration {
             Some(d) => (d > MAX_PLACEHOLDER_SECONDS, Some(d)),
             None => (true, None),
@@ -87,6 +91,9 @@ impl Live {
             return self.defer_resume(target);
         }
         let current = self.current();
+        if request.only_if_current.as_ref().is_some_and(|expected| current.as_ref().map(Channel::id).as_ref() != Some(expected)) {
+            return SwitchOutcome::of("changed", current.as_ref());
+        }
         if request.skip_if_same {
             let inner = self.lock();
             let same = inner.current.as_ref().is_some_and(|c| c.id() == target.id());
@@ -115,7 +122,7 @@ impl Live {
         let mut probe_done = began;
         let mut placeholder = None;
         if !fast && !same_url {
-            let (live, duration) = self.probe_live(&source.url, source.user_agent.as_deref().unwrap_or("")).await;
+            let (live, duration) = self.probe_live(target, &source.url, source.user_agent.as_deref().unwrap_or("")).await;
             probe_done = Instant::now();
             if !live {
                 let view = OffAirView { name: target.name.clone(), duration, at: now_ms() };
@@ -229,6 +236,7 @@ impl Live {
         let outcome = match started {
             Ok(()) => {
                 self.remember_current(false);
+                self.publish_channel();
                 SwitchOutcome::of("resumed", Some(&channel))
             }
             Err(error) => {

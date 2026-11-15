@@ -69,7 +69,7 @@ fn respond(stream: &mut TcpStream, status: &str, content_type: &str, body: &[u8]
 fn lavfi_for(stream_id: &str) -> Vec<String> {
     let video = match stream_id {
         "3" => "smptebars=size=320x180:rate=25",
-        "6" => "testsrc2=size=320x180:rate=25",
+        "6" => "color=c=black:size=320x180:rate=25",
         _ => "testsrc2=size=320x180:rate=25",
     };
     ["-v", "error", "-re", "-f", "lavfi", "-i", video, "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-g", "25", "-keyint_min", "25", "-sc_threshold", "0", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "64k", "-f", "mpegts", "pipe:1"].map(String::from).to_vec()

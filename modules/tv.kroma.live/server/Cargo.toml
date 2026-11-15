@@ -2,7 +2,7 @@
 
 [package]
 name = "kroma-live"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.88"
 description = "KROMA live TV: one IPTV connection restreamed as HLS to every viewer, with standby, off-air detection and a backup provider."
@@ -16,6 +16,7 @@ path = "src/bin/module.rs"
 kroma-module-sdk = { path = "../../../server/crates/kroma-module-sdk", features = ["storage"] }
 kroma-module-runtime = { path = "../../../server/crates/kroma-module-runtime", features = ["storage"] }
 anyhow = "1"
+base64 = "0.22"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 quick-xml = "0.42"
 regex = "1"

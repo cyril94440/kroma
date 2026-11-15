@@ -36,8 +36,14 @@ where
         .merge(ideas::routes::<S>())
         .merge(sync::routes::<S>())
         .merge(telemetry::routes::<S>())
-        .merge(crate::room::routes::<S>())
         .layer(Extension(party))
+}
+
+pub fn point_routes<S>(party: Arc<Party>) -> Router<S>
+where
+    S: HostCtx + Clone + Send + Sync + 'static,
+{
+    crate::room::routes::<S>().layer(Extension(party))
 }
 
 pub(crate) fn person(user: &User) -> Person {
