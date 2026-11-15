@@ -47,14 +47,12 @@ fn require<S: HostCtx>(host: &S, user: &User, permission: Permission) -> Result<
     host.require(user, permission)
 }
 
-pub(crate) fn viewer<S: HostCtx>(host: &S, sport: &Sport, user: &User) -> Result<(), Response> {
-    require(host, user, Permission::Playback)?;
-    sport.note_role(&user.id, user.can(Permission::SettingsManage));
-    Ok(())
+pub(crate) fn viewer<S: HostCtx>(host: &S, user: &User) -> Result<(), Response> {
+    require(host, user, Permission::Playback)
 }
 
-pub(crate) fn admin<S: HostCtx>(host: &S, sport: &Sport, user: &User) -> Result<(), Response> {
-    viewer(host, sport, user)?;
+pub(crate) fn admin<S: HostCtx>(host: &S, user: &User) -> Result<(), Response> {
+    viewer(host, user)?;
     require(host, user, Permission::SettingsManage)
 }
 
@@ -75,7 +73,7 @@ async fn state<S: HostCtx + Clone>(
     Extension(sport): Extension<Arc<Sport>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     let admin = is_admin(&user);
     Ok(Json(work(move || sport.snapshot(&user.id, &user.username, admin)).await?).into_response())
 }
@@ -85,7 +83,7 @@ async fn view<S: HostCtx + Clone>(
     Extension(sport): Extension<Arc<Sport>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     let snapshot = work(move || sport.snapshot(&user.id, &user.username, false)).await?;
     Ok(Json(snapshot["view"].clone()).into_response())
 }
@@ -102,7 +100,7 @@ async fn open<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<OpenBody>,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     let accepted = work(move || sport.open_view(&user.id, body.force)).await?;
     Ok(Json(json!({"ok": true, "accepted": accepted})).into_response())
 }
@@ -119,7 +117,7 @@ async fn watch<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<WatchBody>,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     if body.channel_id.is_empty() || body.channel_id.len() > 80 {
         return Err(refuse(StatusCode::BAD_REQUEST, "invalidChannel"));
     }
@@ -134,7 +132,7 @@ async fn current_match<S: HostCtx + Clone>(
     Extension(sport): Extension<Arc<Sport>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     let snapshot = work(move || sport.snapshot(&user.id, &user.username, false)).await?;
     Ok(Json(json!({"match": snapshot["match"], "seq": snapshot["seq"]})).into_response())
 }
@@ -152,7 +150,7 @@ async fn calibration<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<CalibrationBody>,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     match work(move || sport.calibrate(&body.clock, body.captured_at_ms)).await? {
         Ok(done) => Ok(Json(done).into_response()),
         Err(e) => Err(refuse(
@@ -180,7 +178,7 @@ async fn trace<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Query(q): Query<TraceQuery>,
 ) -> Result<Response, Response> {
-    admin(&host, &sport, &user)?;
+    admin(&host, &user)?;
     let rows = work(move || {
         sport.trace_rows(
             q.genre.as_deref(),
@@ -197,7 +195,7 @@ async fn refresh<S: HostCtx + Clone>(
     Extension(sport): Extension<Arc<Sport>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    admin(&host, &sport, &user)?;
+    admin(&host, &user)?;
     work(move || sport.refresh()).await?;
     Ok(Json(json!({"ok": true})).into_response())
 }

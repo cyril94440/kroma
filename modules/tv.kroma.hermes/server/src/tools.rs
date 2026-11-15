@@ -206,12 +206,23 @@ pub fn failure(reason: &str) -> Value {
     json!({ "ok": false, "erreur": reason })
 }
 
-pub fn admin_refusal() -> Value {
-    json!({ "ok": false, "status": "refus", "raison": "reserve_aux_admins", "message": "action réservée aux administrateurs de la maison, vérifié côté serveur : dis-le simplement à la personne, sans insister ni contourner" })
+pub fn room_reason(code: &str) -> Option<(&'static str, &'static str)> {
+    Some(match code {
+        "notPresent" => ("demandeur_absent", "la demande n'est ouverte qu'aux personnes qui regardent la télé en ce moment, vérifié côté serveur : dis-le, n'insiste pas"),
+        "notInParty" => ("pas_dans_la_watch_party", "cette personne n'est pas dans la watch party : dis-le"),
+        "disconnected" => ("deconnecte_pour_l_instant", "cette personne n'a pas de connexion en ce moment, le serveur ne prétend pas l'avoir retirée : dis-le, réessaie quand elle est reconnectée"),
+        "recentlyKicked" => ("deja_expulse_recemment", "cette personne vient d'être retirée de la watch party (moins de 2 minutes) : dis-le, n'insiste pas"),
+        "pollAlreadyActive" => ("sondage_deja_actif", "un sondage est déjà en cours : dis-le, il faut le clore avant d'en lancer un autre"),
+        "noActivePoll" => ("aucun_sondage_actif", "il n'y a aucun sondage en cours : dis-le"),
+        "noActiveParty" => ("pas_de_watch_party", "il n'y a pas de watch party active : dis-le"),
+        "needTwoMembers" => ("deux_membres_requis", "il faut au moins 2 membres mesurables dans la watch party : dis-le"),
+        _ => return None,
+    })
 }
 
-pub fn is_admin_only(error: &anyhow::Error) -> bool {
-    format!("{error:#}").trim() == "adminOnly"
+pub fn room_refusal(code: &str) -> Value {
+    let (reason, message) = room_reason(code).unwrap_or(("refus", code));
+    json!({ "ok": false, "status": "refus", "raison": reason, "message": message })
 }
 
 pub fn provider_arg(text: &str) -> Result<Option<&'static str>, ()> {

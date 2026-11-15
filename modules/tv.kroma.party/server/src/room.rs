@@ -45,6 +45,10 @@ fn viewer(party: &Party, user_id: &str) -> Option<Person> {
         .map(|v| Person::new(&v.user_id, &v.name))
 }
 
+fn require_viewer(party: &Party, user_id: &str) -> Result<Person, anyhow::Error> {
+    viewer(party, user_id).ok_or_else(|| anyhow::anyhow!("notPresent"))
+}
+
 async fn say<S: HostCtx + Clone>(
     State(_): State<S>,
     Extension(party): Extension<Arc<Party>>,
@@ -99,7 +103,7 @@ async fn start_poll<S: HostCtx + Clone>(
     Json(req): Json<StartPollRequest>,
 ) -> Json<Result<PollReply, String>> {
     port_reply(move || {
-        party.require_admin_id(&req.requested_by).map_err(|e| anyhow::anyhow!(e))?;
+        require_viewer(&party, &req.requested_by)?;
         let view = party
             .start_poll(&req.question, &req.kind, &req.options, req.duration_s)
             .map_err(|e| anyhow::anyhow!(e))?;
@@ -114,7 +118,7 @@ async fn close_poll<S: HostCtx + Clone>(
     Json(req): Json<ClosePollRequest>,
 ) -> Json<Result<ClosedPollReply, String>> {
     port_reply(move || {
-        party.require_admin_id(&req.requested_by).map_err(|e| anyhow::anyhow!(e))?;
+        require_viewer(&party, &req.requested_by)?;
         let view = party.close_poll("closedByAgent").map_err(|e| anyhow::anyhow!(e))?;
         Ok(ClosedPollReply { results: serde_json::to_value(view)? })
     })
@@ -140,8 +144,8 @@ async fn kick<S: HostCtx + Clone>(
     Json(req): Json<KickRequest>,
 ) -> Json<Result<KickReply, String>> {
     port_reply(move || {
-        if let Err(code) = party.require_admin_id(&req.requested_by) {
-            return Ok(KickReply { outcome: "refused", reason: Some(code.into()), disruptions: 0 });
+        if viewer(&party, &req.requested_by).is_none() {
+            return Ok(KickReply { outcome: "refused", reason: Some("notPresent".into()), disruptions: 0 });
         }
         let reason = format!("{} ({})", req.reason, req.requested_by);
         Ok(match party.kick(&req.user_id, &reason) {
@@ -170,7 +174,7 @@ async fn go_live<S: HostCtx + Clone>(
     Json(req): Json<SyncActionRequest>,
 ) -> Json<Result<GoLiveReply, String>> {
     port_reply(move || {
-        party.require_admin_id(&req.requested_by).map_err(|e| anyhow::anyhow!(e))?;
+        require_viewer(&party, &req.requested_by)?;
         party.sync_go_live(&req.requested_by).map(|members| GoLiveReply { members }).map_err(|e| anyhow::anyhow!(e))
     })
     .await
@@ -182,7 +186,7 @@ async fn fine_sync<S: HostCtx + Clone>(
     Json(req): Json<SyncActionRequest>,
 ) -> Json<Result<Done, String>> {
     port_reply(move || {
-        party.require_admin_id(&req.requested_by).map_err(|e| anyhow::anyhow!(e))?;
+        require_viewer(&party, &req.requested_by)?;
         party.sync_fine_sync(&req.requested_by).map(|()| Done { ok: true }).map_err(|e| anyhow::anyhow!(e))
     })
     .await
@@ -194,7 +198,7 @@ async fn client_logs<S: HostCtx + Clone>(
     Json(req): Json<ClientLogsRequest>,
 ) -> Json<Result<ClientLogsReply, String>> {
     port_reply(move || {
-        party.require_log_access(&req.requested_by, req.user_id.as_deref()).map_err(|e| anyhow::anyhow!(e))?;
+        require_viewer(&party, &req.requested_by)?;
         let events = party.read_logs(req.minutes.unwrap_or(30), req.user_id.as_deref(), None, req.limit.unwrap_or(120));
         Ok(ClientLogsReply { events })
     })

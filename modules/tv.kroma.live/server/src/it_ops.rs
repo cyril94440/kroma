@@ -197,15 +197,15 @@ async fn resolve_also_labels_a_reference_and_filters_by_provider() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_benchmark_point_refuses_a_requester_who_is_not_watching() {
+async fn the_benchmark_point_starts_a_scan_for_any_requester_watching_or_not() {
     let rig = rig();
     load(&rig);
     viewers(&rig, &["u1"]);
 
-    for who in ["", "agent", "u2"] {
-        let reply = ask(&rig, "benchmark", json!({ "channelIds": ["p:6"], "requestedBy": who })).await;
-        assert_eq!(reply, json!({ "Ok": { "status": "refused", "id": null, "reason": "notViewing", "total": 1, "alreadyDone": false } }), "{who:?}");
-    }
-    assert!(!rig.live.scan_state().running);
+    let started = ask(&rig, "benchmark", json!({ "channelIds": ["p:6"], "requestedBy": "u2" })).await;
+
+    assert_eq!(started["Ok"]["status"], "started");
+    assert_eq!(started["Ok"]["reason"], Value::Null);
+    assert!(rig.live.scan_state().running);
     rig.live.shutdown();
 }

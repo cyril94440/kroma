@@ -139,10 +139,6 @@ impl Live {
         !self.host.contributions("tv.kroma.party/room").is_empty()
     }
 
-    pub fn is_viewing(&self, user_id: &str) -> bool {
-        self.lock().presence.viewers().iter().any(|v| v.user_id == user_id)
-    }
-
     pub fn viewer_count(&self) -> usize {
         self.lock().presence.count()
     }

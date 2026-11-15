@@ -3,7 +3,7 @@
   "schemaVersion": 3,
   "id": "tv.kroma.hermes",
   "name": "Hermès",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "The assistant of the family chat: understands requests in natural language, finds channels, starts votes and polls, answers questions about what is on, diagnoses the stream and learns the house preferences. Governance stays in code, never in the model.",
   "engines": {
     "server": ">=0.1.39"

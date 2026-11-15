@@ -40,7 +40,7 @@ Events (`sport.<topic>`) carry a persisted `seq`; `GET /state` returns the curre
 
 Tools (point `tv.kroma.hermes/tools`, routes `/_port/tv.kroma.hermes/tools/{list,call}`): `match_facts`, `compos_match`, `live_standings`, `start_prono`, `sport_channel_hint`, `calibrate_clock`.
 
-`start_prono` is an administrator's action on both doors: `POST /prono/start` and the tool, which reads the user id the assistant sends in the call's `context.userId` and looks it up in the roles the module records from every authenticated request (10 minutes; an unseen, empty or `agent` id is not an administrator). Anyone else gets `{ok: false, error: "adminOnly"}` with a reason the assistant relays. The source product let any family member ask for a prono, its code only checking the match window; this is stricter on purpose.
+`start_prono` has two doors. `POST /prono/start` is the administration button and needs `settings.manage`. The tool, reached by the assistant for any family member who asks, takes no role: the module never receives who asked, and the code alone decides on the match window as in the source product (a kick-off close, or at the latest the 10th minute; a prono already open, an unknown match or an unreachable match source are refused with their reason, which the assistant relays). The module keeps no administrator cache.
 
 The list `match_facts` answers when no match is named shows a match ESPN calls finished as still in progress, without its score, until the picture has caught up: the end of the match is estimated at 115 minutes after the kick-off, plus the reveal delay, like the facts of a single match.
 

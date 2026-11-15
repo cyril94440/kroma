@@ -2,7 +2,7 @@
 
 [package]
 name = "kroma-live"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 rust-version = "1.88"
 description = "KROMA live TV: one IPTV connection restreamed as HLS to every viewer, with standby, off-air detection and a backup provider."

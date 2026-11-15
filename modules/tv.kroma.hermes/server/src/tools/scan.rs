@@ -104,7 +104,6 @@ fn announce(env: &mut ToolEnv, job: &ScanJob) {
 fn start_refusal(start: &crate::peers::BenchmarkStart) -> Value {
     match start.reason.as_deref() {
         Some("scanRunning") => json!({ "status": "occupe", "note": "une recherche tourne déjà : dis-le, n'en relance pas une autre" }),
-        Some("notViewing") => json!({ "status": "refus", "raison": "demandeur_absent", "message": "le scan n'est ouvert qu'aux personnes qui regardent la télé en ce moment : dis-le, n'insiste pas" }),
         Some("mixedProviders") => json!({ "error": "chaînes de deux fournisseurs différents : un scan ne porte que sur un fournisseur" }),
         Some("unknownChannel") => json!({ "error": "une des chaînes est inconnue du catalogue" }),
         Some("noChannel") => json!({ "error": "aucune chaîne à scanner" }),

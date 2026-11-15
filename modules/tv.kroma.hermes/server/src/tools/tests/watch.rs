@@ -77,29 +77,29 @@ fn a_party_that_cannot_give_logs_is_reported_not_hidden() {
 }
 
 #[test]
-fn a_non_administrator_is_refused_the_party_actions_with_the_servers_reason() {
+fn a_refused_party_action_is_returned_with_the_servers_reason() {
     let rig = Rig::new();
-    *rig.room.go_live_reply.lock().unwrap() = Some(Err("adminOnly".into()));
-    *rig.room.fine_sync_reply.lock().unwrap() = Some(Err("adminOnly".into()));
+    *rig.room.go_live_reply.lock().unwrap() = Some(Err("notPresent".into()));
+    *rig.room.fine_sync_reply.lock().unwrap() = Some(Err("needTwoMembers".into()));
 
-    for tool in ["party_go_live", "party_fine_sync"] {
-        let out = call(&rig, tool, json!({}), "Mamie");
-        assert_eq!((out["ok"].clone(), out["raison"].as_str()), (json!(false), Some("reserve_aux_admins")), "{tool}");
-    }
+    let live = call(&rig, "party_go_live", json!({}), "Mamie");
+    let fine = call(&rig, "party_fine_sync", json!({}), "Mamie");
+
+    assert_eq!((live["ok"].clone(), live["raison"].as_str()), (json!(false), Some("demandeur_absent")));
+    assert_eq!((fine["ok"].clone(), fine["raison"].as_str()), (json!(false), Some("deux_membres_requis")));
 }
 
 #[test]
-fn client_logs_fall_back_to_the_authors_own_journal_when_the_party_refuses_the_whole_room() {
+fn client_logs_ask_the_whole_room_in_the_authors_name_and_relay_a_refusal() {
     let rig = Rig::new();
-    *rig.room.logs_reply.lock().unwrap() = Some(Err("adminOnly".into()));
-    *rig.room.own_logs_reply.lock().unwrap() = Some(vec![entry(1, "Mamie", "player", "gel")]);
+    *rig.room.logs_reply.lock().unwrap() = Some(Ok(vec![entry(1, "Papi", "player", "gel")]));
 
     let out = call(&rig, "get_client_logs", json!({}), "Mamie");
+    *rig.room.logs_reply.lock().unwrap() = Some(Err("notPresent".into()));
+    let refused = call(&rig, "get_client_logs", json!({}), "Mamie");
 
     assert_eq!(out["total"], 1);
-    assert!(out["portee"].as_str().unwrap().contains("administrateurs"));
-    assert_eq!(
-        *rig.room.logs_asks.lock().unwrap(),
-        vec![("u-mamie".to_string(), None, 300, Some(30)), ("u-mamie".to_string(), Some("u-mamie".to_string()), 300, Some(30))]
-    );
+    assert_eq!(out["par_spectateur"][0]["pseudo"], "Papi");
+    assert_eq!(refused["raison"], "demandeur_absent");
+    assert_eq!(rig.room.logs_asks.lock().unwrap()[0], ("u-mamie".to_string(), None, 300, Some(30)));
 }

@@ -196,9 +196,6 @@ async fn benchmark<S: HostCtx + Clone + Send + Sync + 'static>(State(host): Stat
         Err(error) => return Json(Err(error.to_string())),
     };
     let total = call.channel_ids.len().min(crate::runtime::BENCHMARK_MAX_IDS);
-    if !live.is_viewing(&call.requested_by) {
-        return Json(Ok(BenchmarkReply { status: "refused".into(), id: None, reason: Some("notViewing".into()), total, already_done: false }));
-    }
     tracing::info!(requested_by = %call.requested_by, total, "benchmark requested");
     Json(Ok(match live.start_benchmark(&call.channel_ids) {
         Ok((id, already_done)) => BenchmarkReply { status: "started".into(), id: Some(id), reason: None, total, already_done },

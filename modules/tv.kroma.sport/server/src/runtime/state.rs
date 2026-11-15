@@ -141,5 +141,4 @@ pub struct State {
     pub clips: ClipsState,
     pub announced: BTreeSet<String>,
     pub views: BTreeMap<&'static str, String>,
-    pub admins: BTreeMap<String, i64>,
 }

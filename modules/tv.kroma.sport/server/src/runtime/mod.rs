@@ -21,7 +21,6 @@ mod follow;
 mod guide;
 mod lookup;
 mod prono;
-mod roles;
 mod scan;
 mod snapshot;
 mod standings;
@@ -107,7 +106,6 @@ impl Sport {
             clips: Default::default(),
             announced,
             views: Default::default(),
-            admins: Default::default(),
         };
         inner.clips.done = store
             .clips(None, 500)

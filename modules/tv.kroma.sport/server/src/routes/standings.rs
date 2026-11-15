@@ -28,7 +28,7 @@ async fn standings<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Query(q): Query<StandingsQuery>,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     let cached = work(move || sport.standings_for_page(&q.competition)).await?;
     Ok(Json(json!({"standings": cached, "pending": cached.is_none()})).into_response())
 }

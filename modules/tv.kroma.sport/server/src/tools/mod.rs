@@ -27,13 +27,6 @@ pub struct Listed {
 pub struct Call {
     pub name: String,
     pub arguments: Value,
-    pub context: Value,
-}
-
-impl Call {
-    fn requested_by(&self) -> String {
-        text(&self.context, "userId")
-    }
 }
 
 #[derive(Serialize)]
@@ -61,7 +54,7 @@ async fn call<S: HostCtx + Clone>(
 ) -> Json<Result<Answered, String>> {
     port_reply(move || {
         Ok(Answered {
-            result: dispatch(&sport, &call.name, &call.arguments, &call.requested_by()),
+            result: dispatch(&sport, &call.name, &call.arguments),
         })
     })
     .await
@@ -80,7 +73,7 @@ fn list_of<T: serde::de::DeserializeOwned>(arguments: &Value, key: &str) -> Opti
     serde_json::from_value(arguments.get(key)?.clone()).ok()
 }
 
-pub fn dispatch(sport: &Sport, name: &str, arguments: &Value, requested_by: &str) -> Value {
+pub fn dispatch(sport: &Sport, name: &str, arguments: &Value) -> Value {
     match name {
         "match_facts" => {
             sport.tool_match_facts(&text(arguments, "equipes"), &text(arguments, "competition"))
@@ -93,15 +86,6 @@ pub fn dispatch(sport: &Sport, name: &str, arguments: &Value, requested_by: &str
             arguments.get("top").and_then(Value::as_i64).unwrap_or(10),
         ),
         "start_prono" => {
-            if sport.require_admin_id(requested_by).is_err() {
-                return json!({
-                    "ok": false,
-                    "status": "refus",
-                    "error": "adminOnly",
-                    "raison": "reserve_aux_admins",
-                    "message": "le prono à la demande est réservé aux administrateurs de la maison, vérifié côté serveur : dis-le simplement, sans insister ni contourner"
-                });
-            }
             match sport.start_prono(&text(arguments, "home"), &text(arguments, "away")) {
                 Ok(done) => done,
                 Err(reason) => json!({"ok": false, "error": reason}),

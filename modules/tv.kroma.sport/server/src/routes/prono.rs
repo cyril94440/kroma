@@ -26,7 +26,7 @@ async fn current<S: HostCtx + Clone>(
     Extension(sport): Extension<Arc<Sport>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     let (prono, seq) = work(move || (sport.prono_payload(), sport.sequence())).await?;
     Ok(Json(json!({"prono": prono, "seq": seq})).into_response())
 }
@@ -44,7 +44,7 @@ async fn vote<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<VoteBody>,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     work(move || sport.vote(&user.id, &user.username, &body.id, &body.score))
         .await?
         .map(|()| Json(json!({"ok": true})).into_response())
@@ -64,7 +64,7 @@ async fn start<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<StartBody>,
 ) -> Result<Response, Response> {
-    admin(&host, &sport, &user)?;
+    admin(&host, &user)?;
     match work(move || sport.start_prono(&body.home, &body.away)).await? {
         Ok(started) => Ok(Json(started).into_response()),
         Err(reason) => Ok((
@@ -80,6 +80,6 @@ async fn leaderboard<S: HostCtx + Clone>(
     Extension(sport): Extension<Arc<Sport>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    viewer(&host, &sport, &user)?;
+    viewer(&host, &user)?;
     Ok(Json(json!({"season": work(move || sport.leaderboard()).await?})).into_response())
 }

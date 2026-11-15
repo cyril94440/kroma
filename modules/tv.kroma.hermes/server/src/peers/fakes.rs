@@ -26,7 +26,6 @@ pub struct FakeRoom {
     pub fine_sync_reply: Mutex<Option<Result<Value, String>>>,
     pub logs_reply: Mutex<Option<Result<Vec<Value>, String>>>,
     pub logs_asks: Mutex<Vec<LogsAsk>>,
-    pub own_logs_reply: Mutex<Option<Vec<Value>>>,
     pub party_calls: Mutex<Vec<(String, String)>>,
     pub switch_reply: Mutex<Option<SwitchOutcome>>,
     pub polls: Mutex<Vec<PollCall>>,
@@ -118,11 +117,6 @@ impl Room for FakeRoom {
 
     fn client_logs(&self, requested_by: &str, user_id: Option<&str>, limit: u32, minutes: Option<u32>) -> Result<Vec<Value>> {
         self.logs_asks.lock().unwrap().push((requested_by.into(), user_id.map(str::to_string), limit, minutes));
-        if user_id.is_some() {
-            if let Some(own) = self.own_logs_reply.lock().unwrap().clone() {
-                return Ok(own);
-            }
-        }
         answer(&self.logs_reply)
     }
 }
