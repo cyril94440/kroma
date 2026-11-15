@@ -72,7 +72,15 @@ export function ModuleConfigForm({
     Object.fromEntries(fields.map((f) => [f.key, initial(f, values[f.key])])),
   );
   const [saving, setSaving] = useState(false);
-  const set = (key: string, v: ConfigValue) => setDraft((d) => ({ ...d, [key]: v }));
+  const [cleared, setCleared] = useState<ReadonlySet<string>>(new Set());
+  const set = (key: string, v: ConfigValue) => {
+    setDraft((d) => ({ ...d, [key]: v }));
+    if (v !== '') setCleared((c) => new Set([...c].filter((k) => k !== key)));
+  };
+  const clear = (key: string) => {
+    setDraft((d) => ({ ...d, [key]: '' }));
+    setCleared((c) => new Set(c).add(key));
+  };
 
   const save = async () => {
     setSaving(true);
@@ -81,9 +89,11 @@ export function ModuleConfigForm({
         method: 'PUT',
         body: JSON.stringify(
           Object.fromEntries(
-            Object.entries(draft).filter(
-              ([key, value]) => value !== '' || !fields.find((f) => f.key === key)?.secret,
-            ),
+            Object.entries(draft).flatMap(([key, value]): [string, ConfigValue | null][] => {
+              if (!fields.find((f) => f.key === key)?.secret) return [[key, value]];
+              if (value !== '') return [[key, value]];
+              return cleared.has(key) ? [[key, null]] : [];
+            }),
           ),
         ),
       });
@@ -105,9 +115,10 @@ export function ModuleConfigForm({
               key={f.key}
               field={f}
               value={draft[f.key]}
-              keeps={hasStoredSecret(f, values[f.key])}
+              keeps={hasStoredSecret(f, values[f.key]) && !cleared.has(f.key)}
               words={words}
               onChange={(v) => set(f.key, v)}
+              onClear={() => clear(f.key)}
             />
           ))}
         </ListRow.Group>
@@ -132,13 +143,16 @@ function ConfigRow({
   keeps,
   words,
   onChange,
+  onClear,
 }: Readonly<{
   field: ConfigField;
   value: ConfigValue | undefined;
   keeps: boolean;
   words: (text: string) => string;
   onChange: (v: ConfigValue) => void;
+  onClear: () => void;
 }>) {
+  const t = useT();
   const s = useStyles(sDefinition);
   const label = words(field.label);
   const hint = field.placeholder ? words(field.placeholder) : undefined;
@@ -181,7 +195,16 @@ function ConfigRow({
   return (
     <ListRow.Root size="sm">
       <ListRow.Label>{label}</ListRow.Label>
-      <ListRow.Trailing>{control}</ListRow.Trailing>
+      <ListRow.Trailing>
+        {keeps ? (
+          <Row gap={8} align="center">
+            {control}
+            <Button variant="ghost" size="sm" label={t('common.clear')} onPress={onClear} />
+          </Row>
+        ) : (
+          control
+        )}
+      </ListRow.Trailing>
     </ListRow.Root>
   );
 }

@@ -22,6 +22,7 @@ mod govern_flow;
 mod polls;
 mod provider_vote;
 mod presence;
+mod roles;
 mod snapshot;
 mod syncing;
 mod tick;
@@ -91,6 +92,7 @@ pub(crate) struct State {
     pub last_voice_tick: i64,
     pub last_prune: i64,
     pub last_tick: i64,
+    pub admins: BTreeMap<String, i64>,
 }
 
 pub struct Party {
@@ -168,6 +170,7 @@ impl Party {
                 last_voice_tick: 0,
                 last_prune: 0,
                 last_tick: now,
+                admins: BTreeMap::new(),
             }),
             voice: Mutex::new(VoiceRoom::new(now)),
             ice: Mutex::new(IceCache::default()),

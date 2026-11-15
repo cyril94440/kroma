@@ -177,7 +177,8 @@ fn teams_are_searched_without_inventing_or_confusing_a_match() {
     assert_eq!(ids(json!("Lens")), ["espn-1"]);
     assert_eq!(ids(json!(["PSG", "Le Havre"])), ["espn-2"]);
     assert!(ids(json!("Lens - Paris FC")).is_empty() && ids(json!("")).is_empty());
-    let (live, done) = (list_line(&matches[0]), list_line(&matches[1]));
+    let late = at("2026-10-30T23:30:00Z");
+    let (live, done) = (list_line(&matches[0], late, 60.0), list_line(&matches[1], late, 60.0));
     assert!(
         live["score"].as_str().unwrap().contains("décalé")
             && !live["score"].as_str().unwrap().contains("1-0")
@@ -186,4 +187,19 @@ fn teams_are_searched_without_inventing_or_confusing_a_match() {
         (done["score"].clone(), done["statut"].clone()),
         (json!("1-5"), json!("termine"))
     );
+}
+
+#[test]
+fn a_match_that_just_ended_keeps_its_final_score_back_until_the_picture_has_caught_up() {
+    let matches = board(&[("2", "Paris Saint-Germain", "Le Havre AC", "post", "1", "5")]);
+    let start = at("2026-10-30T20:05:00Z");
+    let end = start + crate::detect::END_AFTER_START_S;
+
+    let behind = list_line(&matches[0], end + 30.0, 60.0);
+    let caught_up = list_line(&matches[0], end + 61.0, 60.0);
+
+    assert_eq!(behind["statut"], "en_cours");
+    assert!(behind["score"].as_str().unwrap().contains("décalé"));
+    assert!(!behind.to_string().contains("1-5"));
+    assert_eq!((caught_up["statut"].clone(), caught_up["score"].clone()), (json!("termine"), json!("1-5")));
 }

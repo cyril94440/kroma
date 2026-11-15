@@ -238,3 +238,16 @@ async fn ice_servers_are_for_participants_only() {
     );
     assert_eq!(stranger, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn a_third_device_of_one_account_is_refused_with_a_conflict_while_others_still_join() {
+    let app = app();
+    join(&app, "mamie", "device-aaaa").await;
+    join(&app, "mamie", "device-bbbb").await;
+
+    let (third, body) = app.post("/voice/join", "mamie", json!({ "deviceId": "device-cccc" })).await;
+    let (other, _) = app.post("/voice/join", "papi", json!({ "deviceId": "device-cccc" })).await;
+
+    assert_eq!((third, body["error"].as_str()), (StatusCode::CONFLICT, Some("accountFull")));
+    assert_eq!(other, StatusCode::OK);
+}

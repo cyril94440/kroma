@@ -206,6 +206,14 @@ pub fn failure(reason: &str) -> Value {
     json!({ "ok": false, "erreur": reason })
 }
 
+pub fn admin_refusal() -> Value {
+    json!({ "ok": false, "status": "refus", "raison": "reserve_aux_admins", "message": "action réservée aux administrateurs de la maison, vérifié côté serveur : dis-le simplement à la personne, sans insister ni contourner" })
+}
+
+pub fn is_admin_only(error: &anyhow::Error) -> bool {
+    format!("{error:#}").trim() == "adminOnly"
+}
+
 pub fn provider_arg(text: &str) -> Result<Option<&'static str>, ()> {
     let t = text.trim().to_lowercase();
     match t.as_str() {

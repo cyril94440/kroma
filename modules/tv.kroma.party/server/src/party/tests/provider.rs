@@ -165,3 +165,62 @@ fn the_resolution_live_publishes_after_the_vote_answer_is_harmless() {
     assert_eq!(rig.last_system().key.as_deref(), Some("party.vote.providerAccepted"));
     assert!(!rig.vote_open());
 }
+
+fn requested(id: &str, by: &str) -> serde_json::Value {
+    let mut event = opened(id, "switchProvider");
+    event["proposal"]["requestedBy"] = json!(by);
+    event
+}
+
+#[test]
+fn the_exact_payload_live_publishes_for_a_requested_proposal_counts_the_asker_as_a_for() {
+    let rig = rig();
+    rig.present(&["Cyril", "Mamie"]);
+
+    rig.party.on_proposal(&json!({
+        "proposal": {
+            "id": "prop-1",
+            "kind": "switchProvider",
+            "text": "requested",
+            "channel": "s:1",
+            "requestedBy": "cyril",
+            "createdAt": 1000,
+            "expiresAt": 31000
+        },
+        "resolved": false,
+        "viewers": 0
+    }));
+
+    assert!(rig.vote_open());
+}
+
+#[test]
+fn a_requested_proposal_left_to_its_deadline_with_blanks_passes_one_to_nothing() {
+    let rig = rig();
+    rig.present(&["Cyril", "Mamie"]);
+    rig.party.on_proposal(&requested("p1", "cyril"));
+    assert_eq!(rig.vote_required(), vec!["mamie".to_string()]);
+
+    rig.advance(31_000);
+    rig.party.tick();
+
+    assert!(!rig.vote_open());
+    assert_eq!(rig.live.proposals.lock().unwrap().last(), Some(&("p1".to_string(), true)));
+}
+
+#[test]
+fn a_requester_who_is_alone_is_applied_at_once() {
+    let rig = rig();
+    rig.present(&["Cyril"]);
+    rig.party.on_proposal(&requested("p1", "cyril"));
+    assert!(!rig.vote_open());
+    assert_eq!(rig.live.proposals.lock().unwrap().last(), Some(&("p1".to_string(), true)));
+}
+
+#[test]
+fn an_asker_who_is_not_present_is_not_counted() {
+    let rig = rig();
+    rig.present(&["Cyril", "Mamie"]);
+    rig.party.on_proposal(&requested("p1", "ghost"));
+    assert!(rig.vote_open());
+}

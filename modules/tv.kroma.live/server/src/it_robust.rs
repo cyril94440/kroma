@@ -146,3 +146,29 @@ async fn a_codec_learned_from_a_probe_makes_the_next_start_tag_the_stream() {
     assert!(rig.live.source_for(&channel).unwrap().hevc);
     assert!(!rig.live.source_for(&rig.live.providers.find_by_ref("p:2").unwrap()).unwrap().hevc);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_relaunch_that_fails_after_the_stop_is_retried_by_the_restart_timer() {
+    let rig = crate::it_live::rig();
+    load(&rig);
+    crate::it_stream::playing(&rig, "p:1").await;
+    rig.live.stop_run().await;
+
+    let message = rig.live.fail_start(&anyhow::anyhow!("start ffmpeg: boom"));
+
+    {
+        let inner = rig.live.lock();
+        assert_eq!((inner.phase, inner.last_error.clone()), (crate::status::Phase::Error, Some(message)));
+        assert!(inner.restart_at.is_some_and(|at| at > Instant::now()));
+        assert!(inner.run.is_none());
+    }
+    rig.live.lock().restart_at = Some(Instant::now() - Duration::from_secs(1));
+
+    rig.live.restart_if_due();
+
+    let inner = rig.live.lock();
+    assert_eq!(inner.phase, crate::status::Phase::Running);
+    assert!(inner.run.is_some() && inner.restart_at.is_none());
+    drop(inner);
+    rig.live.shutdown();
+}

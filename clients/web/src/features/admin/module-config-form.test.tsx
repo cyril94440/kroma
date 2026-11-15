@@ -89,3 +89,34 @@ it('leaves an untouched stored secret out of the save, since the server only mar
   const body = JSON.parse(H.adminApi.mock.calls.at(-1)?.[1].body as string);
   expect(body).toEqual({ agent: 'VLC' });
 });
+
+function showSecret(stored: boolean) {
+  render(
+    <I18nProvider locale="en">
+      <ModuleConfigForm
+        moduleId="tv.kroma.live"
+        fields={[{ key: 'primaryUrl', label: 'Portal', type: 'string', secret: true }]}
+        values={{ primaryUrl: stored }}
+        onSaved={() => {}}
+      />
+    </I18nProvider>,
+  );
+}
+
+const lastBody = () => JSON.parse(H.adminApi.mock.calls.at(-1)?.[1].body as string);
+
+it('clears a stored secret by sending null once the clear control is pressed', async () => {
+  showSecret(true);
+
+  fireEvent.click(screen.getByText('Clear'));
+  fireEvent.click(screen.getByText('Save'));
+  await Promise.resolve();
+
+  expect(lastBody()).toEqual({ primaryUrl: null });
+});
+
+it('offers no clear control for a secret that is not stored', () => {
+  showSecret(false);
+
+  expect(screen.queryByText('Clear')).toBeNull();
+});

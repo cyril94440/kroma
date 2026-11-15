@@ -143,7 +143,7 @@ async fn the_party_calls_send_the_pinned_json_and_read_the_pinned_replies() {
     let out = blocking(move || {
         let plain = room.request_switch(&SwitchAsk { channel_id: "tf1", channel_name: None, requested_by: "u1", reason: "foot", force: false }).unwrap();
         let forced = room.request_switch(&SwitchAsk { channel_id: "p:3", channel_name: Some("TF1"), requested_by: "u1", reason: "", force: true }).unwrap();
-        (plain, forced, room.go_live("u1").unwrap(), room.fine_sync("u1").unwrap_err(), room.client_logs(Some("u1"), 50, Some(30)).unwrap(), room.client_logs(None, 10, None).unwrap())
+        (plain, forced, room.go_live("u1").unwrap(), room.fine_sync("u1").unwrap_err(), room.client_logs("u1", Some("u1"), 50, Some(30)).unwrap(), room.client_logs("u1", None, 10, None).unwrap())
     })
     .await;
     assert_eq!(out.0.vote_id.as_deref(), Some("9"));
@@ -158,8 +158,8 @@ async fn the_party_calls_send_the_pinned_json_and_read_the_pinned_replies() {
     assert_eq!(calls["goLive"], json!({ "requestedBy": "u1" }));
     assert_eq!(calls["fineSync"], json!({ "requestedBy": "u1" }));
     let logs: Vec<&Value> = all.iter().filter(|(m, _)| m == "clientLogs").map(|(_, b)| b).collect();
-    assert_eq!(logs[0], &json!({ "userId": "u1", "limit": 50, "minutes": 30 }));
-    assert_eq!(logs[1], &json!({ "userId": null, "limit": 10 }));
+    assert_eq!(logs[0], &json!({ "requestedBy": "u1", "userId": "u1", "limit": 50, "minutes": 30 }));
+    assert_eq!(logs[1], &json!({ "requestedBy": "u1", "userId": null, "limit": 10 }));
 }
 
 #[test]

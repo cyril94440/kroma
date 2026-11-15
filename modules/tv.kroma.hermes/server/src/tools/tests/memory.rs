@@ -72,3 +72,14 @@ fn notes_are_about_the_author_only_and_can_be_forgotten() {
     assert!(rig.deps.store.notes("u-mamie").unwrap().is_empty());
     assert_eq!(rig.deps.store.notes("u-papi").unwrap().len(), 1);
 }
+
+#[test]
+fn a_lesson_already_known_is_not_stored_twice_so_a_repeat_cannot_push_the_others_out() {
+    let rig = Rig::new();
+    call(&rig, "learn_lesson", json!({ "lesson": "Toujours dire la chaîne et l'heure du prochain match." }), "Mamie");
+
+    let again = call(&rig, "learn_lesson", json!({ "lesson": "toujours dire la chaîne et l'heure du prochain match." }), "Papi");
+
+    assert_eq!((again["ok"].clone(), again["deja_retenue"].clone()), (json!(true), json!(true)));
+    assert_eq!(rig.deps.store.lessons().unwrap().len(), 1);
+}

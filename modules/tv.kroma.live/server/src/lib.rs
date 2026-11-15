@@ -53,6 +53,8 @@ mod it_scan;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_stream;
 #[cfg(all(test, not(target_family = "wasm")))]
+mod it_switch_provider;
+#[cfg(all(test, not(target_family = "wasm")))]
 mod it_points;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_routes;

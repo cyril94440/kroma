@@ -79,7 +79,16 @@ describe('sportRows', () => {
     const rows = sportRows(view);
 
     expect(rows.live.map((e) => e.id)).toEqual(['live']);
-    expect(rows.upcoming.map((e) => e.id)).toEqual(['p9', 'p8', 'p7', 'p6', 'p5', 'p4', 'p3', 'p2']);
+    expect(rows.upcoming.map((e) => e.id)).toEqual([
+      'p9',
+      'p8',
+      'p7',
+      'p6',
+      'p5',
+      'p4',
+      'p3',
+      'p2',
+    ]);
   });
 });
 

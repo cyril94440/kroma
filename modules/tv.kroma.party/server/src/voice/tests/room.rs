@@ -1,34 +1,7 @@
-use std::collections::BTreeSet;
-
 use super::super::error::VoiceError;
-use super::super::limits::{SPEAKING_TTL_MS, TTL_MS};
-use super::super::room::{JoinRequest, VoiceRoom};
-
-const T0: i64 = 1_700_000_000_000;
-const GRACE: i64 = 45_000;
-
-fn room() -> VoiceRoom {
-    VoiceRoom::new(T0)
-}
-
-fn request<'a>(user: &'a str, device: &'a str) -> JoinRequest<'a> {
-    JoinRequest {
-        user_id: user,
-        name: user,
-        device_id: device,
-        muted: false,
-        watching: false,
-        max_peers: 8,
-    }
-}
-
-fn join(room: &mut VoiceRoom, user: &str, device: &str) -> String {
-    room.join(&request(user, device), T0).unwrap().peer_id
-}
-
-fn present(users: &[&str]) -> BTreeSet<String> {
-    users.iter().map(|u| (*u).to_string()).collect()
-}
+use super::super::limits::TTL_MS;
+use super::super::room::JoinRequest;
+use super::support::*;
 
 #[test]
 fn a_join_mints_a_distinct_peer_id_and_bumps_the_revision() {
@@ -242,158 +215,6 @@ fn an_unreadable_presence_list_drops_nobody() {
 }
 
 #[test]
-fn relays_number_each_ordered_pair_on_its_own() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-    let papi = join(&mut room, "papi", "device-bbbb");
-
-    let first = room.relay("mamie", &mamie, &papi, T0).unwrap();
-    let second = room.relay("mamie", &mamie, &papi, T0).unwrap();
-    let reverse = room.relay("papi", &papi, &mamie, T0).unwrap();
-
-    assert_eq!((first.n, second.n, reverse.n), (1, 2, 1));
-    assert_eq!(first.to_user, "papi");
-}
-
-#[test]
-fn the_pair_counter_restarts_when_the_other_side_rejoins() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-    let papi = join(&mut room, "papi", "device-bbbb");
-    room.relay("mamie", &mamie, &papi, T0).unwrap();
-    let papi_again = room
-        .join(&request("papi", "device-bbbb"), T0 + 1)
-        .unwrap()
-        .peer_id;
-
-    let relay = room.relay("mamie", &mamie, &papi_again, T0 + 2).unwrap();
-
-    assert_eq!(relay.n, 1);
-    assert_eq!(
-        room.relay("mamie", &mamie, &papi, T0 + 2),
-        Err(VoiceError::PeerGone)
-    );
-}
-
-#[test]
-fn a_signal_from_someone_who_is_not_a_participant_is_refused() {
-    let mut room = room();
-    let papi = join(&mut room, "papi", "device-bbbb");
-
-    let refused = room.relay("mamie", "ghost-1", &papi, T0);
-
-    assert_eq!(refused, Err(VoiceError::NotJoined));
-}
-
-#[test]
-fn a_participant_cannot_signal_as_someone_elses_peer() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-    let papi = join(&mut room, "papi", "device-bbbb");
-
-    let refused = room.relay("papi", &mamie, &papi, T0);
-
-    assert_eq!(refused, Err(VoiceError::Forbidden));
-}
-
-#[test]
-fn a_signal_to_a_peer_that_left_says_peer_gone() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-    let papi = join(&mut room, "papi", "device-bbbb");
-    room.leave("papi", &papi, false, T0).unwrap();
-
-    assert_eq!(
-        room.relay("mamie", &mamie, &papi, T0),
-        Err(VoiceError::PeerGone)
-    );
-}
-
-#[test]
-fn a_signal_to_oneself_is_refused() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-
-    assert_eq!(
-        room.relay("mamie", &mamie, &mamie, T0),
-        Err(VoiceError::SelfSignal)
-    );
-}
-
-#[test]
-fn a_flood_of_signals_is_throttled_per_sender_and_recovers() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-    let papi = join(&mut room, "papi", "device-bbbb");
-
-    let sent = (0..250)
-        .filter(|_| room.relay("mamie", &mamie, &papi, T0).is_ok())
-        .count();
-    let reverse = room.relay("papi", &papi, &mamie, T0);
-    let later = room.relay("mamie", &mamie, &papi, T0 + 10_000);
-
-    assert_eq!(sent, 240);
-    assert!(reverse.is_ok());
-    assert!(later.is_ok());
-}
-
-#[test]
-fn speaking_lasts_the_ttl_unless_refreshed_and_is_announced_once_per_change() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-
-    room.set_speaking("mamie", &mamie, true, T0).unwrap();
-    let started = room.speaking_change(T0);
-    let unchanged = room.speaking_change(T0 + 1_000);
-    let stopped = room.speaking_change(T0 + SPEAKING_TTL_MS);
-
-    assert_eq!(started, Some(vec![mamie]));
-    assert_eq!(unchanged, None);
-    assert_eq!(stopped, Some(vec![]));
-}
-
-#[test]
-fn a_muted_participant_is_never_marked_speaking_and_muting_clears_it() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-    room.set_speaking("mamie", &mamie, true, T0).unwrap();
-
-    let changed = room.set_muted("mamie", &mamie, true, T0 + 1).unwrap();
-    room.set_speaking("mamie", &mamie, true, T0 + 2).unwrap();
-
-    assert!(changed);
-    assert!(room.speaking(T0 + 3).is_empty());
-}
-
-#[test]
-fn muting_twice_changes_nothing_and_leaves_the_revision_alone() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-    room.set_muted("mamie", &mamie, true, T0).unwrap();
-    let revision = room.revision();
-
-    let changed = room.set_muted("mamie", &mamie, true, T0).unwrap();
-
-    assert!(!changed);
-    assert_eq!(room.revision(), revision);
-}
-
-#[test]
-fn speaking_is_rate_limited_but_silence_always_goes_through() {
-    let mut room = room();
-    let mamie = join(&mut room, "mamie", "device-aaaa");
-
-    let accepted = (0..12)
-        .filter(|_| room.set_speaking("mamie", &mamie, true, T0).is_ok())
-        .count();
-    let silence = room.set_speaking("mamie", &mamie, false, T0);
-
-    assert_eq!(accepted, 10);
-    assert!(silence.is_ok());
-    assert!(room.speaking(T0).is_empty());
-}
-
-#[test]
 fn a_quiet_leave_followed_by_a_return_within_the_grace_is_not_announced() {
     let mut room = room();
     let peer = join(&mut room, "mamie", "device-aaaa");
@@ -410,4 +231,30 @@ fn a_quiet_leave_followed_by_a_return_within_the_grace_is_not_announced() {
 
     assert!(!soon.announce);
     assert!(late.announce);
+}
+
+#[test]
+fn one_account_holds_at_most_two_slots_whatever_the_device_ids() {
+    let mut room = room();
+    join(&mut room, "mamie", "device-aaaa");
+    join(&mut room, "mamie", "device-bbbb");
+
+    let third = room.join(&request("mamie", "device-cccc"), T0);
+    let rejoin = room.join(&request("mamie", "device-aaaa"), T0);
+    let other = room.join(&request("papi", "device-cccc"), T0);
+
+    assert_eq!(third, Err(VoiceError::AccountFull));
+    assert!(rejoin.is_ok());
+    assert!(other.is_ok());
+    assert_eq!(room.members().iter().filter(|m| m.user_id == "mamie").count(), 2);
+}
+
+#[test]
+fn a_slot_freed_by_leaving_lets_the_account_take_another_device() {
+    let mut room = room();
+    let first = join(&mut room, "mamie", "device-aaaa");
+    join(&mut room, "mamie", "device-bbbb");
+    room.leave("mamie", &first, false, T0).unwrap();
+
+    assert!(room.join(&request("mamie", "device-cccc"), T0).is_ok());
 }

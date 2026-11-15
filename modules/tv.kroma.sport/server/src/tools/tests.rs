@@ -117,12 +117,13 @@ mod with_rig {
         }
         rig.serve_summary(&villarreal_summary());
 
-        let lineup = crate::tools::dispatch(&rig.sport, "compos_match", &json!({"equipes": "PSG"}));
-        let nothing = crate::tools::dispatch(&rig.sport, "compos_match", &json!({}));
+        let lineup = crate::tools::dispatch(&rig.sport, "compos_match", &json!({"equipes": "PSG"}), "u1");
+        let nothing = crate::tools::dispatch(&rig.sport, "compos_match", &json!({}), "u1");
         let hint = crate::tools::dispatch(
             &rig.sport,
             "sport_channel_hint",
             &json!({"home": "A", "away": "B", "answer": "pas de chaine"}),
+            "u1",
         );
 
         assert_eq!(
@@ -137,5 +138,28 @@ mod with_rig {
             .unwrap()
             .contains("ne reconnais pas"));
         assert_eq!(hint["ok"], false);
+    }
+
+    #[test]
+    fn the_on_request_prono_is_refused_unless_the_requester_is_a_known_administrator() {
+        let rig = Rig::new("2026-11-03T20:11:00Z");
+        let ask = |by: &str| {
+            crate::tools::dispatch(&rig.sport, "start_prono", &json!({"home": "Le Havre", "away": "PSG"}), by)
+        };
+        rig.sport.note_role("u-mamie", false);
+        rig.sport.note_role("u-cyril", true);
+
+        for who in ["", "agent", "u-mamie", "u-ghost"] {
+            let refused = ask(who);
+            assert_eq!(
+                (refused["ok"].clone(), refused["error"].clone(), refused["raison"].clone()),
+                (json!(false), json!("adminOnly"), json!("reserve_aux_admins")),
+                "{who:?}"
+            );
+        }
+        let passed = ask("u-cyril");
+        assert_ne!(passed["error"], json!("adminOnly"));
+        rig.sport.note_role("u-cyril", false);
+        assert_eq!(ask("u-cyril")["error"], json!("adminOnly"));
     }
 }

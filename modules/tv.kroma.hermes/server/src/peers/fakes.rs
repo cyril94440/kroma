@@ -5,8 +5,8 @@ use serde_json::{json, Value};
 
 use super::{Contributors, ExternalTool, KickOutcome, Room, RoomMessage, SwitchAsk, SwitchOutcome};
 
-pub type LogsAsk = (Option<String>, u32, Option<u32>);
-pub type PollCall = (String, String, Vec<String>, Option<i64>);
+pub type LogsAsk = (String, Option<String>, u32, Option<u32>);
+pub type PollCall = (String, String, String, Vec<String>, Option<i64>);
 pub type ExternalCall = (String, String, Value, String, String);
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,10 +26,12 @@ pub struct FakeRoom {
     pub fine_sync_reply: Mutex<Option<Result<Value, String>>>,
     pub logs_reply: Mutex<Option<Result<Vec<Value>, String>>>,
     pub logs_asks: Mutex<Vec<LogsAsk>>,
+    pub own_logs_reply: Mutex<Option<Vec<Value>>>,
     pub party_calls: Mutex<Vec<(String, String)>>,
     pub switch_reply: Mutex<Option<SwitchOutcome>>,
     pub polls: Mutex<Vec<PollCall>>,
     pub poll_error: Mutex<Option<String>>,
+    pub closes: Mutex<Vec<String>>,
     pub votes: Mutex<Vec<(String, String)>>,
     pub vote_error: Mutex<Option<String>>,
     pub kicks: Mutex<Vec<(String, String, String)>>,
@@ -70,15 +72,16 @@ impl Room for FakeRoom {
         Ok(self.switch_reply.lock().unwrap().clone().unwrap_or(SwitchOutcome { outcome: "voteStarted".into(), vote_id: Some("1".into()), reason: None }))
     }
 
-    fn start_poll(&self, question: &str, kind: &str, options: &[String], duration_s: Option<i64>) -> Result<Value> {
+    fn start_poll(&self, requested_by: &str, question: &str, kind: &str, options: &[String], duration_s: Option<i64>) -> Result<Value> {
         if let Some(e) = self.poll_error.lock().unwrap().clone() {
             return Err(anyhow!(e));
         }
-        self.polls.lock().unwrap().push((question.into(), kind.into(), options.to_vec(), duration_s));
+        self.polls.lock().unwrap().push((requested_by.into(), question.into(), kind.into(), options.to_vec(), duration_s));
         Ok(json!({ "question": question, "options": options }))
     }
 
-    fn close_poll(&self) -> Result<Value> {
+    fn close_poll(&self, requested_by: &str) -> Result<Value> {
+        self.closes.lock().unwrap().push(requested_by.into());
         match self.poll_error.lock().unwrap().clone() {
             Some(e) => Err(anyhow!(e)),
             None => Ok(json!({ "total": 2 })),
@@ -113,8 +116,13 @@ impl Room for FakeRoom {
         answer(&self.fine_sync_reply)
     }
 
-    fn client_logs(&self, user_id: Option<&str>, limit: u32, minutes: Option<u32>) -> Result<Vec<Value>> {
-        self.logs_asks.lock().unwrap().push((user_id.map(str::to_string), limit, minutes));
+    fn client_logs(&self, requested_by: &str, user_id: Option<&str>, limit: u32, minutes: Option<u32>) -> Result<Vec<Value>> {
+        self.logs_asks.lock().unwrap().push((requested_by.into(), user_id.map(str::to_string), limit, minutes));
+        if user_id.is_some() {
+            if let Some(own) = self.own_logs_reply.lock().unwrap().clone() {
+                return Ok(own);
+            }
+        }
         answer(&self.logs_reply)
     }
 }

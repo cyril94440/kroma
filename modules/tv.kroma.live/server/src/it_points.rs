@@ -128,3 +128,18 @@ async fn the_epg_point_searches_by_title_or_lists_a_window_with_millisecond_time
     assert!(first["start"].as_i64().unwrap() > 1_700_000_000_000);
     assert!(window["Ok"]["programmes"].as_array().unwrap().len() >= 3);
 }
+
+#[test]
+fn the_manifest_declares_exactly_the_methods_the_control_point_answers() {
+    let manifest: Value = serde_json::from_str(include_str!("../../module.json")).unwrap();
+    let mut declared: Vec<String> = manifest["definesPoints"][0]["methods"].as_array().unwrap().iter().map(|m| m.as_str().unwrap().to_string()).collect();
+    let mut answered: Vec<String> = [include_str!("routes/points.rs"), include_str!("routes/points_ops.rs")]
+        .iter()
+        .flat_map(|source| source.split("\"/_port/tv.kroma.live/control/").skip(1))
+        .map(|rest| rest.split('"').next().unwrap().to_string())
+        .collect();
+    declared.sort();
+    answered.sort();
+    assert_eq!(manifest["definesPoints"][0]["name"], "control");
+    assert_eq!(declared, answered);
+}

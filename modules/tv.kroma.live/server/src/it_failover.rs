@@ -35,7 +35,7 @@ async fn a_proposal_goes_to_a_vote_when_the_party_module_is_there_and_its_answer
     playing(&rig, "p:1").await;
     let backup = rig.live.providers.find_by_ref("s:1").unwrap();
 
-    let outcome = rig.live.propose_channel("switchToBackup", &backup, "unstable").await;
+    let outcome = rig.live.propose_channel("switchToBackup", &backup, "unstable", None).await;
 
     assert_eq!(outcome, crate::runtime::Proposed::Voting);
     let opened = &rig.live.sent_on("live.proposal")[0];
@@ -54,7 +54,7 @@ async fn an_unanswered_proposal_expires_as_a_refusal() {
     load(&rig);
     playing(&rig, "p:1").await;
     let backup = rig.live.providers.find_by_ref("s:1").unwrap();
-    rig.live.propose_channel("switchToBackup", &backup, "unstable").await;
+    rig.live.propose_channel("switchToBackup", &backup, "unstable", None).await;
     for proposal in rig.live.lock().proposals.values_mut() {
         proposal.expires_at = 0;
     }
@@ -76,13 +76,13 @@ async fn without_the_party_module_a_proposal_is_accepted_for_one_viewer_and_decl
     rig.live.lock().presence.beat("u1", "Ann", now_ms());
     rig.live.lock().presence.beat("u2", "Bob", now_ms());
 
-    let declined = rig.live.propose_channel("switchToBackup", &backup, "unstable").await;
+    let declined = rig.live.propose_channel("switchToBackup", &backup, "unstable", None).await;
 
     assert_eq!(declined, crate::runtime::Proposed::Declined);
     let first = &rig.live.sent_on("live.proposal")[0];
     assert_eq!((first["accepted"].clone(), first["default"].clone()), (json!(false), json!("noVote")));
     rig.live.lock().presence.leave("u2", now_ms());
-    assert_eq!(rig.live.propose_channel("switchToBackup", &backup, "unstable").await, crate::runtime::Proposed::Applied);
+    assert_eq!(rig.live.propose_channel("switchToBackup", &backup, "unstable", None).await, crate::runtime::Proposed::Applied);
     assert!(rig.live.status().on_backup);
     rig.live.shutdown();
 }

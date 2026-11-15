@@ -27,7 +27,9 @@ export function visibleClips(
   now: number,
   matchId: string | null,
 ): Clip[] {
-  return clips.filter((c) => (matchId === null || c.match_id === matchId) && clipVisible(c, pdt, now));
+  return clips.filter(
+    (c) => (matchId === null || c.match_id === matchId) && clipVisible(c, pdt, now),
+  );
 }
 
 export interface SportRows {

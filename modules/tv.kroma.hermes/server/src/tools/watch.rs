@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 
-use super::{failure, int_arg, method_missing, text_arg, Availability, Kind, Spec, ToolEnv};
+use super::{failure, int_arg, is_admin_only, method_missing, text_arg, Availability, Kind, Spec, ToolEnv};
 use crate::paris::clock_label;
 use crate::webcache::normalise;
 
@@ -58,6 +58,7 @@ pub fn specs() -> Vec<Spec> {
 fn party_reason(code: &str) -> (&'static str, String) {
     match code {
         "noActiveParty" => ("pas_de_watch_party", "il n'y a pas de watch party active : dis-le".into()),
+        "adminOnly" => ("reserve_aux_admins", "action réservée aux administrateurs de la maison, vérifié côté serveur : dis-le simplement, sans insister ni contourner".into()),
         "needTwoMembers" => ("deux_membres_requis", "il faut au moins 2 membres mesurables dans la watch party : dis-le".into()),
         other => ("refus", other.to_string()),
     }
@@ -128,7 +129,14 @@ fn client_logs(env: &mut ToolEnv, args: &Value) -> Value {
     let limit = int_arg(args, "limit", 120).clamp(1, MAX_RAW as i64) as usize;
     let (pseudo, category) = (text_arg(args, "pseudo"), text_arg(args, "categorie").to_lowercase());
     env.deps.audit("sources", "get_client_logs", json!({ "minutes": minutes, "pseudo": pseudo, "category": category }));
-    let all = match env.deps.room.client_logs(None, MAX_RAW as u32, Some(minutes)) {
+    let author = env.message.user_id.clone();
+    let mut own_only = false;
+    let mut asked = env.deps.room.client_logs(&author, None, MAX_RAW as u32, Some(minutes));
+    if asked.as_ref().is_err_and(is_admin_only) {
+        own_only = true;
+        asked = env.deps.room.client_logs(&author, Some(&author), MAX_RAW as u32, Some(minutes));
+    }
+    let all = match asked {
         Ok(events) => events,
         Err(e) if method_missing(env, "clientLogs", &e) => return failure("journal indisponible : le module de la watch party ne le propose pas"),
         Err(e) => return failure(&format!("journal indisponible : {e:#}")),
@@ -140,5 +148,9 @@ fn client_logs(env: &mut ToolEnv, args: &Value) -> Value {
         .filter(|e| category.is_empty() || text_of(e, "category").to_lowercase() == category)
         .collect();
     let raw: Vec<Value> = kept.iter().rev().take(limit).map(|e| json!({ "a": e.get("at").and_then(Value::as_i64).map(clock_label), "pseudo": text_of(e, "name"), "appareil": text_of(e, "device"), "categorie": text_of(e, "category"), "evenement": text_of(e, "event"), "donnees": e.get("data") })).collect();
-    json!({ "minutes": minutes, "total": kept.len(), "par_spectateur": summarise(&kept), "evenements": raw })
+    let mut out = json!({ "minutes": minutes, "total": kept.len(), "par_spectateur": summarise(&kept), "evenements": raw });
+    if own_only {
+        out["portee"] = json!("journal de l'auteur du message seulement : celui des autres est réservé aux administrateurs");
+    }
+    out
 }

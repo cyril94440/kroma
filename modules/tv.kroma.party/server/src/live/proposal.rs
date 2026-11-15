@@ -5,6 +5,7 @@ use serde::Deserialize;
 pub struct ProposalBody {
     pub id: String,
     pub kind: String,
+    pub requested_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]

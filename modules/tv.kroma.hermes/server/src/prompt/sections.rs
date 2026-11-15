@@ -83,12 +83,12 @@ pub const SECTIONS: &[Section] = &[
     Section {
         id: "polls",
         needs: &["start_poll", "record_poll_vote", "close_poll"],
-        text: "- SONDAGE (« lance un sondage », « qui va gagner ? ») → start_poll. 'choice' SEULEMENT si les options sont évidentes et exhaustives ; 'open' dès que l'espace des réponses est inconnu ; N'INVENTE JAMAIS d'options arbitraires ; 'score' pour un pronostic ; 'yesno' pour une question fermée. Après un start_poll réussi, UNE phrase courte d'ambiance.\n- VOTE EXPRIMÉ DANS LE CHAT pendant un sondage (« je vote pour l'Espagne », « 2-1 pour moi ») → record_poll_vote(value) — le votant est toujours l'auteur du message. Ne confirme QUE si l'outil renvoie ok:true.\n- « termine le sondage » → close_poll puis reply avec un commentaire des résultats.",
+        text: "- SONDAGE (« lance un sondage », « qui va gagner ? ») → start_poll. 'choice' SEULEMENT si les options sont évidentes et exhaustives ; 'open' dès que l'espace des réponses est inconnu ; N'INVENTE JAMAIS d'options arbitraires ; 'score' pour un pronostic ; 'yesno' pour une question fermée. Après un start_poll réussi, UNE phrase courte d'ambiance. Lancer et clore un sondage sont réservés aux administrateurs (le serveur le vérifie) : s'il refuse, dis-le, sans insister.\n- VOTE EXPRIMÉ DANS LE CHAT pendant un sondage (« je vote pour l'Espagne », « 2-1 pour moi ») → record_poll_vote(value) — le votant est toujours l'auteur du message. Ne confirme QUE si l'outil renvoie ok:true.\n- « termine le sondage » → close_poll puis reply avec un commentaire des résultats.",
     },
     Section {
         id: "kick",
         needs: &["kick_from_party"],
-        text: "Quand un membre de la famille demande d'en retirer un autre de la watch party → kick_from_party DIRECTEMENT : c'est bénin et réversible, ne refuse pas et n'exige pas de preuve ; le serveur revérifie ses règles et peut refuser (rapporte sa raison telle quelle). Rappelle gentiment qu'il peut re-rejoindre quand il veut.",
+        text: "Quand quelqu'un demande d'en retirer un autre de la watch party → kick_from_party DIRECTEMENT : c'est bénin et réversible, ne refuse pas toi-même et n'exige pas de preuve ; le serveur décide seul (réservé aux administrateurs de la maison, vérifié par lui) et peut refuser : rapporte sa raison telle quelle, sans insister. Rappelle gentiment qu'il peut re-rejoindre quand il veut.",
     },
     Section {
         id: "cards",
@@ -113,7 +113,7 @@ pub const SECTIONS: &[Section] = &[
     Section {
         id: "watch-party",
         needs: &["party_go_live", "party_fine_sync"],
-        text: "WATCH PARTY : tes DEUX actions de synchro sont party_go_live (tout le monde au direct) et party_fine_sync (calage de précision à la frame, résultats publiés dans le chat — pour « synchronise-nous parfaitement », « affine la synchro »). Le système annonce lui-même l'action : reply UNE phrase courte. Si on te demande de faire MIEUX après une synchro fine : RELANCE party_fine_sync, ne déclare JAMAIS une précision impossible et n'invente JAMAIS d'explication technique. Refusé sans watch party active (ou à moins de 2 membres) : dis-le.",
+        text: "WATCH PARTY : tes DEUX actions de synchro sont party_go_live (tout le monde au direct) et party_fine_sync (calage de précision à la frame, résultats publiés dans le chat — pour « synchronise-nous parfaitement », « affine la synchro »). Le système annonce lui-même l'action : reply UNE phrase courte. Si on te demande de faire MIEUX après une synchro fine : RELANCE party_fine_sync, ne déclare JAMAIS une précision impossible et n'invente JAMAIS d'explication technique. Réservées aux administrateurs (le serveur le vérifie). Refusé sans watch party active (ou à moins de 2 membres) ou pour un non-administrateur : dis-le.",
     },
     Section {
         id: "learning",

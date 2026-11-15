@@ -38,12 +38,17 @@ describe('parseCard', () => {
     expect(parseCard(card)?.kind).toBe(card.kind);
   });
 
-  it.each([null, 'table', [], {}, { kind: 'html' }, { kind: 'Table' }, { ...match, action: { id: 'x', label: 'y' } }])(
-    'ignores %j',
-    (card) => {
-      expect(parseCard(card)).toBeNull();
-    },
-  );
+  it.each([
+    null,
+    'table',
+    [],
+    {},
+    { kind: 'html' },
+    { kind: 'Table' },
+    { ...match, action: { id: 'x', label: 'y' } },
+  ])('ignores %j', (card) => {
+    expect(parseCard(card)).toBeNull();
+  });
 });
 
 describe('chartBars', () => {
@@ -57,9 +62,20 @@ describe('chartBars', () => {
 });
 
 describe('rowTone', () => {
-  const live = { rows: [{ live: true, outcome: 'win' }, { live: false, outcome: null }, { live: true, outcome: null }] };
+  const live = {
+    rows: [
+      { live: true, outcome: 'win' },
+      { live: false, outcome: null },
+      { live: true, outcome: null },
+    ],
+  };
 
   it('marks a live row by its outcome and leaves a settled one alone', () => {
-    expect([rowTone({ live }, 0), rowTone({ live }, 1), rowTone({ live }, 2), rowTone({}, 0)]).toEqual(['win', null, 'live', null]);
+    expect([
+      rowTone({ live }, 0),
+      rowTone({ live }, 1),
+      rowTone({ live }, 2),
+      rowTone({}, 0),
+    ]).toEqual(['win', null, 'live', null]);
   });
 });

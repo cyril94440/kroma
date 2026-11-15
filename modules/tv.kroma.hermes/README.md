@@ -47,9 +47,9 @@ Each tool is a (name, JSON schema, availability predicate, handler) entry, with 
 | `change_channel` | a channel request through the room, by name (in one provider's catalogue), by reference (`p:3`, `s:4`, `#S.N`), with the optional `force` |
 | `switch_provider` | the same programme at the other provider, through the live `switchProvider` point (rule and vote are code), or a precise channel of the other provider by reference |
 | `probe_channel`, `benchmark_channels`, `stream_history` | a technical probe of one channel, a scan of up to eight channels read by the model and judged by code, the stream history as a summary and a ready `chart` card |
-| `start_poll`, `close_poll`, `record_poll_vote`, `kick_from_party` | polls and kick through the room |
+| `start_poll`, `close_poll`, `record_poll_vote`, `kick_from_party` | polls and kick through the room. The author of the message (taken from the `party.message` event, never from the model's arguments) is sent as `requestedBy`; starting and closing a poll, the kick, `party_go_live`, `party_fine_sync` and the whole-room `get_client_logs` are administrator actions that the party module enforces from the real role of that id, and its `adminOnly` refusal reaches the model as `reserve_aux_admins` with a message to relay (a member's `get_client_logs` falls back to their own journal). `benchmark_channels` is open to anyone watching, and the sport module's `start_prono` is an administrator's: the callee decides, the model only relays |
 | `party_go_live`, `party_fine_sync`, `get_client_logs` | the party's two sync actions and the viewers' client journal |
-| `learn_lesson`, `save_suggestion`, `note_person` | lessons (FIFO 30), suggestions (FIFO 120), per-person notes keyed by user id |
+| `learn_lesson`, `save_suggestion`, `note_person` | lessons (FIFO 30, 10 to 300 characters, a lesson already known is not stored twice), suggestions (FIFO 120), per-person notes keyed by user id (12 per person, 10 to 200 characters). As in the source anyone may teach a lesson; every one is audited with its author and an administrator reviews and deletes them in Admin |
 | `web_search`, `look_at_live` | a grounded web search (10 min cache, dated questions never served from it), a capture of the live picture read by the model |
 
 What each new tool returns to the model (French keys, as in the source):
@@ -108,7 +108,7 @@ Events taken: `party.message`, `party.vote`, `party.poll` (what the gate needs),
 
 Its own SQLite file: the inbox (queue and dedupe), lessons, suggestions, notes, the audit log, and a key-value table that holds the house rules once an administrator edits them. The shipped rules (`resources/house_rules.md`) are the default and the 17 lessons of the source are seeded once. The rules are reloaded at every message.
 
-The audit log keeps records by genre (`chat`, `decisions`, `sources`, `llm`, `vision`, `audit`) for `auditDays` days (30 by default); a line is cut at 64 KB and a genre stops writing for the day at 40 MB. The daily job `hermes.maintenance` (category `maintenance`) reconciles and prunes.
+The audit log keeps records by genre (`chat`, `decisions`, `sources`, `llm`, `vision`, `audit`) for `auditDays` days (30 by default); a line is cut at 64 KB, a genre stops writing for the day at 40 MB and all genres together at 120 MB, so the audit never exceeds 120 MB a day, 3.6 GB at the default 30 days. The daily job `hermes.maintenance` (category `maintenance`) reconciles and prunes.
 
 ## Administration
 

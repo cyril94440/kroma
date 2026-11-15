@@ -75,7 +75,9 @@ describe('the watch party sync', () => {
 
     expect(view.result.current.on).toBe(true);
     expect(view.result.current.notice?.key).toBe('live.sync.toast.joined');
-    expect(party$.beat).toHaveBeenCalledWith(expect.objectContaining({ enabled: true, paused: false }));
+    expect(party$.beat).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: true, paused: false }),
+    );
   });
 
   it('says goodbye to the room when the viewer leaves', async () => {
@@ -135,6 +137,8 @@ describe('the watch party sync', () => {
 
     await act(() => vi.advanceTimersByTimeAsync(8100));
 
-    expect(party$.stats).toHaveBeenCalledWith(expect.objectContaining({ playing: true, buffer: 9 }));
+    expect(party$.stats).toHaveBeenCalledWith(
+      expect.objectContaining({ playing: true, buffer: 9 }),
+    );
   });
 });

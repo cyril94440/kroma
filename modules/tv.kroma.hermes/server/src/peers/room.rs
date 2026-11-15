@@ -49,14 +49,14 @@ pub trait Room: Send + Sync {
     fn say(&self, text: &str, card: Option<Value>, reply_to: Option<&str>) -> Result<String>;
     fn history(&self, limit: u32, before: Option<i64>) -> Result<Vec<RoomMessage>>;
     fn request_switch(&self, ask: &SwitchAsk) -> Result<SwitchOutcome>;
-    fn start_poll(&self, question: &str, kind: &str, options: &[String], duration_s: Option<i64>) -> Result<Value>;
-    fn close_poll(&self) -> Result<Value>;
+    fn start_poll(&self, requested_by: &str, question: &str, kind: &str, options: &[String], duration_s: Option<i64>) -> Result<Value>;
+    fn close_poll(&self, requested_by: &str) -> Result<Value>;
     fn vote_poll(&self, user_id: &str, value: &str) -> Result<()>;
     fn kick(&self, user_id: &str, requested_by: &str, reason: &str) -> Result<KickOutcome>;
     fn activity(&self, status: Option<&str>) -> Result<()>;
     fn go_live(&self, requested_by: &str) -> Result<Value>;
     fn fine_sync(&self, requested_by: &str) -> Result<Value>;
-    fn client_logs(&self, user_id: Option<&str>, limit: u32, minutes: Option<u32>) -> Result<Vec<Value>>;
+    fn client_logs(&self, requested_by: &str, user_id: Option<&str>, limit: u32, minutes: Option<u32>) -> Result<Vec<Value>>;
 }
 
 pub struct PeerRoom {
@@ -128,12 +128,12 @@ impl Room for PeerRoom {
         self.ask("requestSwitch", &body)
     }
 
-    fn start_poll(&self, question: &str, kind: &str, options: &[String], duration_s: Option<i64>) -> Result<Value> {
-        Ok(self.ask::<Poll>("startPoll", &json!({ "question": question, "kind": kind, "options": options, "durationS": duration_s }))?.poll)
+    fn start_poll(&self, requested_by: &str, question: &str, kind: &str, options: &[String], duration_s: Option<i64>) -> Result<Value> {
+        Ok(self.ask::<Poll>("startPoll", &json!({ "requestedBy": requested_by, "question": question, "kind": kind, "options": options, "durationS": duration_s }))?.poll)
     }
 
-    fn close_poll(&self) -> Result<Value> {
-        Ok(self.ask::<Closed>("closePoll", &json!({}))?.results)
+    fn close_poll(&self, requested_by: &str) -> Result<Value> {
+        Ok(self.ask::<Closed>("closePoll", &json!({ "requestedBy": requested_by }))?.results)
     }
 
     fn vote_poll(&self, user_id: &str, value: &str) -> Result<()> {
@@ -156,8 +156,8 @@ impl Room for PeerRoom {
         self.ask("fineSync", &json!({ "requestedBy": requested_by }))
     }
 
-    fn client_logs(&self, user_id: Option<&str>, limit: u32, minutes: Option<u32>) -> Result<Vec<Value>> {
-        let mut body = json!({ "userId": user_id, "limit": limit });
+    fn client_logs(&self, requested_by: &str, user_id: Option<&str>, limit: u32, minutes: Option<u32>) -> Result<Vec<Value>> {
+        let mut body = json!({ "requestedBy": requested_by, "userId": user_id, "limit": limit });
         if let Some(minutes) = minutes {
             body["minutes"] = json!(minutes);
         }

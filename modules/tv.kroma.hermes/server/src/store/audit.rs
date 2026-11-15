@@ -7,6 +7,7 @@ use super::Store;
 
 pub const LINE_MAX_BYTES: usize = 64 * 1024;
 pub const GENRE_DAY_MAX_BYTES: i64 = 40 * 1024 * 1024;
+pub const DAY_MAX_BYTES: i64 = 120 * 1024 * 1024;
 const DAY_MS: i64 = 86_400_000;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -40,7 +41,13 @@ impl Store {
         let conn = self.pool.get()?;
         let mut stmt = conn.prepare("SELECT COALESCE(SUM(bytes), 0) FROM audit WHERE genre = ?1 AND day = ?2")?;
         let used = stmt.query_map(params![genre, day], |r| r.get::<_, i64>(0))?.next().transpose()?.unwrap_or(0);
-        if used + line.len() as i64 > GENRE_DAY_MAX_BYTES {
+        let all_genres = conn
+            .prepare("SELECT COALESCE(SUM(bytes), 0) FROM audit WHERE day = ?1")?
+            .query_map(params![day], |r| r.get::<_, i64>(0))?
+            .next()
+            .transpose()?
+            .unwrap_or(0);
+        if used + line.len() as i64 > GENRE_DAY_MAX_BYTES || all_genres + line.len() as i64 > DAY_MAX_BYTES {
             return Ok(false);
         }
         conn.execute(

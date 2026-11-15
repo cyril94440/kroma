@@ -7,6 +7,7 @@ pub const MAX_CANDIDATE_BYTES: usize = 2 * 1024;
 pub const MAX_TOKEN_BYTES: usize = 64;
 pub const RETURN_GRACE_MS: i64 = 180_000;
 pub const DEVICE_ID_MIN: usize = 8;
+pub const SLOTS_PER_ACCOUNT: usize = 2;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Rate {

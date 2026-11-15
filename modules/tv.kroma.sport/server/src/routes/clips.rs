@@ -32,7 +32,7 @@ async fn list<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Query(q): Query<ListQuery>,
 ) -> Result<Response, Response> {
-    viewer(&host, &user)?;
+    viewer(&host, &sport, &user)?;
     let clips = work(move || sport.clips(q.match_id.as_deref(), q.limit.unwrap_or(100))).await?;
     Ok(Json(json!({"clips": clips})).into_response())
 }
@@ -43,7 +43,7 @@ async fn remove<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Path(id): Path<String>,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &sport, &user)?;
     if work(move || sport.delete_clip(&id)).await? {
         Ok(Json(json!({"ok": true})).into_response())
     } else {

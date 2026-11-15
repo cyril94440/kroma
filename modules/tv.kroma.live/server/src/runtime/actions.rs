@@ -12,6 +12,7 @@ use crate::model::{Channel, ProviderId};
 use crate::status::Proposal;
 
 pub const PROPOSAL_SECONDS: i64 = 30;
+pub const PARTY_SAFETY_SECONDS: i64 = 900;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Proposed {
@@ -185,7 +186,7 @@ impl Live {
     async fn suggest_backup(&self, current: &Channel) {
         match self.working_equivalent(current, ProviderId::Backup).await {
             Ok(target) => {
-                self.propose_channel("switchToBackup", &target, "unstable").await;
+                self.propose_channel("switchToBackup", &target, "unstable", None).await;
             }
             Err(_) => self.emit(TOPIC_FAILOVER, json!({ "kind": "noWorkingEquivalent", "channel": current.name })),
         }
@@ -194,19 +195,22 @@ impl Live {
     async fn propose_for(&self, kind: &str, current: &Channel, to: ProviderId, why: &str) {
         let rules = self.rules();
         let Some(mapped) = self.providers.mapped(current, to, &rules) else { return };
-        self.propose_channel(kind, &mapped, why).await;
+        self.propose_channel(kind, &mapped, why, None).await;
     }
 
-    pub(crate) async fn propose_channel(&self, kind: &str, target: &Channel, why: &str) -> Proposed {
+    pub(crate) async fn propose_channel(&self, kind: &str, target: &Channel, why: &str, requested_by: Option<&str>) -> Proposed {
+        let party = self.party_present();
+        let window = if party { PARTY_SAFETY_SECONDS } else { PROPOSAL_SECONDS };
         let proposal = Proposal {
             id: kroma_module_sdk::primitives::random_token(),
             kind: kind.into(),
             text: why.into(),
             channel: Some(target.id()),
+            requested_by: requested_by.map(str::to_string),
             created_at: now_ms(),
-            expires_at: now_ms() + PROPOSAL_SECONDS * 1000,
+            expires_at: now_ms() + window * 1000,
         };
-        if self.party_present() {
+        if party {
             self.lock().proposals.insert(proposal.id.clone(), proposal.clone());
             self.emit(TOPIC_PROPOSAL, json!({ "proposal": proposal, "resolved": false, "viewers": self.viewer_count() }));
             return Proposed::Voting;
@@ -229,9 +233,10 @@ impl Live {
 
     pub(crate) fn expire_proposals(&self) {
         let now = now_ms();
+        let party = self.party_present();
         let expired: Vec<Proposal> = {
             let mut inner = self.lock();
-            let ids: Vec<String> = inner.proposals.iter().filter(|(_, p)| p.expires_at <= now).map(|(id, _)| id.clone()).collect();
+            let ids: Vec<String> = inner.proposals.iter().filter(|(_, p)| p.expires_at <= now || (!party && p.created_at + PROPOSAL_SECONDS * 1000 <= now)).map(|(id, _)| id.clone()).collect();
             ids.iter().filter_map(|id| inner.proposals.remove(id)).collect()
         };
         for proposal in expired {

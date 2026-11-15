@@ -56,16 +56,17 @@ pub(crate) fn is_admin(user: &User) -> bool {
     user.can(Permission::SettingsManage) || user.can(Permission::UsersManage)
 }
 
-pub(crate) fn actor<S: HostCtx>(state: &S, user: &User) -> Result<Actor, Response> {
+pub(crate) fn actor<S: HostCtx>(state: &S, party: &Party, user: &User) -> Result<Actor, Response> {
     state.require(user, Permission::Playback)?;
+    party.note_role(&user.id, user.can(Permission::SettingsManage));
     Ok(Actor {
         person: person(user),
         admin: is_admin(user),
     })
 }
 
-pub(crate) fn admin<S: HostCtx>(state: &S, user: &User) -> Result<Actor, Response> {
-    let who = actor(state, user)?;
+pub(crate) fn admin<S: HostCtx>(state: &S, party: &Party, user: &User) -> Result<Actor, Response> {
+    let who = actor(state, party, user)?;
     state.require(user, Permission::SettingsManage)?;
     Ok(who)
 }
@@ -89,7 +90,7 @@ async fn state<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     let view = work(move || party.snapshot(&who)).await?;
     Ok(Json(view).into_response())
 }
@@ -99,7 +100,7 @@ async fn time<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    actor(&host, &user)?;
+    actor(&host, &party, &user)?;
     Ok(Json(json!({ "now": party.time_now() })).into_response())
 }
 
@@ -115,7 +116,7 @@ async fn post_chat<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<ChatBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     match work(move || party.post_message(&who, &body.text)).await? {
         Ok(message) => Ok(Json(json!({ "message": message })).into_response()),
         Err(e) => {
@@ -141,7 +142,7 @@ async fn history<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Query(q): Query<HistoryQuery>,
 ) -> Result<Response, Response> {
-    actor(&host, &user)?;
+    actor(&host, &party, &user)?;
     let messages = work(move || party.history(q.limit.unwrap_or(100), q.before)).await?;
     Ok(Json(json!({ "messages": messages })).into_response())
 }
@@ -159,7 +160,7 @@ async fn react<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<ReactBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.toggle_reaction(&who, &body.id, &body.emoji))
         .await?
         .map(|_| ok())
@@ -178,7 +179,7 @@ async fn floating<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<FloatingBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.floating_reaction(&who, &body.emoji))
         .await?
         .map(|_| ok())

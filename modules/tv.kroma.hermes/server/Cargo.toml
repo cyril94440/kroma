@@ -2,7 +2,7 @@
 
 [package]
 name = "kroma-hermes"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.88"
 description = "The family chat assistant: understands requests, resolves channels, starts votes and polls, answers questions and learns house preferences"

@@ -2,8 +2,9 @@ import type { Clip, MatchPayload, PronoPayload } from '@kromatv/client/sport';
 import { calculateMatch, clockWords, visibleClips } from '@kromatv/core';
 import type { MessageKey } from '@kromatv/i18n';
 import { useT } from '@kromatv/ui';
-import { Box, Drawer, SegmentGroup, Text } from '@kromatv/ui/kit';
+import { Box, Drawer, Text } from '@kromatv/ui/kit';
 import { useMemo, useState } from 'react';
+import { TabStrip } from '#tv/features/live/TabStrip';
 import { ClipsTab } from '#tv/features/live/match/ClipsTab';
 import { PitchTab } from '#tv/features/live/match/PitchTab';
 import { PronoTab } from '#tv/features/live/match/PronoTab';
@@ -61,6 +62,7 @@ export function MatchDrawer({
     [clips, pdt, now, match],
   );
   const words = view ? clockWords(view.clock) : null;
+  const tabs = useMemo(() => TABS.map((id) => ({ id, label: t(TAB_LABEL[id]) })), [t]);
   return (
     <Drawer.Root open={open} onClose={onClose} title={t('live.match')} width="xl" floating>
       <Drawer.Panel>
@@ -80,13 +82,7 @@ export function MatchDrawer({
               </Text>
             </>
           ) : null}
-          <SegmentGroup.Root<Tab> value={tab} onValueChange={setTab} label={t('live.tabs')} stretch>
-            {TABS.map((id) => (
-              <SegmentGroup.Item key={id} value={id}>
-                <SegmentGroup.Label>{t(TAB_LABEL[id])}</SegmentGroup.Label>
-              </SegmentGroup.Item>
-            ))}
-          </SegmentGroup.Root>
+          <TabStrip tabs={tabs} value={tab} onChange={setTab} />
           {tab === 'summary' && view ? <SummaryTab view={view} /> : null}
           {tab === 'lineups' && match && view ? (
             <PitchTab teams={match.equipes} onPitch={view.onPitch} />

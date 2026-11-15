@@ -32,7 +32,10 @@ describe('useIdeas', () => {
   });
 
   it('keeps what it shows when a read fails', async () => {
-    const ideas = vi.fn().mockResolvedValueOnce({ ideas: [idea] }).mockRejectedValueOnce(new Error('x'));
+    const ideas = vi
+      .fn()
+      .mockResolvedValueOnce({ ideas: [idea] })
+      .mockRejectedValueOnce(new Error('x'));
     const client = { party: { ideas } } as unknown as LiveClient;
     const view = renderHook((p: { version: number }) => useIdeas(client, p.version, true), {
       initialProps: { version: 0 },

@@ -43,7 +43,9 @@ describe('the live screen actions', () => {
 
   it('resolves a card channel name to a channel and zaps to it', async () => {
     const requestSwitch = vi.fn(async () => ({ outcome: 'voteStarted' as const }));
-    const channels = vi.fn(async () => ({ channels: [{ id: 'p:9', name: 'Canal+ Foot', group: '' }] }));
+    const channels = vi.fn(async () => ({
+      channels: [{ id: 'p:9', name: 'Canal+ Foot', group: '' }],
+    }));
     const client = { party: { requestSwitch, channels } } as unknown as LiveClient;
 
     const outcome = await run(client, true).zapByName('Canal+ Foot');

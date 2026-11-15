@@ -29,7 +29,7 @@ async fn current<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     let snap = work(move || party.snapshot(&who)).await?;
     Ok(Json(json!({ "poll": snap["poll"], "lastPoll": snap["lastPoll"] })).into_response())
 }
@@ -49,7 +49,7 @@ async fn start<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<StartBody>,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &party, &user)?;
     work(move || party.start_poll(&body.question, &body.kind, &body.options, body.duration_s))
         .await?
         .map(|view| Json(json!({ "poll": view })).into_response())
@@ -68,7 +68,7 @@ async fn vote<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<VoteBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.vote_poll(&who.person, &body.value))
         .await?
         .map(|_| ok())
@@ -80,7 +80,7 @@ async fn close<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &party, &user)?;
     work(move || party.close_poll("closedByAdmin"))
         .await?
         .map(|view| Json(json!({ "results": view })).into_response())

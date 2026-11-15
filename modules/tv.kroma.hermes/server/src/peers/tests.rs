@@ -59,8 +59,8 @@ async fn the_room_calls_send_the_pinned_json_and_read_the_pinned_replies() {
         let said = room.say("Bonsoir", Some(json!({ "kind": "match" })), Some("m0")).unwrap();
         let history = room.history(5, Some(9)).unwrap();
         let switched = room.request_switch(&SwitchAsk { channel_id: "tf1", channel_name: None, requested_by: "u1", reason: "foot", force: false }).unwrap();
-        let poll = room.start_poll("Q", "choice", &["A".into(), "B".into()], Some(60)).unwrap();
-        let closed = room.close_poll().unwrap();
+        let poll = room.start_poll("u1", "Q", "choice", &["A".into(), "B".into()], Some(60)).unwrap();
+        let closed = room.close_poll("u1").unwrap();
         room.vote_poll("u1", "a").unwrap();
         let kicked = room.kick("u2", "u1", "rude").unwrap();
         room.activity(Some("réfléchit")).unwrap();
@@ -77,8 +77,8 @@ async fn the_room_calls_send_the_pinned_json_and_read_the_pinned_replies() {
     assert_eq!(sent["say"], json!({ "text": "Bonsoir", "as": "agent", "card": { "kind": "match" }, "replyTo": "m0" }));
     assert_eq!(sent["history"], json!({ "limit": 5, "before": 9 }));
     assert_eq!(sent["requestSwitch"], json!({ "channelId": "tf1", "requestedBy": "u1", "reason": "foot" }));
-    assert_eq!(sent["startPoll"], json!({ "question": "Q", "kind": "choice", "options": ["A", "B"], "durationS": 60 }));
-    assert_eq!(sent["closePoll"], json!({}));
+    assert_eq!(sent["startPoll"], json!({ "requestedBy": "u1", "question": "Q", "kind": "choice", "options": ["A", "B"], "durationS": 60 }));
+    assert_eq!(sent["closePoll"], json!({ "requestedBy": "u1" }));
     assert_eq!(sent["votePoll"], json!({ "userId": "u1", "value": "a" }));
     assert_eq!(sent["kick"], json!({ "userId": "u2", "requestedBy": "u1", "reason": "rude" }));
     assert_eq!(sent["activity"], json!({ "status": "réfléchit" }));
@@ -164,4 +164,15 @@ fn the_manifest_declares_the_peers_and_the_point_it_defines() {
     assert_eq!(manifest["definesPoints"][0]["methods"], json!(["list", "call"]));
     assert_eq!(TOOLS, "tv.kroma.hermes/tools");
     assert_eq!(manifest["dependencies"], json!({ "tv.kroma.party": ">=0.1.0", "tv.kroma.live": ">=0.3.0" }));
+}
+
+#[test]
+fn the_manifest_declares_exactly_the_methods_the_tools_point_is_called_with() {
+    let manifest: Value = serde_json::from_str(include_str!("../../../module.json")).unwrap();
+    let mut declared: Vec<String> = manifest["definesPoints"][0]["methods"].as_array().unwrap().iter().map(|m| m.as_str().unwrap().to_string()).collect();
+    let mut called: Vec<String> = super::contributors::METHODS.iter().map(|m| m.to_string()).collect();
+    declared.sort();
+    called.sort();
+    assert_eq!(manifest["definesPoints"][0]["name"], "tools");
+    assert_eq!(declared, called);
 }

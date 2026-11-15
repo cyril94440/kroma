@@ -22,6 +22,15 @@ pub struct SavedCurrent {
 }
 
 impl Live {
+    pub(crate) fn fail_start(&self, error: &anyhow::Error) -> String {
+        let message = redact(&format!("{error:#}"));
+        let mut inner = self.lock();
+        inner.phase = Phase::Error;
+        inner.last_error = Some(message.clone());
+        inner.restart_at = Some(Instant::now() + Duration::from_secs(cmd::restart_delay_seconds(inner.restarts.max(1))));
+        message
+    }
+
     pub(crate) fn ffmpeg_supports_https(&self) -> bool {
         if let Some(known) = self.lock().https_ok {
             return known;

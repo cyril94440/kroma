@@ -1,7 +1,6 @@
-import { liveBadges, pollToAnswer, voteToAnswer } from '@kromatv/core';
+import { liveBadges } from '@kromatv/core';
 import { useIdeas, useLiveActions, useLiveSync } from '@kromatv/core/react';
 import { Player, TV_FLAGS, useT } from '@kromatv/ui';
-import { Box, Text, toast } from '@kromatv/ui/kit';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useEnv } from '#tv/app/providers/env';
 import { useClient, useNav } from '#tv/app/router';
@@ -18,10 +17,12 @@ import { MatchDrawer } from '#tv/features/live/match/MatchDrawer';
 import { PollDrawer } from '#tv/features/live/PollDrawer';
 import { ReactionsDrawer } from '#tv/features/live/ReactionsDrawer';
 import { SportDrawer } from '#tv/features/live/sport/SportDrawer';
+import { useLiveAnswers } from '#tv/features/live/useLiveAnswers';
 import { useLiveHandlers } from '#tv/features/live/useLiveHandlers';
 import { useLiveScreen } from '#tv/features/live/useLiveScreen';
 import { useSyncToasts } from '#tv/features/live/useSyncToasts';
 import { useVerdictToasts } from '#tv/features/live/useVerdictToasts';
+import { ViewersCard } from '#tv/features/live/ViewersCard';
 import { VoteDrawer } from '#tv/features/live/VoteDrawer';
 
 const noStoryboard = () => null;
@@ -42,8 +43,6 @@ export function TvLive<E extends LiveEngine>({
   const live = useLivePlayback(backend, playlistUrl);
   const controller = useLiveController(live);
   const [panel, setPanel] = useState<Panel | null>(null);
-  const [dismissedVote, setDismissedVote] = useState<number | null>(null);
-  const [dismissedPoll, setDismissedPoll] = useState<number | null>(null);
   const { engineRef } = live;
   const frameTimeMs = useCallback(() => engineRef.current?.frameTimeMs() ?? null, [engineRef]);
   const { status, party, sport, now } = room;
@@ -53,6 +52,8 @@ export function TvLive<E extends LiveEngine>({
   const sportState = sport.state;
   const match = sportState?.match ?? null;
   const closePanel = useCallback(() => setPanel(null), []);
+  const answers = useLiveAnswers(actions, vote, poll, me);
+  const { openVote, openPoll } = answers;
   const handlers = useLiveHandlers(actions, closePanel);
   const sync = useLiveSync({
     client,
@@ -75,28 +76,6 @@ export function TvLive<E extends LiveEngine>({
     [mousePointer],
   );
 
-  const answerVote = useCallback(
-    (approve: boolean) => {
-      if (vote) setDismissedVote(vote.id);
-      actions.vote(approve).then(
-        () => toast({ message: t('live.voted') }),
-        () => undefined,
-      );
-    },
-    [actions, vote, t],
-  );
-
-  const answerPoll = useCallback(
-    (value: string) => {
-      if (poll) setDismissedPoll(poll.id);
-      actions.pollVote(value).then(
-        () => toast({ message: t('live.pollAnswered') }),
-        () => undefined,
-      );
-    },
-    [actions, poll, t],
-  );
-
   const matchData = useMemo(
     () => ({
       match,
@@ -111,8 +90,6 @@ export function TvLive<E extends LiveEngine>({
   const activity = party.state?.activity
     ? t('live.activity', { name: agent, label: party.state.activity })
     : null;
-  const openVote = voteToAnswer(vote, me, dismissedVote);
-  const openPoll = openVote ? null : pollToAnswer(poll, me, dismissedPoll);
   const badge = status ? liveBadges(status)[0] : undefined;
   const title = status?.channel?.name ?? t('nav.live');
   const next = status?.next ? `${t('live.next')} ${status.next.title}` : null;
@@ -121,7 +98,13 @@ export function TvLive<E extends LiveEngine>({
 
   return (
     <>
-      <Player.Root controller={controller} flags={flags} title={title} onClose={nav.back}>
+      <Player.Root
+        controller={controller}
+        flags={flags}
+        title={title}
+        active={panel === null && !openVote && !openPoll}
+        onClose={nav.back}
+      >
         <Player.Title>{title}</Player.Title>
         {subtitle ? <Player.Subtitle>{subtitle}</Player.Subtitle> : null}
         {badge ? <Player.Warning>{t(`live.badge.${badge}`)}</Player.Warning> : null}
@@ -133,25 +116,7 @@ export function TvLive<E extends LiveEngine>({
           <backend.Surface live={live} title={title} />
         </Player.Media>
         <LiveStateCard status={status} failed={room.failed} />
-        {status && status.viewers.length > 0 ? (
-          <Box absolute right={64} top={150} z={12} pointerEvents="none" align="flex-end">
-            <Text variant="labelTv" color="textMuted">
-              {t('live.viewers', { count: status.viewers.length })}
-            </Text>
-            {sync.on ? (
-              <Text variant="labelTv" color="accentText">
-                {t(
-                  group && group.members.length > 1
-                    ? 'live.sync.status.group'
-                    : 'live.sync.status.alone',
-                  {
-                    count: group?.members.length ?? 0,
-                  },
-                )}
-              </Text>
-            ) : null}
-          </Box>
-        ) : null}
+        <ViewersCard status={status} syncOn={sync.on} group={group} />
         {modules.party && party.state ? (
           <ChatOverlay messages={party.state.messages} floating={party.floating} now={now} />
         ) : null}
@@ -192,15 +157,15 @@ export function TvLive<E extends LiveEngine>({
         vote={openVote}
         userId={me}
         now={now}
-        onAnswer={answerVote}
-        onClose={() => vote && setDismissedVote(vote.id)}
+        onAnswer={answers.answerVote}
+        onClose={answers.putAwayVote}
       />
       <PollDrawer
         poll={openPoll}
         userId={me}
         now={now}
-        onAnswer={answerPoll}
-        onClose={() => poll && setDismissedPoll(poll.id)}
+        onAnswer={answers.answerPoll}
+        onClose={answers.putAwayPoll}
       />
     </>
   );

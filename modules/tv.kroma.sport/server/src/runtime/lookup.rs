@@ -65,7 +65,8 @@ impl Sport {
             search(&matches, &json!(teams))
         };
         if found.is_empty() || found.len() > FOUND_MAX {
-            let mut out = json!({"matchs_du_jour": matches.iter().map(list_line).take(LIST_MAX).collect::<Vec<_>>()});
+            let delay = self.assistant_delay(now);
+            let mut out = json!({"matchs_du_jour": matches.iter().map(|m| list_line(m, now, delay)).take(LIST_MAX).collect::<Vec<_>>()});
             if !teams.is_empty() {
                 out["attention"] = json!(if found.is_empty() {
                     "aucun match trouvé pour ces équipes aujourd'hui (ESPN)"

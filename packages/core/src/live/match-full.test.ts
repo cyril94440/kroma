@@ -135,4 +135,3 @@ describe('pitchSlot', () => {
     expect(dom.leftPercent + ext.leftPercent).toBeCloseTo(100, 5);
   });
 });
-

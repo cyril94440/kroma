@@ -105,6 +105,7 @@ impl Live {
         self.stop_run().await;
         if let Err(error) = self.start_run(&channel, true) {
             tracing::warn!(error = %error, "relaunch for the hvc1 tag failed");
+            self.fail_start(&error);
         }
     }
 

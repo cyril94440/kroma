@@ -1,15 +1,17 @@
 use std::sync::Arc;
 
 use axum::extract::{Extension, Query, State};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use kroma_module_sdk::domain::Permission;
 use kroma_module_sdk::host::{AuthUser, HostCtx};
 
-use super::{actor, admin, ok, work};
+use super::{actor, admin, ok, refuse, work};
 use crate::party::{Party, ViewerStats};
 use crate::store::LogEntry;
 
@@ -45,7 +47,7 @@ async fn stats<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(b): Json<StatsBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     let finite = |x: f64| if x.is_finite() { x } else { 0.0 };
     party.record_stats(
         &who,
@@ -87,7 +89,7 @@ async fn ingest<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<LogBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     let clip = |s: &str, n: usize| s.chars().take(n).collect::<String>();
     let now = party.time_now();
     let device = body.device.as_deref().map(|d| clip(d, 40));
@@ -125,7 +127,10 @@ async fn logs<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Query(q): Query<LogQuery>,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
+    if !user.can(Permission::SettingsManage) && q.user_id.as_deref() != Some(who.person.user_id.as_str()) {
+        return Err(refuse(StatusCode::FORBIDDEN, "adminOnly"));
+    }
     let rows = work(move || party.read_logs(q.minutes.unwrap_or(30), q.user_id.as_deref(), q.category.as_deref(), q.limit.unwrap_or(120)))
         .await?;
     Ok(Json(json!({ "events": rows })).into_response())
@@ -136,6 +141,6 @@ async fn health<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &party, &user)?;
     Ok(Json(party.health()).into_response())
 }

@@ -1,6 +1,7 @@
 mod error;
 pub(crate) mod ice;
 mod limits;
+mod members;
 mod room;
 mod signal;
 

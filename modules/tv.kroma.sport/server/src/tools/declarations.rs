@@ -38,7 +38,7 @@ pub fn declared() -> Vec<Value> {
         ),
         tool(
             "start_prono",
-            "Lance un PRONO DE MATCH (score exact) à la demande (« fais un prono pour Le Havre – PSG »). Pour un match de foot précis d'une grande ligue : chaque spectateur saisit un score, clos au coup d'envoi, points 3 (score exact) / 1 (bon vainqueur) comptés par le CODE pendant la saison. Les pronos des matchs diffusés sur la chaîne du direct s'ouvrent déjà tout seuls : n'appelle cet outil que sur demande explicite. Le code vérifie le match (coup d'envoi proche ou au plus tard 10e minute) et peut refuser : rapporte son erreur telle quelle. Pour une autre question, un autre sport ou un sondage libre, utilise start_poll.",
+            "Lance un PRONO DE MATCH (score exact) à la demande (« fais un prono pour Le Havre – PSG »). Pour un match de foot précis d'une grande ligue : chaque spectateur saisit un score, clos au coup d'envoi, points 3 (score exact) / 1 (bon vainqueur) comptés par le CODE pendant la saison. Les pronos des matchs diffusés sur la chaîne du direct s'ouvrent déjà tout seuls : n'appelle cet outil que sur demande explicite. Réservé aux administrateurs (le code le vérifie lui-même). Le code vérifie le match (coup d'envoi proche ou au plus tard 10e minute) et peut refuser : rapporte son erreur telle quelle. Pour une autre question, un autre sport ou un sondage libre, utilise start_poll.",
             json!({
                 "home": {"type": "string", "description": "Équipe qui reçoit, ex: 'Le Havre'"},
                 "away": {"type": "string", "description": "Équipe qui se déplace, ex: 'PSG'"}

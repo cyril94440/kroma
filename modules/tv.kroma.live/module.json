@@ -3,7 +3,7 @@
   "schemaVersion": 3,
   "id": "tv.kroma.live",
   "name": "Live TV",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Live television from an IPTV provider restreamed to everyone at home over one connection, with standby when nobody watches, off-air detection and an automatic backup provider.",
   "engines": {
     "server": ">=0.1.39"
@@ -14,7 +14,7 @@
   "definesPoints": [
     {
       "name": "control",
-      "methods": ["status", "resolve", "switch", "presence", "proposal", "epg", "snapshot", "clipCut", "clipBufferInfo", "restart", "switchProvider", "probe", "benchmark", "scanResult", "history"]
+      "methods": ["status", "resolve", "switch", "presence", "proposal", "epg", "snapshot", "clipCut", "clipBufferInfo", "restart", "switchProvider", "probe", "benchmark", "scanResult", "history", "scanFrame", "clipList", "clipDelete"]
     }
   ],
   "contributes": [

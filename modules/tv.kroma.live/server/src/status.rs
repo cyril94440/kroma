@@ -84,6 +84,8 @@ pub struct Proposal {
     pub kind: String,
     pub text: String,
     pub channel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requested_by: Option<String>,
     pub created_at: i64,
     pub expires_at: i64,
 }

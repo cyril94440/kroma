@@ -2,6 +2,7 @@
 pub enum VoiceError {
     BadDevice,
     Full,
+    AccountFull,
     RateLimited,
     NotJoined,
     Forbidden,
@@ -16,6 +17,7 @@ impl VoiceError {
         match self {
             VoiceError::BadDevice => "badDevice",
             VoiceError::Full => "full",
+            VoiceError::AccountFull => "accountFull",
             VoiceError::RateLimited => "rateLimited",
             VoiceError::NotJoined => "notJoined",
             VoiceError::Forbidden => "forbidden",

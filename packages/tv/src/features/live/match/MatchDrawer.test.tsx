@@ -31,7 +31,7 @@ const show = (
   );
 
 const tab = async (name: string) => {
-  const segment = await screen.findByRole('radio', { name });
+  const segment = await screen.findByRole('button', { name });
   clearPressGuard();
   fireEvent.click(segment);
 };

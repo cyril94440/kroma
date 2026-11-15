@@ -50,8 +50,14 @@ backup provider when the main one stops delivering in front of viewers.
   provider; the return to the main provider is proposed when the programme ends.
   With the Watch party module installed a proposal is voted there
   (`live.proposal`, answered through the `tv.kroma.live/control` `proposal`
-  method). Without it a proposal is accepted when at most one viewer is present
-  and declined otherwise.
+  method). The party module owns the deadline: it votes for its own
+  `voteSeconds` and answers `accept` true or false when the vote closes, so the
+  proposal carries a safety expiry of 15 minutes (`expiresAt`) rather than a 30 s
+  one, and live only expires it itself when no party module answers any more.
+  A proposal someone asked for carries `requestedBy` (a user id; absent for an
+  automatic failover proposal), which the party module counts as that person's
+  vote for. Without a party module a proposal is accepted when at most one viewer
+  is present and declined otherwise.
 - **Canaries and variants.** `canaries` names up to two channels of the main
   provider that should always play. When the channel in trouble is silent and a
   canary plays, the provider is fine: the module does not fail over, it tries
@@ -128,7 +134,7 @@ with the media ticket.
 `live.status` (the full status), `live.channel` (`channel`, `provider`,
 `onBackup`, `now`, `next`, `playlist`), `live.presence` (`viewers`), `live.health`
 (`sourceKbps`, `stutter`, `black`, `frozen`, `trouble`, `state`, `lossSeconds`),
-`live.proposal` (`{proposal: {id, kind, text, channel, createdAt, expiresAt},
+`live.proposal` (`{proposal: {id, kind, text, channel, requestedBy?, createdAt, expiresAt},
 resolved}`, plus `viewers` while it is open for a vote, or `accepted` and `default`
 (`vote`, `noVote` or `timeout`) once it is resolved; `kind` is `switchToBackup`,
 `returnToPrimary` or `switchProvider`), `live.failover` (`kind`: `failover`, `failback`, `returnIdle`,
@@ -164,11 +170,13 @@ a fixed contract other modules code against; the others were added to them.
 | `restart` | `{requestedBy, reason}` | `{restarted, error}`; `error`: `noChannel`, `standby`, `streamHealthy`, `recentRestart`, `channelChanged` |
 | `switchProvider` | `{provider, channelId?, requestedBy, reason}` | `{switched, provider, error}`; `channelId` (`p:3`, `s:12`) names the exact channel of `provider` to go to instead of the best equivalent of the current one; it is probed once, then follows the same rule (alone or in trouble: at once, otherwise a vote; the stream is in trouble when it has delivered nothing for `troubleDeadSeconds`, when it stutters or restarts while flowing, or as soon as ffmpeg has exited and nothing flows again). `error`: `unknownProvider`, `noBackup`, `noChannel`, `alreadyOn`, `primaryDown`, `notFound`, `notWorking`, `busy`, `voteRequired` (a `live.proposal` is published), and with `channelId` `unknownChannel` and `providerMismatch` |
 | `probe` | `{channelId}` | `{channelId, name, provider, alive, resolution, codec, audioCodec, fps, bitrateKbps, offAir, local, error}`; `error`: `unknownChannel`, `busy`, `liveAtThisProvider`, `standby`, `notReady` |
-| `benchmark` | `{channelIds, requestedBy}` | `{status: "started"\|"refused", id, reason, total, alreadyDone}`; `reason`: `unknownChannel`, `mixedProviders`, `noChannel`, `scanRunning` |
+| `benchmark` | `{channelIds, requestedBy}` | `{status: "started"\|"refused", id, reason, total, alreadyDone}`; `reason`: `notViewing` (`requestedBy` is not watching: the scan is open to anyone watching, as in the source product, while `POST /scan` with a free query stays an administrator's), `unknownChannel`, `mixedProviders`, `noChannel`, `scanRunning` |
 | `scanResult` | `{}` | the last scan: `{id, query, running, provider, items, total}`; each item is `{number, id, name, ok, black, still, frame, frames, error, now, at}`, `at` being the ms epoch at which its capture ended |
 | `scanFrame` | `{path}` | `{jpegBase64}`; `path` is a `frame` or `frames` value of the last `scanResult`, nothing else; `Err`: `invalidPath`, `notFound`, `tooLarge` (over 1 MiB) |
 | `clipList` | `{}` | `{paths}`, the `path` of every clip still on disk, as `clipCut` returned it |
 | `clipDelete` | `{path}` | `{deleted}` (`false` when the clip was already gone), the clip's folder is removed with it; `Err`: `invalidPath` for anything but a `clipCut` path |
 | `history` | `{limit?}` | `{stepSeconds, points, providerEvents}`, the last `limit` points (360 by default, 1080 at most) |
 
-The JSON of every method is pinned by a test (`src/it_points.rs`, `src/it_ops.rs`).
+The JSON of every method is pinned by a test (`src/it_points.rs`, `src/it_ops.rs`), and a test compares the methods `module.json` declares with the routes the module answers.
+
+When starting a run fails after the previous one was stopped (a zap, the relaunch that tags an HEVC picture, the restart timer), the module goes to `Error` and schedules the next attempt with the usual back-off, instead of staying down.

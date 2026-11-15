@@ -74,7 +74,7 @@ fn restarts_recent(points: &[HistoryPoint]) -> i64 {
 
 fn player_freezes(env: &ToolEnv, status: &Status, pseudo: &str) -> Option<(usize, String)> {
     let viewer = status.viewers.iter().find(|v| crate::webcache::normalise(&v.name) == crate::webcache::normalise(pseudo))?;
-    let events = env.deps.room.client_logs(Some(&viewer.user_id), 200, Some(30)).ok()?;
+    let events = env.deps.room.client_logs(&env.message.user_id, Some(&viewer.user_id), 200, Some(30)).ok()?;
     let count = events.iter().filter(|e| e.get("event").and_then(Value::as_str).is_some_and(|n| n.contains("gel") || n.contains("freeze"))).count();
     Some((count, viewer.name.clone()))
 }

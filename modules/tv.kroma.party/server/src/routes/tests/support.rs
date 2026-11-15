@@ -114,6 +114,10 @@ impl App {
         self.send("POST", path, Some(token), Some(body)).await
     }
 
+    pub async fn seen_as_admin(&self) {
+        assert_eq!(self.get("/state", "cyril").await.0, StatusCode::OK);
+    }
+
     pub async fn port(&self, method: &str, body: Value) -> Value {
         let (status, json) = self.send("POST", &format!("/_port/tv.kroma.party/room/{method}"), None, Some(body)).await;
         assert_eq!(status, StatusCode::OK);

@@ -147,7 +147,7 @@ impl Live {
             self.emit(TOPIC_FAILOVER, json!({ "kind": "providerSwitch", "from": current.provider, "to": target, "channel": current.name, "requestedBy": requested_by, "status": outcome.status }));
             return if outcome.switched() { answer(true, None) } else { answer(false, Some(&outcome.error.unwrap_or(outcome.status))) };
         }
-        match self.propose_channel("switchProvider", &wanted, if event { "unverifiedMultiplex" } else { "requested" }).await {
+        match self.propose_channel("switchProvider", &wanted, if event { "unverifiedMultiplex" } else { "requested" }, Some(requested_by)).await {
             super::actions::Proposed::Applied => answer(true, None),
             _ => answer(false, Some("voteRequired")),
         }

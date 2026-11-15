@@ -19,7 +19,7 @@ export function PitchTab({
     );
   }
   return (
-    <Box w="100%" aspect={0.8} bg="success/9" radius={16} style={{ position: 'relative' }}>
+    <Box w="100%" aspect={0.8} bg="success/9" radius="lg" style={{ position: 'relative' }}>
       {(['dom', 'ext'] as const).flatMap((side) =>
         onPitch[side].map((player) => {
           const slot = pitchSlot(side, player);

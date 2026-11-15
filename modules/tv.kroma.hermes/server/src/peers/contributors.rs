@@ -24,6 +24,11 @@ pub trait Contributors: Send + Sync {
     fn call(&self, module_id: &str, name: &str, arguments: &Value, user_id: &str, message_id: &str) -> Result<Value>;
 }
 
+const LIST: &str = "list";
+const CALL: &str = "call";
+
+pub const METHODS: [&str; 2] = [LIST, CALL];
+
 pub struct PeerContributors {
     host: Arc<dyn HostCtx>,
     cache: Mutex<Option<(i64, Vec<ExternalTool>)>>,
@@ -65,7 +70,7 @@ impl Contributors for PeerContributors {
         }
         let mut found = Vec::new();
         for contribution in self.host.contributions(TOOLS) {
-            let listed: Result<Listed> = call_point(&contribution.resolver(), TOOLS, "list", &json!({}));
+            let listed: Result<Listed> = call_point(&contribution.resolver(), TOOLS, LIST, &json!({}));
             let Ok(listed) = listed else { continue };
             for tool in listed.tools.into_iter().filter(|t| !t.name.is_empty()) {
                 let parameters = if tool.parameters.is_object() { tool.parameters } else { json!({ "type": "object", "properties": {} }) };
@@ -89,7 +94,7 @@ impl Contributors for PeerContributors {
         let answered: Answered = call_point(
             &contribution.resolver(),
             TOOLS,
-            "call",
+            CALL,
             &json!({ "name": name, "arguments": arguments, "context": { "userId": user_id, "messageId": message_id } }),
         )?;
         Ok(answered.result)

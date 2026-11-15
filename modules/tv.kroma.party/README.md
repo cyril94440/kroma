@@ -40,7 +40,9 @@ A module has no socket, so every client message is an HTTP call and every push i
 
 Deterministic, never decided by the assistant. 30 seconds (`voteSeconds`), for against against; a blank counts for nothing; the request counts as a vote for; a tie or a minority stays. One person is one voice (the KROMA account). Only viewers present in the live module's presence list take part; someone who arrives after the vote opens may vote. The vote closes as soon as the outcome is certain. A voter who is away longer than `presenceGraceSeconds` leaves the quorum, and the vote is cancelled when the requester and all voters are gone. A request is refused while another vote is open, when the channel is already on, or when presence cannot be read. Administrators and the ids in `bypassUserIds` may switch without a vote.
 
-A provider proposal raised by the live module (`live.proposal`, kinds `switchToBackup`, `returnToPrimary` and `switchProvider`) is voted the same way and answered with the control point's `proposal` method. The event is `{proposal: {id, kind, ...}, resolved}`; when live resolves the proposal itself (`resolved: true` with `default` `timeout` or `noVote`) before the vote ends, the vote is closed without being answered.
+
+
+A provider proposal raised by the live module (`live.proposal`, kinds `switchToBackup`, `returnToPrimary` and `switchProvider`) is voted the same way and answered with the control point's `proposal` method when the vote closes: this module owns the deadline (`voteSeconds`), and live only gives the proposal a 15 minute safety expiry. The event is `{proposal: {id, kind, requestedBy?, ...}, resolved}`; `requestedBy`, when it names a present viewer, is the vote's requester: it counts as a vote for and is not asked, so a vote left to its deadline with blanks passes one to nothing and a requester alone in the room is applied at once. An automatic proposal has no requester. When live resolves the proposal itself (`resolved: true` with `default` `timeout` or `noVote`) before the vote ends, the vote is closed without being answered.
 
 ## Points
 
@@ -53,16 +55,20 @@ Defines `tv.kroma.party/room`, for the assistant module that comes later. Every 
 | `say` | `{text, as: "agent"\|"system", card, replyTo}` | `{id}` |
 | `history` | `{limit, before}` | `{messages: [{id, userId, name, kind, text, at}]}` |
 | `requestSwitch` | `{channelId, requestedBy, reason}` | `{outcome: "voteStarted"\|"switchedDirectly"\|"refused", voteId, reason}` |
-| `startPoll` | `{question, kind, options, durationS}` | `{poll}` |
-| `closePoll` | `{}` | `{results}` |
-| `kick` | `{userId, requestedBy, reason}` | `{outcome: "kicked"\|"refused", reason, disruptions}` |
+| `startPoll` | `{requestedBy, question, kind, options, durationS}` | `{poll}`; `Err("adminOnly")` |
+| `closePoll` | `{requestedBy}` | `{results}`; `Err("adminOnly")` |
+| `kick` | `{userId, requestedBy, reason}` | `{outcome: "kicked"\|"refused", reason, disruptions}`; `reason` `adminOnly` for anyone who is not an administrator |
 | `activity` | `{status}` | `{ok}` |
 | `votePoll` (added) | `{userId, value}` | `{ok}` |
-| `goLive` | `{requestedBy}` | `{members}`, or `Err("noActiveParty")` |
-| `fineSync` | `{requestedBy}` | `{ok}`, or `Err("needTwoMembers")` |
-| `clientLogs` | `{userId: string\|null, limit, minutes?}` | `{events: [{at, userId, name, device, category, event, data}]}`, the entries `GET clientlog` returns |
+| `goLive` | `{requestedBy}` | `{members}`, or `Err("noActiveParty")`, `Err("adminOnly")` |
+| `fineSync` | `{requestedBy}` | `{ok}`, or `Err("needTwoMembers")`, `Err("adminOnly")` |
+| `clientLogs` | `{requestedBy, userId: string\|null, limit, minutes?}` | `{events: [{at, userId, name, device, category, event, data}]}`, the entries `GET clientlog` returns; `Err("adminOnly")` unless `requestedBy` is an administrator or asks for their own journal (`userId` equal to `requestedBy`, the same rule as `GET clientlog?userId=`) |
 
-`requestSwitch` also takes an optional `channelName`, used to name the channel in the vote announcement when the live module cannot resolve the id, and an optional `force`, honoured only when `requestedBy` is listed in `bypassUserIds` (an administrator must be listed to be forced on behalf of); otherwise the request goes to a vote. `requestedBy` is the user id on whose behalf the request is made; any id that is not a present viewer (for example `agent`) is a proposal without a voice of its own. Every message published to the room, user or assistant, is also a `party.message` event; a user message carries `mentionsAgent`, `isQuestion` and `keywordHit`, the lexical signals only. The decision to answer belongs to the assistant.
+`requestSwitch` also takes an optional `channelName`, used to name the channel in the vote announcement when the live module cannot resolve the id, and an optional `force`, honoured when `requestedBy` is an administrator the module has seen or is listed in `bypassUserIds`; otherwise the request goes to a vote. `requestedBy` is the user id on whose behalf the request is made; any id that is not a present viewer (for example `agent`) is a proposal without a voice of its own. 
+
+**Who may ask, and how the module knows.** The module never trusts a role handed to it. Every authenticated request records whether its account holds `settings.manage` (an administrator) and for how long (10 minutes), and a point call looks `requestedBy` up there: an id it has not seen as an administrator recently, an empty one and `agent` are not administrators. Kick, go live, fine sync, starting and closing a poll and reading everyone's client journal are administrator actions on both doors, the `kick`, `goLive`, `fineSync`, `startPoll`, `closePoll` and `clientLogs` methods and the HTTP routes; the source product let any family member ask the assistant for them (its server only checked evidence for a kick: at least two buffering stalls in 30 minutes and a 10 minute cooldown, which this module does not port), so these are stricter than the source on purpose. The assistant returns the module's `adminOnly` refusal to the model with its reason.
+
+Every message published to the room, user or assistant, is also a `party.message` event; a user message carries `mentionsAgent`, `isQuestion` and `keywordHit`, the lexical signals only. The decision to answer belongs to the assistant.
 
 ## Voice chat
 
@@ -73,7 +79,7 @@ A mesh of browser to browser audio connections, as in the source product: every 
 | Route | Body | Answer |
 | --- | --- | --- |
 | `GET voice/state` | | `{revision, now, participants: [{peerId, userId, name, muted}], speaking: [peerId], max}` |
-| `POST voice/join` | `{deviceId, muted, watching}` | `{peerId, revision, participants, speaking, iceServers, beatSeconds, expireSeconds}`; `409 full`, `429 rateLimited`, `400 badDevice` |
+| `POST voice/join` | `{deviceId, muted, watching}` | `{peerId, revision, participants, speaking, iceServers, beatSeconds, expireSeconds}`; `409 full`, `409 accountFull` (an account holds at most 2 slots, whatever its device ids), `429 rateLimited`, `400 badDevice` |
 | `POST voice/leave` | `{peerId, quiet?}` | `{ok}`; `quiet` (sent when a page unloads) skips the chat line, and a return within 3 minutes is not announced either |
 | `POST voice/beat` | `{peerId}` | `{ok, revision}`, or `404 notJoined` when the module forgot the peer |
 | `POST voice/mute` | `{peerId, muted}` | `{ok}` |

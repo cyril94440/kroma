@@ -40,21 +40,22 @@ async fn request_switch_answers_each_outcome_of_the_contract() {
 #[tokio::test]
 async fn polls_and_kick_and_activity_answer_through_the_point() {
     let app = app();
+    app.seen_as_admin().await;
     app.watching(&["mamie", "papi"]);
-    let started = app.port("startPoll", json!({ "question": "Qui ?", "kind": "choice", "options": ["A", "B"], "durationS": 60 })).await;
+    let started = app.port("startPoll", json!({ "requestedBy": "cyril", "question": "Qui ?", "kind": "choice", "options": ["A", "B"], "durationS": 60 })).await;
     assert_eq!(started["Ok"]["poll"]["options"], json!(["A", "B"]));
     let voted = app.port("votePoll", json!({ "userId": "mamie", "value": "a" })).await;
     assert_eq!(voted["Ok"], json!({ "ok": true }));
     let absent = app.port("votePoll", json!({ "userId": "ghost", "value": "a" })).await;
     assert_eq!(absent["Err"], "notPresent");
-    let closed = app.port("closePoll", json!({})).await;
+    let closed = app.port("closePoll", json!({ "requestedBy": "cyril" })).await;
     assert_eq!(closed["Ok"]["results"]["total"], 1);
-    assert_eq!(app.port("closePoll", json!({})).await["Err"], "noActivePoll");
+    assert_eq!(app.port("closePoll", json!({ "requestedBy": "cyril" })).await["Err"], "noActivePoll");
 
     app.post("/sync/beat", "mamie", json!({ "delay": 2.0 })).await;
-    let kicked = app.port("kick", json!({ "userId": "mamie", "requestedBy": "agent", "reason": "rude" })).await;
+    let kicked = app.port("kick", json!({ "userId": "mamie", "requestedBy": "cyril", "reason": "rude" })).await;
     assert_eq!(kicked["Ok"]["outcome"], "kicked");
-    let refused = app.port("kick", json!({ "userId": "mamie", "requestedBy": "agent", "reason": "again" })).await;
+    let refused = app.port("kick", json!({ "userId": "mamie", "requestedBy": "cyril", "reason": "again" })).await;
     assert_eq!(refused["Ok"]["outcome"], "refused");
     assert_eq!(refused["Ok"]["reason"], "notInParty");
 
@@ -76,9 +77,15 @@ fn the_manifest_declares_exactly_the_methods_the_point_answers() {
         .map(|m| m.as_str().unwrap().to_string())
         .collect();
     assert_eq!(manifest["definesPoints"][0]["name"], "room");
-    for fixed in ["say", "history", "requestSwitch", "startPoll", "closePoll", "kick", "activity"] {
-        assert!(methods.contains(&fixed.to_string()), "{fixed}");
-    }
+    let mut declared = methods.clone();
+    let mut answered: Vec<String> = include_str!("../../room.rs")
+        .split(".route(&point(\"")
+        .skip(1)
+        .map(|rest| rest.split('"').next().unwrap().to_string())
+        .collect();
+    declared.sort();
+    answered.sort();
+    assert_eq!(declared, answered);
     assert_eq!(manifest["consumes"][0]["point"], "tv.kroma.live/control");
     assert_eq!(manifest["contributes"][0]["point"], "tv.kroma.party/room");
 }
@@ -86,6 +93,7 @@ fn the_manifest_declares_exactly_the_methods_the_point_answers() {
 #[tokio::test]
 async fn go_live_and_fine_sync_answer_like_the_admin_routes() {
     let app = app();
+    app.seen_as_admin().await;
     let none = app.port("goLive", json!({ "requestedBy": "cyril" })).await;
     assert_eq!(none["Err"], "noActiveParty");
     let (code, _) = app.post("/sync/beat", "mamie", json!({ "delay": 3.0 })).await;
@@ -100,24 +108,26 @@ async fn go_live_and_fine_sync_answer_like_the_admin_routes() {
 #[tokio::test]
 async fn fine_sync_needs_two_measurable_members() {
     let app = app();
+    app.seen_as_admin().await;
     let (_, _) = app.post("/sync/beat", "mamie", json!({ "delay": 3.0 })).await;
-    let fine = app.port("fineSync", json!({})).await;
+    let fine = app.port("fineSync", json!({ "requestedBy": "cyril" })).await;
     assert_eq!(fine["Err"], "needTwoMembers");
 }
 
 #[tokio::test]
 async fn client_logs_return_the_entries_the_admin_route_returns() {
     let app = app();
+    app.seen_as_admin().await;
     let (code, _) = app
         .post("/clientlog", "mamie", json!({ "events": [{ "category": "sync", "event": "recalage", "data": { "gap": 2 } }] }))
         .await;
     assert_eq!(code, axum::http::StatusCode::OK);
-    let logs = app.port("clientLogs", json!({ "userId": null, "limit": 10 })).await;
+    let logs = app.port("clientLogs", json!({ "requestedBy": "cyril", "userId": null, "limit": 10 })).await;
     let admin = app.get("/clientlog?limit=10", "cyril").await.1;
     assert_eq!(logs["Ok"]["events"], admin["events"]);
-    let mine = app.port("clientLogs", json!({ "userId": "mamie", "limit": 10 })).await;
+    let mine = app.port("clientLogs", json!({ "requestedBy": "cyril", "userId": "mamie", "limit": 10 })).await;
     assert_eq!(mine["Ok"]["events"][0]["event"], "recalage");
-    let other = app.port("clientLogs", json!({ "userId": "papi", "limit": 10 })).await;
+    let other = app.port("clientLogs", json!({ "requestedBy": "cyril", "userId": "papi", "limit": 10 })).await;
     assert_eq!(other["Ok"]["events"], json!([]));
 }
 
@@ -136,4 +146,67 @@ async fn a_request_names_the_channel_it_was_given_when_live_cannot_resolve_the_i
     app.port("requestSwitch", json!({ "channelId": "p:3", "channelName": "TF1", "requestedBy": "mamie", "reason": "" })).await;
     let (_, state) = app.get("/state", "papi").await;
     assert_eq!(state["vote"]["label"], "TF1");
+}
+
+#[tokio::test]
+async fn the_admin_only_actions_refuse_anyone_the_party_has_not_seen_as_an_administrator() {
+    let app = app();
+    app.watching(&["mamie", "papi"]);
+    app.post("/sync/beat", "mamie", json!({ "delay": 3.0 })).await;
+    app.post("/sync/beat", "papi", json!({ "delay": 5.0 })).await;
+    app.seen_as_admin().await;
+
+    for who in ["mamie", "agent", "ghost", "", "cyril-but-not-seen"] {
+        let kick = app.port("kick", json!({ "userId": "papi", "requestedBy": who, "reason": "x" })).await;
+        assert_eq!(kick["Ok"], json!({ "outcome": "refused", "reason": "adminOnly", "disruptions": 0 }), "kick by {who:?}");
+        let calls = [
+            ("startPoll", json!({ "requestedBy": who, "question": "Qui ?", "kind": "yesno" })),
+            ("closePoll", json!({ "requestedBy": who })),
+            ("goLive", json!({ "requestedBy": who })),
+            ("fineSync", json!({ "requestedBy": who })),
+            ("clientLogs", json!({ "requestedBy": who, "limit": 5 })),
+        ];
+        for (method, body) in calls {
+            assert_eq!(app.port(method, body).await["Err"], "adminOnly", "{method} by {who:?}");
+        }
+    }
+    assert_eq!(app.party.lock().sync.member_count(), 2);
+}
+
+#[tokio::test]
+async fn an_administrator_who_lost_the_role_is_refused_from_the_next_authenticated_request() {
+    let app = app();
+    app.seen_as_admin().await;
+    assert_eq!(app.port("closePoll", json!({ "requestedBy": "cyril" })).await["Err"], "noActivePoll");
+
+    app.party.note_role("cyril", false);
+
+    assert_eq!(app.port("closePoll", json!({ "requestedBy": "cyril" })).await["Err"], "adminOnly");
+}
+
+#[tokio::test]
+async fn force_is_honoured_for_a_seen_administrator_without_being_listed() {
+    let app = app();
+    app.seen_as_admin().await;
+    app.watching(&["mamie", "cyril"]);
+    let forced = app.port("requestSwitch", json!({ "channelId": "m6", "requestedBy": "cyril", "reason": "", "force": true })).await;
+    assert_eq!(forced["Ok"]["outcome"], "switchedDirectly");
+}
+
+#[tokio::test]
+async fn a_member_reads_only_their_own_device_journal_through_either_door() {
+    let app = app();
+    app.post("/clientlog", "mamie", json!({ "events": [{ "category": "player", "event": "gel", "data": {} }] })).await;
+
+    let own = app.port("clientLogs", json!({ "requestedBy": "mamie", "userId": "mamie", "limit": 10 })).await;
+    let other = app.port("clientLogs", json!({ "requestedBy": "mamie", "userId": "papi", "limit": 10 })).await;
+    let all = app.port("clientLogs", json!({ "requestedBy": "mamie", "limit": 10 })).await;
+
+    assert_eq!(own["Ok"]["events"][0]["event"], "gel");
+    assert_eq!(other["Err"], "adminOnly");
+    assert_eq!(all["Err"], "adminOnly");
+    let (own_http, _) = app.get("/clientlog?userId=mamie", "mamie").await;
+    let (other_http, _) = app.get("/clientlog?userId=papi", "mamie").await;
+    let (all_http, _) = app.get("/clientlog", "mamie").await;
+    assert_eq!((own_http, other_http, all_http), (axum::http::StatusCode::OK, axum::http::StatusCode::FORBIDDEN, axum::http::StatusCode::FORBIDDEN));
 }

@@ -50,7 +50,7 @@ async fn beat<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(b): Json<BeatBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     let delay = if b.delay.is_finite() { b.delay } else { 0.0 };
     work(move || {
         party.sync_beat(
@@ -77,7 +77,7 @@ async fn fine_done<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(b): Json<FineBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     let done = FineDone { ms: b.ms.round() as i64, seeks: b.seeks.round() as i64, abandoned: b.abandoned, solo: b.solo };
     work(move || party.sync_fine_done(&who.person, done)).await?;
     Ok(ok())
@@ -98,7 +98,7 @@ async fn recalibration<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(b): Json<RecalBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || {
         party.sync_recalibration(&who.person, Recal { gap: b.gap, target: b.target, arrival: b.arrival, blocked: b.blocked })
     })
@@ -119,7 +119,7 @@ async fn kick<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(b): Json<KickBody>,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &party, &user)?;
     work(move || party.kick(&b.user_id, &b.reason))
         .await?
         .map(|disruptions| Json(json!({ "kicked": true, "disruptions": disruptions })).into_response())
@@ -131,7 +131,7 @@ async fn go_live<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    let who = admin(&host, &user)?;
+    let who = admin(&host, &party, &user)?;
     work(move || party.sync_go_live(&who.person.user_id))
         .await?
         .map(|members| Json(json!({ "members": members })).into_response())
@@ -143,7 +143,7 @@ async fn fine_sync<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    let who = admin(&host, &user)?;
+    let who = admin(&host, &party, &user)?;
     work(move || party.sync_fine_sync(&who.person.user_id))
         .await?
         .map(|_| ok())
@@ -155,6 +155,6 @@ async fn info<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &party, &user)?;
     Ok(Json(party.sync_info()).into_response())
 }

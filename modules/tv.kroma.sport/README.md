@@ -40,6 +40,10 @@ Events (`sport.<topic>`) carry a persisted `seq`; `GET /state` returns the curre
 
 Tools (point `tv.kroma.hermes/tools`, routes `/_port/tv.kroma.hermes/tools/{list,call}`): `match_facts`, `compos_match`, `live_standings`, `start_prono`, `sport_channel_hint`, `calibrate_clock`.
 
+`start_prono` is an administrator's action on both doors: `POST /prono/start` and the tool, which reads the user id the assistant sends in the call's `context.userId` and looks it up in the roles the module records from every authenticated request (10 minutes; an unseen, empty or `agent` id is not an administrator). Anyone else gets `{ok: false, error: "adminOnly"}` with a reason the assistant relays. The source product let any family member ask for a prono, its code only checking the match window; this is stricter on purpose.
+
+The list `match_facts` answers when no match is named shows a match ESPN calls finished as still in progress, without its score, until the picture has caught up: the end of the match is estimated at 115 minutes after the kick-off, plus the reveal delay, like the facts of a single match.
+
 Contract v1 keeps the source's French field names (`statut`, `equipes`, `joueurs`, `periodes`, `evenements`, `votes`, `requis`, `distribution`, `classement_match`, `resultats`, `saison`, `debut_ms`, `fin_ms`, `duree_s`).
 
 ## Differences from hermes-tv

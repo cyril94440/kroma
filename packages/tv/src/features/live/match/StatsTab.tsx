@@ -20,7 +20,7 @@ export function StatsTab({ view }: Readonly<{ view: MatchView }>) {
               </Text>
               <Text variant="bodyTv">{`${stat.ext}${unit}`}</Text>
             </Box>
-            <Box row h={8} radius={4} bg="tint/6">
+            <Box row h={8} radius="pill" bg="tint/6">
               <Box style={{ flex: stat.dom / total }} bg="accent" />
               <Box style={{ flex: stat.ext / total }} bg="info" />
             </Box>

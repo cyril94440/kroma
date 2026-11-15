@@ -137,7 +137,7 @@ impl Live {
         }
     }
 
-    fn restart_if_due(&self) {
+    pub(crate) fn restart_if_due(&self) {
         let (due, channel) = {
             let inner = self.lock();
             let due = inner.restart_at.is_some_and(|at| Instant::now() >= at) && inner.run.is_none() && inner.phase != Phase::Paused;
@@ -146,10 +146,7 @@ impl Live {
         let Some(channel) = channel.filter(|_| due) else { return };
         let Ok(_gate) = self.gate.try_lock() else { return };
         if let Err(error) = self.start_run(&channel, true) {
-            let mut inner = self.lock();
-            inner.last_error = Some(redact(&format!("{error:#}")));
-            inner.phase = Phase::Error;
-            inner.restart_at = Some(Instant::now() + Duration::from_secs(restart_delay_seconds(inner.restarts.max(1))));
+            self.fail_start(&error);
         }
     }
 

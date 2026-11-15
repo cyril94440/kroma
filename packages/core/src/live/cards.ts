@@ -24,7 +24,10 @@ export type RowTone = 'live' | 'win' | 'draw' | 'loss' | null;
 
 /** How a table row of a provisional standing is marked: its outcome while a
  *  match is in play, nothing for a settled row. */
-export function rowTone(card: { live?: { rows: { live: boolean; outcome: string | null }[] } }, row: number): RowTone {
+export function rowTone(
+  card: { live?: { rows: { live: boolean; outcome: string | null }[] } },
+  row: number,
+): RowTone {
   const entry = card.live?.rows[row];
   if (!entry?.live) return null;
   if (entry.outcome === 'win' || entry.outcome === 'draw' || entry.outcome === 'loss') {

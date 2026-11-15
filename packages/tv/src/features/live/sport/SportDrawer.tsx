@@ -2,8 +2,9 @@ import type { SportEvent, SportView } from '@kromatv/client/sport';
 import { sportRows } from '@kromatv/core';
 import type { LiveClient } from '@kromatv/core/react';
 import { useT } from '@kromatv/ui';
-import { Box, Drawer, SegmentGroup } from '@kromatv/ui/kit';
+import { Box, Drawer } from '@kromatv/ui/kit';
 import { useMemo, useState } from 'react';
+import { TabStrip } from '#tv/features/live/TabStrip';
 import { SportRows } from '#tv/features/live/sport/SportRows';
 import { StandingsTab } from '#tv/features/live/sport/StandingsTab';
 
@@ -26,24 +27,19 @@ export function SportDrawer({
 }>) {
   const t = useT();
   const [tab, setTab] = useState<Tab>('rows');
+  const tabs = useMemo(
+    () => [
+      { id: 'rows' as const, label: t('live.sport.live') },
+      { id: 'standings' as const, label: t('live.standings') },
+    ],
+    [t],
+  );
   const rows = useMemo(() => (view ? sportRows(view) : { live: [], upcoming: [] }), [view]);
   return (
     <Drawer.Root open={open} onClose={onClose} title={t('live.sport')} width="xl" floating>
       <Drawer.Panel>
         <Box gap={18}>
-          <SegmentGroup.Root<Tab>
-            value={tab}
-            onValueChange={setTab}
-            label={t('live.sport')}
-            stretch
-          >
-            <SegmentGroup.Item value="rows">
-              <SegmentGroup.Label>{t('live.sport.live')}</SegmentGroup.Label>
-            </SegmentGroup.Item>
-            <SegmentGroup.Item value="standings">
-              <SegmentGroup.Label>{t('live.standings')}</SegmentGroup.Label>
-            </SegmentGroup.Item>
-          </SegmentGroup.Root>
+          <TabStrip tabs={tabs} value={tab} onChange={setTab} />
           {tab === 'rows' ? <SportRows rows={rows} onWatch={onWatch} /> : null}
           {tab === 'standings' && open ? <StandingsTab client={client} /> : null}
         </Box>

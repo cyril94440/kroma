@@ -9,7 +9,8 @@ const table = {
   matchs_comptes: 1,
 };
 
-const clientOf = (standings: ReturnType<typeof vi.fn>) => ({ sport: { standings } }) as unknown as LiveClient;
+const clientOf = (standings: ReturnType<typeof vi.fn>) =>
+  ({ sport: { standings } }) as unknown as LiveClient;
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());

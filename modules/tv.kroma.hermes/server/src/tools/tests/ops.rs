@@ -52,7 +52,7 @@ fn a_stable_server_with_freezes_on_the_complainers_app_points_at_their_side() {
 
     assert!(out["verdict"].as_str().unwrap().starts_with("cote_spectateur"));
     assert_eq!((out["spectateur"]["pseudo"].clone(), out["spectateur"]["gels_30_min"].clone()), (json!("Mamie"), json!(2)));
-    assert_eq!(rig.room.logs_asks.lock().unwrap()[0], (Some("u-mamie".to_string()), 200, Some(30)));
+    assert_eq!(rig.room.logs_asks.lock().unwrap()[0], ("u-mamie".to_string(), Some("u-mamie".to_string()), 200, Some(30)));
 }
 
 #[test]

@@ -7,8 +7,9 @@
 
 use std::fs::File as StdFile;
 use std::net::SocketAddr;
-use std::path::{Component, Path as FsPath, PathBuf};
-use std::sync::Arc;
+use std::path::{Component, PathBuf};
+use std::sync::{Arc, LazyLock};
+use std::time::Instant;
 
 use axum::body::Body;
 use axum::extract::{ConnectInfo, Extension, Path, Query, State};
@@ -29,10 +30,21 @@ use crate::api::stream::byte_sink;
 use crate::model::Permission;
 use crate::state::SharedState;
 
+mod beneath;
+mod roots;
+
+use beneath::open_under;
+
+static ROOTS: LazyLock<roots::Roots> = LazyLock::new(roots::Roots::default);
+
 const MAX_PLAYLIST_BYTES: u64 = 1024 * 1024;
 const MAX_PATH_BYTES: usize = 512;
 const SEGMENT_CACHE: &str = "private, max-age=30";
 const PLAYLIST_MIME: &str = "application/vnd.apple.mpegurl";
+
+pub(crate) fn forget_root(state: &SharedState, module: &str) {
+    ROOTS.forget(&state.config.data_dir, module);
+}
 
 pub fn routes() -> Router<SharedState> {
     Router::new().route("/module-files/{module}/{*path}", get(serve))
@@ -53,7 +65,9 @@ async fn serve(
         return Err(not_found());
     }
     let relative = safe_relative(&path).ok_or_else(not_found)?;
-    let root = supervisor.public_root_of(&module).ok_or_else(not_found)?;
+    let root = ROOTS
+        .get(&state.config.data_dir, &module, Instant::now(), || supervisor.public_root_of(&module))
+        .ok_or_else(not_found)?;
     let opened = tokio::task::spawn_blocking(move || open_under(&root, &relative))
         .await
         .map_err(|_| not_found())?
@@ -123,38 +137,6 @@ fn safe_relative(path: &str) -> Option<PathBuf> {
         .components()
         .all(|part| matches!(part, Component::Normal(_)))
         .then_some(relative)
-}
-
-struct Opened {
-    file: StdFile,
-    path: PathBuf,
-}
-
-fn open_under(root: &FsPath, relative: &FsPath) -> Option<Opened> {
-    let root = root.canonicalize().ok()?;
-    let resolved = root.join(relative).canonicalize().ok()?;
-    if !resolved.starts_with(&root) {
-        return None;
-    }
-    let file = open_without_following(&resolved).ok()?;
-    file.metadata().ok()?.is_file().then_some(Opened {
-        file,
-        path: resolved,
-    })
-}
-
-#[cfg(unix)]
-fn open_without_following(path: &FsPath) -> std::io::Result<StdFile> {
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(path)
-}
-
-#[cfg(not(unix))]
-fn open_without_following(path: &FsPath) -> std::io::Result<StdFile> {
-    StdFile::open(path)
 }
 
 #[cfg(test)]

@@ -36,7 +36,7 @@ async fn cast<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<CastBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.actor_vote(&who, body.approve))
         .await?
         .map(|_| ok())
@@ -57,7 +57,7 @@ async fn request_switch<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<SwitchBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     if body.channel_id.trim().is_empty() {
         return Err(refuse(StatusCode::BAD_REQUEST, "channelIdRequired"));
     }
@@ -94,7 +94,7 @@ async fn votes<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Query(q): Query<VotesQuery>,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &party, &user)?;
     let rows = work(move || party.recent_votes(q.limit.unwrap_or(50))).await?;
     Ok(Json(json!({ "votes": rows })).into_response())
 }
@@ -111,7 +111,7 @@ async fn channels<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Query(query): Query<ChannelsQuery>,
 ) -> Result<Response, Response> {
-    actor(&host, &user)?;
+    actor(&host, &party, &user)?;
     let found = work(move || party.find_channels(&query.q)).await?;
     Ok(Json(json!({ "channels": found })).into_response())
 }

@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::{json, Map, Value};
 
-use crate::detect::{name_designates, FlatMatch};
+use crate::detect::{name_designates, FlatMatch, END_AFTER_START_S};
 use crate::iso::parse_secs;
 use crate::team_match::side_matches;
 
@@ -51,8 +51,10 @@ pub fn search<'a>(matches: &'a [FlatMatch], teams: &Value) -> Vec<&'a FlatMatch>
         .collect()
 }
 
-pub fn list_line(m: &FlatMatch) -> Value {
-    let state = match m.state.as_str() {
+pub fn list_line(m: &FlatMatch, now_s: f64, delay_s: f64) -> Value {
+    let behind = m.state == "post" && m.start.is_some_and(|start| now_s < start + END_AFTER_START_S + delay_s);
+    let phase = if behind { "in" } else { m.state.as_str() };
+    let state = match phase {
         "pre" => "a_venir",
         "in" => "en_cours",
         "post" => "termine",
@@ -63,7 +65,7 @@ pub fn list_line(m: &FlatMatch) -> Value {
         ("competition".to_string(), json!(m.competition)),
         ("statut".to_string(), json!(state)),
     ]);
-    match m.state.as_str() {
+    match phase {
         "post" => {
             line.insert("score".into(), json!(m.score));
         }

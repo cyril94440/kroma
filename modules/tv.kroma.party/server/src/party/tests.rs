@@ -7,3 +7,4 @@ mod presence;
 mod support;
 mod syncing;
 mod voice;
+mod voice_signal;

@@ -1,4 +1,5 @@
-import type { LinkPeer, LinkState, PeerFactory, Send } from './voice-peer';
+import type { LinkDeps } from './voice-link-deps';
+import type { LinkPeer, LinkState } from './voice-peer';
 import type {
   IceCandidate,
   IceServer,
@@ -9,17 +10,6 @@ import type {
 import { Negotiation } from './voice-negotiation';
 import { Outbox } from './voice-outbox';
 import { LINK_TIMING, Timers } from './voice-timing';
-
-export interface LinkDeps {
-  self: string;
-  remote: string;
-  createPeer: PeerFactory;
-  send: Send;
-  onStream: (stream: MediaStream) => void;
-  onState: (state: LinkState) => void;
-  newSession: () => string;
-  now: () => number;
-}
 
 type Route = { from: string; to: string; session: string };
 

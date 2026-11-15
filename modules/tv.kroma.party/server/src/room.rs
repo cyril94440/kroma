@@ -3,137 +3,17 @@ use std::sync::Arc;
 use axum::extract::{Extension, State};
 use axum::routing::post;
 use axum::{Json, Router};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use kroma_module_sdk::host::{port_reply, HostCtx};
 
-use crate::model::{Person, RoomMessage};
+use crate::model::Person;
 use crate::party::{Actor, Party, Request};
 
+mod wire;
+
+pub use wire::*;
+
 pub const ROOM: &str = "tv.kroma.party/room";
-
-#[derive(Deserialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct SayRequest {
-    pub text: String,
-    #[serde(rename = "as")]
-    pub speaker: String,
-    pub card: Option<Value>,
-    pub reply_to: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct SayReply {
-    pub id: String,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct HistoryRequest {
-    pub limit: u32,
-    pub before: Option<i64>,
-}
-
-#[derive(Serialize)]
-pub struct HistoryReply {
-    pub messages: Vec<RoomMessage>,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct SwitchRequest {
-    pub channel_id: String,
-    pub channel_name: Option<String>,
-    pub requested_by: String,
-    pub reason: String,
-    pub force: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SwitchReply {
-    pub outcome: &'static str,
-    pub vote_id: Option<String>,
-    pub reason: Option<String>,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct StartPollRequest {
-    pub question: String,
-    pub kind: String,
-    pub options: Vec<String>,
-    pub duration_s: Option<i64>,
-}
-
-#[derive(Serialize)]
-pub struct PollReply {
-    pub poll: Value,
-}
-
-#[derive(Serialize)]
-pub struct ClosedPollReply {
-    pub results: Value,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct VotePollRequest {
-    pub user_id: String,
-    pub value: String,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct KickRequest {
-    pub user_id: String,
-    pub requested_by: String,
-    pub reason: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct KickReply {
-    pub outcome: &'static str,
-    pub reason: Option<String>,
-    pub disruptions: usize,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct SyncActionRequest {
-    pub requested_by: String,
-}
-
-#[derive(Serialize)]
-pub struct GoLiveReply {
-    pub members: usize,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct ClientLogsRequest {
-    pub user_id: Option<String>,
-    pub limit: Option<u32>,
-    pub minutes: Option<i64>,
-}
-
-#[derive(Serialize)]
-pub struct ClientLogsReply {
-    pub events: Vec<crate::store::LogEntry>,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default)]
-pub struct ActivityRequest {
-    pub status: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct Done {
-    pub ok: bool,
-}
 
 fn point(method: &str) -> String {
     format!("/_port/{ROOM}/{method}")
@@ -199,7 +79,8 @@ async fn request_switch<S: HostCtx + Clone>(
 ) -> Json<Result<SwitchReply, String>> {
     port_reply(move || {
         let requester = viewer(&party, &req.requested_by);
-        let force = req.force && party.may_bypass(&Actor { person: Person::new(&req.requested_by, ""), admin: false });
+        let force = req.force
+            && party.may_bypass(&Actor { person: Person::new(&req.requested_by, ""), admin: party.is_admin_id(&req.requested_by) });
         let result = party.request_switch(Request {
             channel_id: &req.channel_id,
             channel_name: req.channel_name.as_deref(),
@@ -218,6 +99,7 @@ async fn start_poll<S: HostCtx + Clone>(
     Json(req): Json<StartPollRequest>,
 ) -> Json<Result<PollReply, String>> {
     port_reply(move || {
+        party.require_admin_id(&req.requested_by).map_err(|e| anyhow::anyhow!(e))?;
         let view = party
             .start_poll(&req.question, &req.kind, &req.options, req.duration_s)
             .map_err(|e| anyhow::anyhow!(e))?;
@@ -229,9 +111,10 @@ async fn start_poll<S: HostCtx + Clone>(
 async fn close_poll<S: HostCtx + Clone>(
     State(_): State<S>,
     Extension(party): Extension<Arc<Party>>,
-    Json(_): Json<Value>,
+    Json(req): Json<ClosePollRequest>,
 ) -> Json<Result<ClosedPollReply, String>> {
     port_reply(move || {
+        party.require_admin_id(&req.requested_by).map_err(|e| anyhow::anyhow!(e))?;
         let view = party.close_poll("closedByAgent").map_err(|e| anyhow::anyhow!(e))?;
         Ok(ClosedPollReply { results: serde_json::to_value(view)? })
     })
@@ -257,6 +140,9 @@ async fn kick<S: HostCtx + Clone>(
     Json(req): Json<KickRequest>,
 ) -> Json<Result<KickReply, String>> {
     port_reply(move || {
+        if let Err(code) = party.require_admin_id(&req.requested_by) {
+            return Ok(KickReply { outcome: "refused", reason: Some(code.into()), disruptions: 0 });
+        }
         let reason = format!("{} ({})", req.reason, req.requested_by);
         Ok(match party.kick(&req.user_id, &reason) {
             Ok(disruptions) => KickReply { outcome: "kicked", reason: None, disruptions },
@@ -284,8 +170,8 @@ async fn go_live<S: HostCtx + Clone>(
     Json(req): Json<SyncActionRequest>,
 ) -> Json<Result<GoLiveReply, String>> {
     port_reply(move || {
-        let by = if req.requested_by.is_empty() { "agent" } else { &req.requested_by };
-        party.sync_go_live(by).map(|members| GoLiveReply { members }).map_err(|e| anyhow::anyhow!(e))
+        party.require_admin_id(&req.requested_by).map_err(|e| anyhow::anyhow!(e))?;
+        party.sync_go_live(&req.requested_by).map(|members| GoLiveReply { members }).map_err(|e| anyhow::anyhow!(e))
     })
     .await
 }
@@ -296,8 +182,8 @@ async fn fine_sync<S: HostCtx + Clone>(
     Json(req): Json<SyncActionRequest>,
 ) -> Json<Result<Done, String>> {
     port_reply(move || {
-        let by = if req.requested_by.is_empty() { "agent" } else { &req.requested_by };
-        party.sync_fine_sync(by).map(|()| Done { ok: true }).map_err(|e| anyhow::anyhow!(e))
+        party.require_admin_id(&req.requested_by).map_err(|e| anyhow::anyhow!(e))?;
+        party.sync_fine_sync(&req.requested_by).map(|()| Done { ok: true }).map_err(|e| anyhow::anyhow!(e))
     })
     .await
 }
@@ -308,6 +194,7 @@ async fn client_logs<S: HostCtx + Clone>(
     Json(req): Json<ClientLogsRequest>,
 ) -> Json<Result<ClientLogsReply, String>> {
     port_reply(move || {
+        party.require_log_access(&req.requested_by, req.user_id.as_deref()).map_err(|e| anyhow::anyhow!(e))?;
         let events = party.read_logs(req.minutes.unwrap_or(30), req.user_id.as_deref(), None, req.limit.unwrap_or(120));
         Ok(ClientLogsReply { events })
     })

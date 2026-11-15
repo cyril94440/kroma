@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 
-use super::{always, failure, int_arg, text_arg, Kind, Spec, ToolEnv};
+use super::{admin_refusal, always, failure, int_arg, is_admin_only, text_arg, Kind, Spec, ToolEnv};
 use crate::peers::Viewer;
 use crate::webcache::normalise;
 
@@ -52,7 +52,7 @@ pub fn specs() -> Vec<Spec> {
             available: always,
             describe: || {
                 (
-                    "Retire quelqu'un de la watch party (bénin et réversible : il peut re-rejoindre en un clic). À appeler directement quand un membre de la famille le demande ; le serveur revérifie lui-même ses règles et peut refuser.",
+                    "Retire quelqu'un de la watch party (bénin et réversible : il peut re-rejoindre en un clic). À appeler directement quand quelqu'un le demande ; le serveur décide seul (réservé aux administrateurs) et peut refuser.",
                     json!({ "type": "object", "properties": {
                         "pseudo": { "type": "string", "description": "nom affiché de la personne" },
                         "reason": { "type": "string" },
@@ -69,19 +69,21 @@ fn start_poll(env: &mut ToolEnv, args: &Value) -> Value {
     let kind = text_arg(args, "type");
     let options: Vec<String> = args.get("options").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
     let duration = int_arg(args, "duration_s", 120).clamp(10, 900);
-    let result = env.deps.room.start_poll(&question, &kind, &options, Some(duration));
+    let result = env.deps.room.start_poll(&env.message.user_id, &question, &kind, &options, Some(duration));
     env.deps.audit("decisions", "start_poll", json!({ "user": env.message.user_id, "question": question, "type": kind, "options": options, "result": format!("{result:?}") }));
     match result {
         Ok(poll) => json!({ "ok": true, "poll": poll }),
+        Err(e) if is_admin_only(&e) => admin_refusal(),
         Err(e) => failure(&format!("lancement impossible : {e:#}")),
     }
 }
 
 fn close_poll(env: &mut ToolEnv, _args: &Value) -> Value {
-    let result = env.deps.room.close_poll();
+    let result = env.deps.room.close_poll(&env.message.user_id);
     env.deps.audit("decisions", "close_poll", json!({ "user": env.message.user_id, "result": format!("{result:?}") }));
     match result {
         Ok(results) => json!({ "ok": true, "resultats": results }),
+        Err(e) if is_admin_only(&e) => admin_refusal(),
         Err(e) => failure(&format!("clôture impossible : {e:#}")),
     }
 }
@@ -130,6 +132,7 @@ fn kick_from_party(env: &mut ToolEnv, args: &Value) -> Value {
     env.deps.audit("decisions", "kick", json!({ "requested_by": env.message.user_id, "target": target.user_id, "reason": reason, "result": format!("{result:?}") }));
     match result {
         Ok(out) if out.outcome == "kicked" => json!({ "ok": true, "personne": target.name, "perturbations_recentes": out.disruptions, "note": "il peut re-rejoindre quand il veut" }),
+        Ok(out) if out.reason.as_deref() == Some("adminOnly") => admin_refusal(),
         Ok(out) => json!({ "ok": false, "status": "refus", "raison": out.reason.unwrap_or_else(|| "refusé".into()) }),
         Err(e) => failure(&format!("appel impossible : {e:#}")),
     }

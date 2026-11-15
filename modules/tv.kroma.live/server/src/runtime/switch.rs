@@ -150,11 +150,7 @@ impl Live {
         self.stop_run().await;
         let stopped = Instant::now();
         if let Err(error) = self.start_run(target, false) {
-            let message = crate::portal::redact(&format!("{error:#}"));
-            let mut inner = self.lock();
-            inner.phase = Phase::Error;
-            inner.last_error = Some(message.clone());
-            return SwitchOutcome::error(message);
+            return SwitchOutcome::error(self.fail_start(&error));
         }
         let launched = Instant::now();
         {

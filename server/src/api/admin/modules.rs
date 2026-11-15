@@ -123,6 +123,7 @@ async fn set_enabled(
 ) -> Result<Response, Response> {
     super::require(&user, Permission::SettingsManage)?;
     kroma_engine::modules::set_module_enabled(&state.settings, &state.db, &id, body.enabled);
+    crate::api::module_files::forget_root(&state, &id);
     // Drive the module's lifecycle so the toggle starts/stops its live services,
     // not just its listing flag.
     if let Some(module) = kroma_module_kernel::find_server(&id) {
@@ -173,7 +174,8 @@ async fn set_config(
         .find(|m| m.id == id)
         .map(|m| m.config)
         .unwrap_or_default();
-    let map = super::modules_config::writable_config(&fields, values);
+    let map = super::modules_config::writable_config(&fields, values)
+        .map_err(|key| bad(&format!("config: \"{key}\" is a secret and takes text, or null to clear it")))?;
     kroma_engine::modules::set_module_config(&state.settings, &state.db, &id, map);
     Ok(Json(json!({ "id": id, "ok": true })).into_response())
 }
@@ -235,6 +237,7 @@ async fn reinstall_module(
     let installed = super::store::install::reinstall(&state, &supervisor, &id)
         .await
         .map_err(|e| bad(&format!("reinstall failed: {e:#}")))?;
+    crate::api::module_files::forget_root(&state, &id);
     let running = supervisor.is_running(&id);
     Ok(
         Json(json!({ "reinstalled": true, "running": running, "module": installed }))

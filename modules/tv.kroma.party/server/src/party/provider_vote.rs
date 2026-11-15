@@ -32,6 +32,11 @@ impl Party {
         }
         let viewers = self.fetch_presence().unwrap_or_default();
         let present = people(&viewers);
+        let requester = event
+            .proposal
+            .requested_by
+            .as_deref()
+            .and_then(|id| present.iter().find(|p| p.user_id == id).cloned());
         let now = self.now();
         let mut st = self.lock();
         if st.vote.is_some() {
@@ -45,7 +50,7 @@ impl Party {
             kind: VoteKind::Provider { proposal_id: id, proposal_kind: kind.clone() },
             label: &kind,
             note: "",
-            requester: None,
+            requester,
             present: &present,
             now,
             seconds: self.vote_seconds(),

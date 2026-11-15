@@ -28,7 +28,7 @@ async fn list<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    actor(&host, &user)?;
+    actor(&host, &party, &user)?;
     let ideas = work(move || party.ideas_view()).await?;
     Ok(Json(json!({ "ideas": ideas })).into_response())
 }
@@ -59,7 +59,7 @@ async fn submit<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<SubmitBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     let input = IdeaInput {
         genre: body.genre,
         text: body.text,
@@ -87,7 +87,7 @@ async fn triage<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Query(q): Query<TriageQuery>,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &party, &user)?;
     let ideas = work(move || party.ideas_for_triage(q.status.as_deref())).await?;
     Ok(Json(json!({ "ideas": ideas })).into_response())
 }
@@ -106,7 +106,7 @@ async fn update<S: HostCtx + Clone>(
     Path(id): Path<String>,
     Json(body): Json<UpdateBody>,
 ) -> Result<Response, Response> {
-    admin(&host, &user)?;
+    admin(&host, &party, &user)?;
     work(move || party.update_idea(&id, body.status.as_deref(), body.reply.as_deref()))
         .await?
         .map(|idea| Json(json!({ "idea": idea })).into_response())

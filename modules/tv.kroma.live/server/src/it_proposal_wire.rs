@@ -20,7 +20,7 @@ async fn opened_with_party() -> (crate::it_live::Rig, Value) {
     load(&rig);
     playing(&rig, "p:1").await;
     let backup = rig.live.providers.find_by_ref("s:1").unwrap();
-    rig.live.propose_channel("switchToBackup", &backup, "unstable").await;
+    rig.live.propose_channel("switchToBackup", &backup, "unstable", None).await;
     let opened = rig.live.sent_on("live.proposal")[0].clone();
     (rig, opened)
 }
@@ -108,7 +108,7 @@ async fn without_the_party_module_the_proposal_is_published_already_resolved() {
     playing(&rig, "p:1").await;
     let backup = rig.live.providers.find_by_ref("s:1").unwrap();
 
-    rig.live.propose_channel("switchToBackup", &backup, "unstable").await;
+    rig.live.propose_channel("switchToBackup", &backup, "unstable", None).await;
 
     assert_eq!(
         pinned(rig.live.sent_on("live.proposal")[0].clone()),
@@ -126,5 +126,43 @@ async fn without_the_party_module_the_proposal_is_published_already_resolved() {
             "default": "noVote"
         })
     );
+    rig.live.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_requested_proposal_carries_the_asker_and_waits_for_the_party_vote() {
+    let rig = rig_with(Default::default(), with_party);
+    load(&rig);
+    playing(&rig, "p:1").await;
+    let backup = rig.live.providers.find_by_ref("s:1").unwrap();
+    let before = now_ms();
+
+    rig.live.propose_channel("switchProvider", &backup, "requested", Some("u1")).await;
+
+    let opened = rig.live.sent_on("live.proposal")[0].clone();
+    assert_eq!(opened["proposal"]["requestedBy"], "u1");
+    let window = opened["proposal"]["expiresAt"].as_i64().unwrap() - before;
+    assert!(window > 600_000, "a vote may run to 600 s, got {window}");
+    assert_eq!(
+        pinned(opened)["proposal"],
+        json!({
+            "id": "prop-1",
+            "kind": "switchProvider",
+            "text": "requested",
+            "channel": "s:1",
+            "requestedBy": "u1",
+            "createdAt": 1000,
+            "expiresAt": 31000
+        })
+    );
+    rig.live.expire_proposals();
+    assert_eq!(rig.live.sent_on("live.proposal").len(), 1, "party owns the deadline");
+    rig.live.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_automatic_proposal_has_no_requester() {
+    let (rig, opened) = opened_with_party().await;
+    assert!(opened["proposal"].get("requestedBy").is_none());
     rig.live.shutdown();
 }

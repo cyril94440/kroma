@@ -111,3 +111,17 @@ fn the_key_value_store_round_trips() {
     s.kv_delete("k").unwrap();
     assert_eq!(s.kv_get("k").unwrap(), None);
 }
+
+#[test]
+fn every_genre_together_stops_writing_for_the_day_at_the_total_cap() {
+    let (s, _keep) = test_store("hermes-total-cap");
+    let conn = s.pool.get().unwrap();
+    for genre in ["chat", "decisions", "sources"] {
+        conn.execute("INSERT INTO audit (at, day, genre, event, bytes, data) VALUES (5, 0, ?1, 'e', 41943000, '{}')", [genre]).unwrap();
+    }
+    drop(conn);
+
+    assert!(!s.record("llm", "e", &json!({ "text": "x".repeat(200) }), 5));
+    assert!(s.record("llm", "e", &json!({ "a": 1 }), 5));
+    assert!(s.record("llm", "e", &json!({ "a": 1 }), 86_400_000 * 2));
+}

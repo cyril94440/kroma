@@ -1,8 +1,9 @@
 import { MicError, type MicFailure, stopStream } from './voice-mic';
 import { watchSpeech } from './voice-meter';
+import type { SessionDeps } from './voice-session-deps';
 import { Talk } from './voice-talk';
 import { VoiceMesh } from './voice-mesh';
-import type { LinkState, PeerFactory } from './voice-peer';
+import type { LinkState } from './voice-peer';
 import {
   type JoinAnswer,
   type SignalEvent,
@@ -11,20 +12,8 @@ import {
   type VoiceState,
 } from './voice-schemas';
 import { SESSION_TIMING, Timers } from './voice-timing';
-import { VoiceRequestError, type VoiceApi } from './voice-api';
+import { VoiceRequestError } from './voice-api';
 import { IDLE, type VoiceView } from './voice-view';
-
-export interface SessionDeps {
-  api: VoiceApi;
-  deviceId: string;
-  watching: boolean;
-  acquireMic: () => Promise<MediaStream>;
-  watchSpeech?: typeof watchSpeech;
-  createPeer: PeerFactory;
-  newSession: () => string;
-  now: () => number;
-  onChange: (view: VoiceView) => void;
-}
 
 /** One person's voice session: observes the room from the moment it exists,
  *  and once `join` has run it holds the microphone, the heartbeat, and the mesh

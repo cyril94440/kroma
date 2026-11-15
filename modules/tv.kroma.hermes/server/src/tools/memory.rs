@@ -64,12 +64,21 @@ fn learn_lesson(env: &mut ToolEnv, args: &Value) -> Value {
         return failure("leçon trop courte ou trop longue (10-300 caractères)");
     }
     let now = env.deps.now();
+    if env.deps.store.lessons().is_ok_and(|all| all.iter().any(|known| same_lesson(&known.text, &lesson))) {
+        env.deps.audit("decisions", "learn_lesson", json!({ "user": env.message.user_id, "lesson": lesson, "duplicate": true }));
+        return json!({ "ok": true, "deja_retenue": true });
+    }
     let dated = format!("[{}] {lesson}", crate::paris::date_label(now));
     env.deps.audit("decisions", "learn_lesson", json!({ "user": env.message.user_id, "lesson": lesson }));
     match env.deps.store.add_lesson(&dated, now, LESSONS_MAX) {
         Ok(total) => json!({ "ok": true, "lecons_total": total }),
         Err(e) => failure(&format!("{e:#}")),
     }
+}
+
+fn same_lesson(stored: &str, lesson: &str) -> bool {
+    let body = stored.strip_prefix('[').and_then(|rest| rest.split_once("] ")).map_or(stored, |(_, text)| text);
+    body.trim().to_lowercase() == lesson.trim().to_lowercase()
 }
 
 fn clip(text: String, max: usize) -> String {

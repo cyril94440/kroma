@@ -10,7 +10,7 @@ fn start_poll_forwards_the_question_and_clamps_the_duration() {
     let out = call(&rig, "start_poll", json!({ "question": "Qui gagne ?", "type": "choice", "options": ["Lens", "PSG", "Nul"], "duration_s": 5000 }), "Mamie");
     assert_eq!(out["ok"], true);
     let polls = rig.room.polls.lock().unwrap().clone();
-    assert_eq!(polls[0], ("Qui gagne ?".to_string(), "choice".to_string(), vec!["Lens".to_string(), "PSG".to_string(), "Nul".to_string()], Some(900)));
+    assert_eq!(polls[0], ("u-mamie".to_string(), "Qui gagne ?".to_string(), "choice".to_string(), vec!["Lens".to_string(), "PSG".to_string(), "Nul".to_string()], Some(900)));
 }
 
 #[test]
@@ -67,4 +67,29 @@ fn the_rooms_own_refusal_is_reported_as_is() {
     let out = call(&rig, "kick_from_party", json!({ "pseudo": "Papi" }), "Mamie");
     assert_eq!(out["ok"], false);
     assert_eq!(out["raison"], "notInParty");
+}
+
+#[test]
+fn the_polls_and_the_kick_name_the_author_from_the_message_never_from_the_arguments() {
+    let rig = Rig::new();
+    call(&rig, "start_poll", json!({ "question": "Qui ?", "type": "open", "requestedBy": "u-cyril", "pseudo": "Cyril" }), "Mamie");
+    call(&rig, "close_poll", json!({ "requestedBy": "u-cyril" }), "Mamie");
+
+    assert_eq!(rig.room.polls.lock().unwrap()[0].0, "u-mamie");
+    assert_eq!(*rig.room.closes.lock().unwrap(), vec!["u-mamie".to_string()]);
+}
+
+#[test]
+fn an_admin_only_refusal_of_the_party_is_returned_to_the_model_with_its_reason() {
+    let rig = Rig::new();
+    *rig.room.poll_error.lock().unwrap() = Some("adminOnly".into());
+
+    for tool in ["start_poll", "close_poll"] {
+        let out = call(&rig, tool, json!({ "question": "Qui ?", "type": "open" }), "Mamie");
+        assert_eq!((out["ok"].clone(), out["raison"].clone()), (json!(false), json!("reserve_aux_admins")), "{tool}");
+        assert!(out["message"].as_str().unwrap().contains("administrateurs"));
+    }
+    *rig.room.kick_reply.lock().unwrap() = Some(KickOutcome { outcome: "refused".into(), reason: Some("adminOnly".into()), disruptions: 0 });
+    let kick = call(&rig, "kick_from_party", json!({ "pseudo": "Papi" }), "Mamie");
+    assert_eq!(kick["raison"], "reserve_aux_admins");
 }

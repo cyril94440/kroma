@@ -18,6 +18,7 @@ fn plant_clip(rig: &Rig, name: &str) -> String {
 }
 
 async fn scanned(rig: &Rig) -> serde_json::Value {
+    rig.live.lock().presence.beat("u1", "u1", crate::runtime::now_ms());
     let started = ask(rig, "benchmark", json!({ "channelIds": ["p:1"], "requestedBy": "u1" })).await;
     assert_eq!(started["Ok"]["status"], "started");
     assert!(until(Duration::from_secs(90), || !rig.live.scan_state().running).await);

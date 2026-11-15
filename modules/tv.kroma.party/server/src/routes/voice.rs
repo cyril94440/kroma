@@ -34,7 +34,7 @@ fn refusal(error: VoiceError) -> Response {
         VoiceError::BadDevice | VoiceError::SelfSignal | VoiceError::BadSignal => {
             StatusCode::BAD_REQUEST
         }
-        VoiceError::Full => StatusCode::CONFLICT,
+        VoiceError::Full | VoiceError::AccountFull => StatusCode::CONFLICT,
         VoiceError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
         VoiceError::NotJoined | VoiceError::PeerGone => StatusCode::NOT_FOUND,
         VoiceError::Forbidden => StatusCode::FORBIDDEN,
@@ -48,7 +48,7 @@ async fn state<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    actor(&host, &user)?;
+    actor(&host, &party, &user)?;
     Ok(Json(party.voice_state()).into_response())
 }
 
@@ -57,7 +57,7 @@ async fn ice<S: HostCtx + Clone>(
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.voice_ice(&who.person.user_id))
         .await?
         .map(|answer| Json(answer).into_response())
@@ -78,7 +78,7 @@ async fn join<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<JoinBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.voice_join(&who, &body.device_id, body.muted, body.watching))
         .await?
         .map(|answer| Json(answer).into_response())
@@ -104,7 +104,7 @@ async fn leave<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<LeaveBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.voice_leave(&who.person.user_id, &body.peer_id, body.quiet))
         .await?
         .map(|()| ok())
@@ -117,7 +117,7 @@ async fn beat<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<PeerBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.voice_beat(&who.person.user_id, &body.peer_id))
         .await?
         .map(|revision| Json(json!({ "ok": true, "revision": revision })).into_response())
@@ -137,7 +137,7 @@ async fn mute<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<MuteBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.voice_mute(&who.person.user_id, &body.peer_id, body.muted))
         .await?
         .map(|()| ok())
@@ -157,7 +157,7 @@ async fn speaking<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     Json(body): Json<SpeakingBody>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     work(move || party.voice_speaking(&who.person.user_id, &body.peer_id, body.speaking))
         .await?
         .map(|()| ok())
@@ -170,7 +170,7 @@ async fn signal<S: HostCtx + Clone>(
     AuthUser(user): AuthUser,
     body: Result<Json<Signal>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Response, Response> {
-    let who = actor(&host, &user)?;
+    let who = actor(&host, &party, &user)?;
     let Json(signal) = body.map_err(|_| refusal(VoiceError::BadSignal))?;
     work(move || party.voice_signal(&who.person.user_id, &signal))
         .await?
