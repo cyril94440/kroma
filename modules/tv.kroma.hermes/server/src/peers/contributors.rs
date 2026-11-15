@@ -27,6 +27,7 @@ pub trait Contributors: Send + Sync {
 const LIST: &str = "list";
 const CALL: &str = "call";
 
+#[cfg(test)]
 pub const METHODS: [&str; 2] = [LIST, CALL];
 
 pub struct PeerContributors {
