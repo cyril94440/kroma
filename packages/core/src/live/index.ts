@@ -5,3 +5,7 @@ export * from './party-state';
 export * from './reveal';
 export * from './sport-state';
 export * from './live-player';
+export * from './cards';
+export * from './match-lineup';
+export * from './sport-view';
+export * from './team-color';

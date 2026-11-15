@@ -132,7 +132,7 @@ export function useLiveRoom({ client, openEvents, modules, watching }: LiveRoomO
           }
           if (modules.sport && raw.type.startsWith('sport.')) {
             const parsed = SportEventMessage.safeParse(raw);
-            if (parsed.success) setSport((model) => applySportEvent(model, parsed.data));
+            if (parsed.success) setSport((model) => applySportEvent(model, parsed.data, Date.now()));
           }
         },
       }),

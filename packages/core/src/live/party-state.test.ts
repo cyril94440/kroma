@@ -204,6 +204,12 @@ describe('applyEvent', () => {
     expect(model.seq).toBe(10);
   });
 
+  it('moves the ideas version when the box changes', () => {
+    const model = applyEvent(joined(), { type: 'party.ideas', seq: 11, ideas: [] }, 0);
+
+    expect([model.ideasSeq, model.seq]).toEqual([11, 11]);
+  });
+
   it('waits for the first snapshot before applying anything', () => {
     expect(applyEvent(EMPTY, said(1, 'x'), 0)).toBe(EMPTY);
   });

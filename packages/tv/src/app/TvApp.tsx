@@ -166,9 +166,10 @@ export function TvApp({
       ...SCREENS,
       player: playback.Player,
       trailer: playback.Trailer,
+      clip: playback.Clip,
       live: live ?? NoLive,
     }),
-    [playback.Player, playback.Trailer, live],
+    [playback.Player, playback.Trailer, playback.Clip, live],
   );
 
   return (
@@ -266,7 +267,7 @@ export function TvApp({
 
 const NoLive = () => null;
 
-const SCREENS: Omit<TvScreens, 'player' | 'trailer' | 'live'> = {
+const SCREENS: Omit<TvScreens, 'player' | 'trailer' | 'clip' | 'live'> = {
   connect: TvConnect,
   profiles: TvProfiles,
   addProfile: TvAddProfile,

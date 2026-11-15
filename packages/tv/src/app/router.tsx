@@ -50,6 +50,7 @@ export interface TvRoutes {
   };
   releases: undefined;
   live: undefined;
+  clip: { url: string; title: string; subtitle: string };
 }
 
 export interface ReportEpisode {

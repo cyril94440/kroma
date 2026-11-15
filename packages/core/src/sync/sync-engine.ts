@@ -1,3 +1,4 @@
+import type { MessageKey } from '@kromatv/i18n';
 import { type ClockSample, measureOffset } from './clock-offset';
 import * as K from './sync-constants';
 import { FineSync } from './sync-fine';
@@ -34,7 +35,7 @@ export interface SyncTransport {
 }
 
 export interface SyncNotice {
-  key: string;
+  key: MessageKey;
   vars?: Record<string, string | number>;
   ms?: number;
 }

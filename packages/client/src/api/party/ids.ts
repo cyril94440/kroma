@@ -14,6 +14,11 @@ export const PARTY_ROUTES = {
   pollStart: '/poll/start',
   react: '/react',
   floating: '/reaction',
+  ideas: '/ideas',
+  syncBeat: '/sync/beat',
+  syncFineDone: '/sync/fine-done',
+  syncRecalibration: '/sync/recalibration',
+  stats: '/stats',
 } as const;
 
 export const PARTY_EVENT_PREFIX = 'party.';

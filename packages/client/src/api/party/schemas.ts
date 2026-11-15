@@ -107,6 +107,25 @@ export const PartyState = z.object({
 });
 export type PartyState = z.infer<typeof PartyState>;
 
+export const IDEA_GENRES = ['idea', 'bug', 'other'] as const;
+export type IdeaGenre = (typeof IDEA_GENRES)[number];
+export const IDEA_STATUSES = ['received', 'inProgress', 'done', 'refused'] as const;
+
+export const Idea = z.object({
+  id: z.string(),
+  ts: z.number(),
+  genre: z.enum(IDEA_GENRES).catch('other'),
+  text: z.string(),
+  status: z.enum(IDEA_STATUSES).catch('received'),
+  reply: z.string().nullable().catch(null),
+  author: Person,
+  updatedAt: z.number().catch(0),
+});
+export type Idea = z.infer<typeof Idea>;
+
+export const Ideas = z.object({ ideas: z.array(Idea) });
+export const Created = z.object({ id: z.string() });
+
 export const SentMessage = z.object({ message: ChatMessage });
 export const SwitchOutcome = z.object({
   outcome: z.enum(['voteStarted', 'switchedDirectly', 'refused']),
@@ -163,5 +182,93 @@ export const PartyEvent = z.discriminatedUnion('type', [
     reason: z.string().catch(''),
     count: z.number().catch(0),
   }),
+  z.object({ type: z.literal('party.ideas'), ...seq, ideas: z.array(Idea) }),
 ]);
 export type PartyEvent = z.infer<typeof PartyEvent>;
+
+export const SyncBeatBody = z.object({
+  enabled: z.boolean(),
+  delay: z.number(),
+  paused: z.boolean(),
+  pinned: z.boolean(),
+  blocked: z.boolean(),
+});
+export type SyncBeatBody = z.infer<typeof SyncBeatBody>;
+
+export const SyncFineBody = z.object({
+  ms: z.number(),
+  seeks: z.number(),
+  abandoned: z.boolean(),
+  solo: z.boolean(),
+});
+export type SyncFineBody = z.infer<typeof SyncFineBody>;
+
+export const SyncRecalibrationBody = z.object({
+  gap: z.number(),
+  target: z.number(),
+  arrival: z.boolean(),
+  blocked: z.boolean(),
+});
+export type SyncRecalibrationBody = z.infer<typeof SyncRecalibrationBody>;
+
+export const ViewerStatsBody = z.object({
+  buffer: z.number(),
+  bandwidthKbps: z.number(),
+  stalls: z.number(),
+  rebufferMs: z.number(),
+  dropped: z.number(),
+  resolution: z.string(),
+  playing: z.boolean(),
+  delay: z.number().nullable(),
+  paused: z.boolean(),
+});
+export type ViewerStatsBody = z.infer<typeof ViewerStatsBody>;
+
+const Cell = z.union([z.string(), z.number()]);
+
+export const TableCard = z.object({
+  kind: z.literal('table'),
+  title: z.string().optional(),
+  columns: z.array(z.string()),
+  rows: z.array(z.array(Cell)),
+  note: z.string().optional(),
+  live: z
+    .object({
+      rows: z.array(
+        z.object({
+          live: z.boolean().catch(false),
+          outcome: z.enum(['win', 'draw', 'loss']).nullable().catch(null),
+          move: z.number().catch(0),
+        }),
+      ),
+      points_col: z.number().optional(),
+      match_col: z.number().optional(),
+    })
+    .optional(),
+});
+export type TableCard = z.infer<typeof TableCard>;
+
+export const ChartCard = z.object({
+  kind: z.literal('chart'),
+  title: z.string().optional(),
+  style: z.enum(['bar', 'line']),
+  unit: z.string().optional(),
+  points: z.array(z.object({ label: z.string(), value: z.number() })),
+});
+export type ChartCard = z.infer<typeof ChartCard>;
+
+export const MatchCard = z.object({
+  kind: z.literal('match'),
+  home: z.string(),
+  away: z.string(),
+  competition: z.string().optional(),
+  score: z.string().optional(),
+  channel: z.string().optional(),
+  start: z.number().optional(),
+  status: z.enum(['upcoming', 'live', 'ended']).optional(),
+  action: z.object({ id: z.literal('watch'), label: z.string() }).optional(),
+});
+export type MatchCard = z.infer<typeof MatchCard>;
+
+export const Card = z.discriminatedUnion('kind', [TableCard, ChartCard, MatchCard]);
+export type Card = z.infer<typeof Card>;

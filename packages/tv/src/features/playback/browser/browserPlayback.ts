@@ -13,6 +13,9 @@ export const BROWSER_PLAYBACK: PlaybackPlatform = {
       default: m.BrowserPlayer,
     })),
   ),
+  Clip: lazy(() =>
+    import('#tv/features/playback/browser/BrowserClip').then((m) => ({ default: m.BrowserClip })),
+  ),
   Trailer: lazy(() =>
     import('#tv/features/playback/browser/BrowserTrailer').then((m) => ({
       default: m.BrowserTrailer,

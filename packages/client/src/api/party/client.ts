@@ -4,12 +4,19 @@ import type { ModuleApi } from '../modules/module-api';
 import { PARTY_MODULE, PARTY_ROUTES as R } from './ids';
 import {
   Candidates,
+  Created,
+  type IdeaGenre,
+  Ideas,
   Ok,
   PartyState,
   PollStarted,
   SentMessage,
   ServerTime,
   SwitchOutcome,
+  type SyncBeatBody,
+  type SyncFineBody,
+  type SyncRecalibrationBody,
+  type ViewerStatsBody,
 } from './schemas';
 
 /** The watch-party module as a viewer reaches it: the shared chat, the zapping
@@ -30,6 +37,12 @@ export default function partyApi(ctx: RequestContext) {
       api.post(R.pollStart, { question, kind, options, durationS }, PollStarted),
     react: (id: string, emoji: string) => api.post(R.react, { id, emoji }, Ok),
     floating: (emoji: string) => api.post(R.floating, { emoji }, Ok),
+    ideas: () => api.get(R.ideas, Ideas),
+    submitIdea: (genre: IdeaGenre, text: string) => api.post(R.ideas, { genre, text }, Created),
+    beat: (body: SyncBeatBody) => api.post(R.syncBeat, body, Ok),
+    fineDone: (body: SyncFineBody) => api.post(R.syncFineDone, body, Ok),
+    recalibration: (body: SyncRecalibrationBody) => api.post(R.syncRecalibration, body, Ok),
+    stats: (body: ViewerStatsBody) => api.post(R.stats, body, Ok),
   };
 }
 

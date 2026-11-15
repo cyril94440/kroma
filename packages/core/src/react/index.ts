@@ -43,3 +43,8 @@ export type { LiveModulesState } from './use-live-modules';
 export { useLiveModules } from './use-live-modules';
 export type { LiveActions, ZapOutcome } from './use-live-actions';
 export { useLiveActions } from './use-live-actions';
+export type { LiveSync, LiveSyncOptions, SyncSource } from './use-live-sync';
+export { SYNC_NOTICE_MS, SYNC_STATS_EVERY_MS, useLiveSync } from './use-live-sync';
+export { useIdeas } from './use-ideas';
+export type { Standings, StandingsState } from './use-standings';
+export { STANDINGS_POLL_MS, useStandings } from './use-standings';

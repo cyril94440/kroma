@@ -27,6 +27,7 @@ export interface PartyModel {
   kickedAt: number;
   goLiveAt: number;
   fineSyncAt: number;
+  ideasSeq: number;
 }
 
 export const EMPTY_PARTY: PartyModel = {
@@ -39,6 +40,7 @@ export const EMPTY_PARTY: PartyModel = {
   kickedAt: 0,
   goLiveAt: 0,
   fineSyncAt: 0,
+  ideasSeq: 0,
 };
 
 export function adoptParty(model: PartyModel, state: PartyState): PartyModel {
@@ -105,6 +107,8 @@ export function applyPartyEvent(model: PartyModel, event: PartyEvent, now: numbe
       return { ...base, goLiveAt: now };
     case 'party.sync.finesync':
       return { ...base, fineSyncAt: now };
+    case 'party.ideas':
+      return { ...base, ideasSeq: event.seq };
     default:
       return { ...base, state: patch(model.state, event) };
   }
@@ -115,7 +119,14 @@ export function expireFloating(model: PartyModel, now: number, ttlMs: number): P
   return kept.length === model.floating.length ? model : { ...model, floating: kept };
 }
 
-export const REACTIONS = ['⚽', '\u{1F525}', '\u{1F602}', '\u{1F62E}', '❤️', '\u{1F44F}'] as const;
+export const REACTIONS = [
+  { emoji: '⚽', label: 'live.reaction.goal' },
+  { emoji: '\u{1F525}', label: 'live.reaction.fire' },
+  { emoji: '\u{1F602}', label: 'live.reaction.laugh' },
+  { emoji: '\u{1F62E}', label: 'live.reaction.wow' },
+  { emoji: '❤️', label: 'live.reaction.love' },
+  { emoji: '\u{1F44F}', label: 'live.reaction.clap' },
+] as const;
 
 export function voteOf(
   vote: { votes: Record<string, boolean>; required: { userId: string }[] },

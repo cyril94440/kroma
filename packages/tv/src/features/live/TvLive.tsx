@@ -1,8 +1,7 @@
-import type { ChannelView } from '@kromatv/client/live';
 import { liveBadges, pollToAnswer, voteToAnswer } from '@kromatv/core';
-import { useLiveActions } from '@kromatv/core/react';
+import { useIdeas, useLiveActions, useLiveSync } from '@kromatv/core/react';
 import { Player, TV_FLAGS, useT } from '@kromatv/ui';
-import { Box, Button, Text, toast } from '@kromatv/ui/kit';
+import { Box, Text, toast } from '@kromatv/ui/kit';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useEnv } from '#tv/app/providers/env';
 import { useClient, useNav } from '#tv/app/router';
@@ -13,22 +12,19 @@ import type { LiveBackend, LiveEngine } from '#tv/features/live/engine/liveEngin
 import { useLiveController } from '#tv/features/live/engine/useLiveController';
 import { useLivePlayback } from '#tv/features/live/engine/useLivePlayback';
 import { LiveStateCard } from '#tv/features/live/LiveStateCard';
-import { MatchDrawer } from '#tv/features/live/MatchDrawer';
+import { IdeasDrawer } from '#tv/features/live/IdeasDrawer';
+import { LiveActionsBar, type Panel } from '#tv/features/live/LiveActionsBar';
+import { MatchDrawer } from '#tv/features/live/match/MatchDrawer';
 import { PollDrawer } from '#tv/features/live/PollDrawer';
 import { ReactionsDrawer } from '#tv/features/live/ReactionsDrawer';
+import { SportDrawer } from '#tv/features/live/sport/SportDrawer';
+import { useLiveHandlers } from '#tv/features/live/useLiveHandlers';
 import { useLiveScreen } from '#tv/features/live/useLiveScreen';
+import { useSyncToasts } from '#tv/features/live/useSyncToasts';
 import { useVerdictToasts } from '#tv/features/live/useVerdictToasts';
 import { VoteDrawer } from '#tv/features/live/VoteDrawer';
 
-type Panel = 'channels' | 'chat' | 'reactions' | 'match';
-
 const noStoryboard = () => null;
-
-const ZAP_MESSAGE = {
-  voteStarted: 'live.zapStarted',
-  switchedDirectly: 'live.zapDirect',
-  refused: 'live.zapRefused',
-} as const;
 
 /** The live-TV screen: the stream in the shared player chrome, with the
  *  channel list, the chat, the reactions and the match panel one press away,
@@ -54,28 +50,29 @@ export function TvLive<E extends LiveEngine>({
   const me = party.state?.me.userId ?? '';
   const vote = party.state?.vote ?? null;
   const poll = party.state?.poll ?? null;
-  const match = sport.state?.match ?? null;
+  const sportState = sport.state;
+  const match = sportState?.match ?? null;
+  const closePanel = useCallback(() => setPanel(null), []);
+  const handlers = useLiveHandlers(actions, closePanel);
+  const sync = useLiveSync({
+    client,
+    source: engineRef,
+    party,
+    playing: live.playing,
+    channelId: status?.channel?.id ?? null,
+  });
+  const { ideas } = useIdeas(client, party.ideasSeq, modules.party && panel === 'ideas');
 
   useEffect(() => {
     if (modulesReady && !modules.live) nav.home();
   }, [modulesReady, modules.live, nav]);
 
   useVerdictToasts(party.lastClosed);
+  useSyncToasts(sync.notice);
 
   const flags = useMemo(
     () => ({ ...TV_FLAGS, pointer: mousePointer, tracks: false, live: true }),
     [mousePointer],
-  );
-
-  const zap = useCallback(
-    (channel: ChannelView) => {
-      setPanel(null);
-      actions.zap(channel).then(
-        (outcome) => toast({ message: t(ZAP_MESSAGE[outcome], { name: channel.name }) }),
-        () => toast({ message: t('live.zapRefused') }),
-      );
-    },
-    [actions, t],
   );
 
   const answerVote = useCallback(
@@ -100,13 +97,28 @@ export function TvLive<E extends LiveEngine>({
     [actions, poll, t],
   );
 
+  const matchData = useMemo(
+    () => ({
+      match,
+      prono: sportState?.prono ?? null,
+      clips: sportState?.clips ?? [],
+      me,
+      postSeenAt: sport.postSeen?.at ?? null,
+    }),
+    [match, sportState, me, sport.postSeen],
+  );
+  const hasMatch = match !== null || sportState?.prono != null || (sportState?.clips.length ?? 0) > 0;
+  const agent = party.state?.config.agentName ?? '';
+  const activity = party.state?.activity
+    ? t('live.activity', { name: agent, label: party.state.activity })
+    : null;
   const openVote = voteToAnswer(vote, me, dismissedVote);
   const openPoll = openVote ? null : pollToAnswer(poll, me, dismissedPoll);
-  const closePanel = useCallback(() => setPanel(null), []);
   const badge = status ? liveBadges(status)[0] : undefined;
   const title = status?.channel?.name ?? t('nav.live');
   const next = status?.next ? `${t('live.next')} ${status.next.title}` : null;
   const subtitle = [status?.now?.title, next].filter(Boolean).join('  ·  ');
+  const group = party.state?.sync ?? null;
 
   return (
     <>
@@ -115,36 +127,7 @@ export function TvLive<E extends LiveEngine>({
         {subtitle ? <Player.Subtitle>{subtitle}</Player.Subtitle> : null}
         {badge ? <Player.Warning>{t(`live.badge.${badge}`)}</Player.Warning> : null}
         <Player.Actions>
-          <Button
-            icon="list"
-            label={t('live.channels')}
-            variant="scrim"
-            onPress={() => setPanel('channels')}
-          />
-          {modules.party ? (
-            <Button
-              icon="message"
-              label={t('live.chat')}
-              variant="scrim"
-              onPress={() => setPanel('chat')}
-            />
-          ) : null}
-          {modules.party ? (
-            <Button
-              icon="mood-smile"
-              label={t('live.reactions')}
-              variant="scrim"
-              onPress={() => setPanel('reactions')}
-            />
-          ) : null}
-          {modules.sport && match ? (
-            <Button
-              icon="ball-football"
-              label={t('live.match')}
-              variant="scrim"
-              onPress={() => setPanel('match')}
-            />
-          ) : null}
+          <LiveActionsBar modules={modules} hasMatch={hasMatch} sync={sync} onOpen={setPanel} />
         </Player.Actions>
         <Player.Transport tileAt={noStoryboard} />
         <Player.Media>
@@ -152,10 +135,17 @@ export function TvLive<E extends LiveEngine>({
         </Player.Media>
         <LiveStateCard status={status} failed={room.failed} />
         {status && status.viewers.length > 0 ? (
-          <Box absolute right={64} top={150} z={12} pointerEvents="none">
+          <Box absolute right={64} top={150} z={12} pointerEvents="none" align="flex-end">
             <Text variant="labelTv" color="textMuted">
               {t('live.viewers', { count: status.viewers.length })}
             </Text>
+            {sync.on ? (
+              <Text variant="labelTv" color="accentText">
+                {t(group && group.members.length > 1 ? 'live.sync.status.group' : 'live.sync.status.alone', {
+                  count: group?.members.length ?? 0,
+                })}
+              </Text>
+            ) : null}
           </Box>
         ) : null}
         {modules.party && party.state ? (
@@ -166,26 +156,34 @@ export function TvLive<E extends LiveEngine>({
         open={panel === 'channels'}
         currentId={status?.channel?.id ?? null}
         onClose={closePanel}
-        onPick={zap}
+        onPick={handlers.zap}
       />
       <ChatDrawer
         open={panel === 'chat'}
         messages={party.state?.messages ?? []}
+        activity={activity}
         onClose={closePanel}
-        onReply={(text) => void actions.chat(text).catch(() => undefined)}
+        onReply={handlers.reply}
+        onWatch={handlers.zapByName}
       />
-      <ReactionsDrawer
-        open={panel === 'reactions'}
-        onClose={closePanel}
-        onReact={(emoji) => void actions.react(emoji).catch(() => undefined)}
-      />
+      <ReactionsDrawer open={panel === 'reactions'} onClose={closePanel} onReact={handlers.react} />
       <MatchDrawer
         open={panel === 'match'}
-        match={match}
+        data={matchData}
         frameTimeMs={frameTimeMs}
         now={now + sport.clockOffsetMs}
         onClose={closePanel}
+        onVote={handlers.voteProno}
+        onPlayClip={handlers.playClip}
       />
+      <SportDrawer
+        open={panel === 'sport'}
+        view={sportState?.view ?? null}
+        client={client}
+        onClose={closePanel}
+        onWatch={handlers.watchSport}
+      />
+      <IdeasDrawer open={panel === 'ideas'} ideas={ideas} onClose={closePanel} />
       <VoteDrawer
         vote={openVote}
         userId={me}

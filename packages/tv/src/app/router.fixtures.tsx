@@ -24,6 +24,7 @@ export function stubScreens(screens: Partial<TvScreens> = {}): TvScreens {
     report: stub('report'),
     releases: stub('releases'),
     live: stub('live'),
+    clip: stub('clip'),
     ...screens,
   };
 }

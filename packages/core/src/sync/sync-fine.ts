@@ -1,3 +1,4 @@
+import type { MessageKey } from '@kromatv/i18n';
 import * as K from './sync-constants';
 import type { SyncEngine } from './sync-engine';
 import { clampMove } from './sync-player';
@@ -131,7 +132,7 @@ class Campaign {
     return this.aborted() ? 'stop' : 'continue';
   }
 
-  private finish(key: string, errS: number): void {
+  private finish(key: MessageKey, errS: number): void {
     this.finished = true;
     const ms = Math.max(1, Math.round(errS * 1000));
     this.engine.deps.notify({ key, vars: { ms } });
