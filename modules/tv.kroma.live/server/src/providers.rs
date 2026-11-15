@@ -118,12 +118,7 @@ impl Providers {
 
     pub fn equivalents(&self, channel: &Channel, to: ProviderId, limit: usize, rules: &Rules) -> Vec<Channel> {
         let source = self.catalogue(channel.provider);
-        let found = if channel.provider == to {
-            self.catalogue(to).equivalents(&channel.name, Some(&source), limit, rules)
-        } else {
-            self.catalogue(to).equivalents(&channel.name, Some(&source), limit, rules)
-        };
-        found.into_iter().cloned().collect()
+        self.catalogue(to).equivalents(&channel.name, Some(&source), limit, rules).into_iter().cloned().collect()
     }
 
     pub fn coverage(&self, favourites: &[String], rules: &Rules) -> Vec<CoverageRow> {

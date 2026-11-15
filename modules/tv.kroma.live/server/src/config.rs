@@ -5,6 +5,7 @@ use crate::model::ProviderId;
 use crate::portal::Portal;
 
 pub const BACKUP_USER_AGENT: &str = "IPTVSmartersPro";
+pub const MAX_CANARIES: usize = 2;
 
 #[derive(Debug, Clone)]
 pub struct Settings {
@@ -27,6 +28,7 @@ pub struct Settings {
     pub audio_auto_copy: String,
     pub default_channel: String,
     pub backup_enabled_failover: bool,
+    pub canaries: Vec<String>,
 }
 
 fn bounded(value: i64, default: f64, low: f64, high: f64) -> f64 {
@@ -56,6 +58,7 @@ impl Settings {
             audio_auto_copy: host.config_str("audioAutoCopy", ""),
             default_channel: host.config_str("defaultChannel", "Canal+ VIP RAW").trim().to_string(),
             backup_enabled_failover: host.config_bool("autoFailover", true),
+            canaries: host.config_str("canaries", "").split(',').map(|n| n.trim().to_string()).filter(|n| !n.is_empty()).take(MAX_CANARIES).collect(),
         }
     }
 
