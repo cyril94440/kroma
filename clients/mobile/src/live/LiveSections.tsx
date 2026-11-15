@@ -1,54 +1,75 @@
 import type { ChannelView } from '@kromatv/client/live';
-import type { MatchPayload } from '@kromatv/client/sport';
-import type { ChatMessage } from '@kromatv/client/party';
-import type { LiveActions, LiveClient } from '@kromatv/core/react';
+import type { ChatMessage, Idea, IdeaGenre } from '@kromatv/client/party';
+import type { Clip, SportEvent, SportView } from '@kromatv/client/sport';
+import type { LiveClient } from '@kromatv/core/react';
 import { Box, Button } from '@kromatv/ui/kit';
 import { useT } from '#mobile/lib/i18n';
 import { LiveChannels } from '#mobile/live/LiveChannels';
 import { LiveChat } from '#mobile/live/LiveChat';
-import { LiveMatch } from '#mobile/live/LiveMatch';
+import { LiveIdeas } from '#mobile/live/LiveIdeas';
+import { LiveSport } from '#mobile/live/LiveSport';
+import { LiveMatch, type MatchPanelData } from '#mobile/live/match/LiveMatch';
 
-export type Section = 'chat' | 'channels' | 'match';
+export type Section = 'chat' | 'channels' | 'match' | 'sport' | 'ideas';
 
-export function availableSections(party: boolean, sportMatch: boolean): Section[] {
+export function availableSections(modules: {
+  party: boolean;
+  sport: boolean;
+  hasMatch: boolean;
+}): Section[] {
   return [
-    ...(party ? (['chat'] as const) : []),
+    ...(modules.party ? (['chat'] as const) : []),
     'channels',
-    ...(sportMatch ? (['match'] as const) : []),
+    ...(modules.sport && modules.hasMatch ? (['match'] as const) : []),
+    ...(modules.sport ? (['sport'] as const) : []),
+    ...(modules.party ? (['ideas'] as const) : []),
   ];
 }
 
-/** The tabs under the picture and the one that is open: chat, the channel list
- *  and the match, each only where its module is on. */
+export interface SectionData {
+  messages: readonly ChatMessage[];
+  activity: string | null;
+  currentId: string | null;
+  match: MatchPanelData;
+  sportView: SportView | null;
+  ideas: readonly Idea[];
+}
+
+export interface SectionActions {
+  onSend: (text: string) => void;
+  onWatchCard: (channel: string) => void;
+  onZap: (channel: ChannelView) => void;
+  onVote: (id: string, score: string) => void;
+  onPlayClip: (clip: Clip) => void;
+  onWatchSport: (event: SportEvent) => void;
+  onIdea: (genre: IdeaGenre, text: string) => Promise<unknown>;
+}
+
+/** The tabs under the picture and the one that is open, each only where its
+ *  module is on. */
 export function LiveSections({
   sections,
   shown,
   onShow,
   client,
+  data,
   actions,
-  messages,
-  currentId,
-  onZap,
-  match,
   frameTimeMs,
   now,
 }: Readonly<{
   sections: readonly Section[];
   shown: Section;
   onShow: (section: Section) => void;
-  client: Pick<LiveClient, 'live'>;
-  actions: LiveActions;
-  messages: readonly ChatMessage[];
-  currentId: string | null;
-  onZap: (channel: ChannelView) => void;
-  match: MatchPayload | null;
+  client: Pick<LiveClient, 'live' | 'sport'>;
+  data: SectionData;
+  actions: SectionActions;
   frameTimeMs: () => number | null;
   now: number;
 }>) {
   const t = useT();
   return (
     <Box gap={16}>
-      <Box row gap={8}>
+      <Box row wrap gap={8}>
         {sections.map((entry) => (
           <Button
             key={entry}
@@ -60,14 +81,28 @@ export function LiveSections({
       </Box>
       {shown === 'chat' ? (
         <LiveChat
-          messages={messages}
-          onSend={(text) => void actions.chat(text).catch(() => undefined)}
+          messages={data.messages}
+          activity={data.activity}
+          onSend={actions.onSend}
+          onWatch={actions.onWatchCard}
         />
       ) : null}
       {shown === 'channels' ? (
-        <LiveChannels client={client} currentId={currentId} onPick={onZap} />
+        <LiveChannels client={client} currentId={data.currentId} onPick={actions.onZap} />
       ) : null}
-      {shown === 'match' ? <LiveMatch match={match} frameTimeMs={frameTimeMs} now={now} /> : null}
+      {shown === 'match' ? (
+        <LiveMatch
+          data={data.match}
+          frameTimeMs={frameTimeMs}
+          now={now}
+          onVote={actions.onVote}
+          onPlayClip={actions.onPlayClip}
+        />
+      ) : null}
+      {shown === 'sport' ? (
+        <LiveSport view={data.sportView} client={client} onWatch={actions.onWatchSport} />
+      ) : null}
+      {shown === 'ideas' ? <LiveIdeas ideas={data.ideas} onSubmit={actions.onIdea} /> : null}
     </Box>
   );
 }

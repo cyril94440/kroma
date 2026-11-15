@@ -38,6 +38,7 @@ export default function AppLayout() {
     >
       <Stack.Screen name="player/[id]" {...PLAYER_SCREEN} />
       <Stack.Screen name="trailer/[kind]/[tmdbId]" {...PLAYER_SCREEN} />
+      <Stack.Screen name="clip" {...PLAYER_SCREEN} />
     </Stack>
   );
 }

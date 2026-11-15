@@ -40,7 +40,7 @@ A module has no socket, so every client message is an HTTP call and every push i
 
 Deterministic, never decided by the assistant. 30 seconds (`voteSeconds`), for against against; a blank counts for nothing; the request counts as a vote for; a tie or a minority stays. One person is one voice (the KROMA account). Only viewers present in the live module's presence list take part; someone who arrives after the vote opens may vote. The vote closes as soon as the outcome is certain. A voter who is away longer than `presenceGraceSeconds` leaves the quorum, and the vote is cancelled when the requester and all voters are gone. A request is refused while another vote is open, when the channel is already on, or when presence cannot be read. Administrators and the ids in `bypassUserIds` may switch without a vote.
 
-A provider proposal raised by the live module (`live.proposal`, kinds `switchToBackup`, `returnToPrimary` and `switchProvider`) is voted the same way and answered with the control point's `proposal` method.
+A provider proposal raised by the live module (`live.proposal`, kinds `switchToBackup`, `returnToPrimary` and `switchProvider`) is voted the same way and answered with the control point's `proposal` method. The event is `{proposal: {id, kind, ...}, resolved}`; when live resolves the proposal itself (`resolved: true` with `default` `timeout` or `noVote`) before the vote ends, the vote is closed without being answered.
 
 ## Points
 

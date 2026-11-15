@@ -6,6 +6,10 @@ use serde_json::json;
 
 use kroma_module_sdk::host::{call_point, pinned_resolver, HostCtx};
 
+mod proposal;
+
+pub(crate) use proposal::ProposalEvent;
+
 pub const CONTROL: &str = "tv.kroma.live/control";
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

@@ -103,4 +103,30 @@ describe('the phone live engine', () => {
     expect(result.current.failed).toBe(false);
     expect(result.current.waiting).toBe(false);
   });
+
+  it('gives the watch party the frame, the buffer and the three moves of the player', () => {
+    const { result } = renderHook(() => useLiveEngine(URL));
+    Object.assign(live(), {
+      currentLiveTimestamp: 1_700_000_000_000,
+      currentOffsetFromLive: 5,
+      bufferedPosition: 14,
+      currentTime: 10,
+      status: 'readyToPlay',
+      playbackRate: 1,
+    });
+    const source = result.current.sync.current;
+
+    source.seekByMs(-2500);
+    source.goLive();
+    source.setRate(1.05);
+
+    expect([
+      source.frameTimeMs(),
+      source.bufferAheadMs(),
+      source.isReady(),
+      source.moveRange(),
+      live().seekBy.mock.calls,
+      (live() as unknown as { playbackRate: number }).playbackRate,
+    ]).toEqual([1_700_000_000_000, 4000, true, null, [[-2.5], [5]], 1.05]);
+  });
 });

@@ -76,6 +76,49 @@ describe('the live entry of the browse top bar', () => {
     expect(wearsRing(screen.getByLabelText('Movies'))).toBe(false);
   });
 
+  it('keeps the remote on the same item when the entry arrives under it', async () => {
+    const shell = (entries: readonly NavEntry[]) =>
+      onScreen(
+        <TvNavProvider screens={{} as never}>
+          <NavEntriesProvider entries={entries}>
+            <TvTopNav />
+            <Focusable label="Content" autoFocus />
+          </NavEntriesProvider>
+        </TvNavProvider>,
+      );
+    const view = render(shell([]));
+    await press('ArrowUp');
+    await press('ArrowRight');
+    await press('ArrowRight');
+    expect(wearsRing(screen.getByLabelText('Series'))).toBe(true);
+
+    view.rerender(shell([LIVE]));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
+
+    expect(wearsRing(screen.getByLabelText('Series'))).toBe(true);
+  });
+
+  it('does not pull the remote back to the bar once it has left it', async () => {
+    const shell = (entries: readonly NavEntry[]) =>
+      onScreen(
+        <TvNavProvider screens={{} as never}>
+          <NavEntriesProvider entries={entries}>
+            <TvTopNav />
+            <Focusable label="Content" autoFocus />
+          </NavEntriesProvider>
+        </TvNavProvider>,
+      );
+    const view = render(shell([]));
+    await press('ArrowUp');
+    await press('ArrowDown');
+    expect(wearsRing(screen.getByLabelText('Content'))).toBe(true);
+
+    view.rerender(shell([LIVE]));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
+
+    expect(wearsRing(screen.getByLabelText('Content'))).toBe(true);
+  });
+
   it('is absent when nothing offers it', () => {
     bar([]);
 

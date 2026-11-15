@@ -139,7 +139,7 @@ impl Live {
         let event = self.providers.catalogue(current.provider).is_event_channel(&current.name);
         let (alone, trouble) = {
             let inner = self.lock();
-            (inner.presence.viewers().iter().all(|viewer| viewer.user_id == requested_by), inner.policy.trouble(now_seconds()))
+            (inner.presence.viewers().iter().all(|viewer| viewer.user_id == requested_by), inner.in_trouble(now_seconds()))
         };
         if !event && (alone || trouble) {
             let outcome = self.switch(SwitchRequest { channel_id: wanted.id(), skip_if_same: true, requested_by: Some(requested_by.into()), reason: reason.into(), only_if_current: Some(current.id()), ..SwitchRequest::default() }).await;

@@ -1,6 +1,6 @@
 import type { PollView, VoteView } from '@kromatv/client/party';
 import { REACTIONS, voteOf, voteWaiting } from '@kromatv/core';
-import { Box, Button, Text } from '@kromatv/ui/kit';
+import { Box, Button, Focusable, Text } from '@kromatv/ui/kit';
 import { useT } from '#mobile/lib/i18n';
 
 /** The zapping vote as a banner under the picture: who asked for what, the
@@ -80,11 +80,29 @@ export function PollCard({
   );
 }
 
+const REACTION_SIZE = 48;
+
+/** The reactions everyone sees float over the picture. The glyph is the wire
+ *  value and is drawn as content; each control is named for what it says. */
 export function ReactionsRow({ onReact }: Readonly<{ onReact: (emoji: string) => void }>) {
+  const t = useT();
   return (
     <Box row gap={8}>
-      {REACTIONS.map((emoji) => (
-        <Button key={emoji} label={emoji} variant="scrim" onPress={() => onReact(emoji)} />
+      {REACTIONS.map(({ emoji, label }) => (
+        <Focusable
+          key={emoji}
+          label={t(label)}
+          onPress={() => onReact(emoji)}
+          style={{
+            width: REACTION_SIZE,
+            height: REACTION_SIZE,
+            borderRadius: REACTION_SIZE / 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text variant="title">{emoji}</Text>
+        </Focusable>
       ))}
     </Box>
   );

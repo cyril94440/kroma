@@ -158,6 +158,16 @@ pub struct Live {
     pub(crate) sent: Mutex<Vec<(String, serde_json::Value)>>,
 }
 
+impl Inner {
+    pub fn in_trouble(&self, now: f64) -> bool {
+        self.policy.trouble(now) || self.crashed_and_silent()
+    }
+
+    fn crashed_and_silent(&self) -> bool {
+        self.policy.has_backup && self.restarts >= 1 && (self.run.is_none() || self.kbps <= 0.0)
+    }
+}
+
 impl Live {
     pub fn new(host: Arc<dyn HostCtx>, pool: Pool, root: PathBuf, programs: Programs) -> Arc<Live> {
         let settings = Settings::read(host.as_ref());

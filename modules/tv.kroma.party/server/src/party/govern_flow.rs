@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 
 use super::{people, Party, State};
-use crate::vote::{Opening, Reevaluated, Verdict, Vote, VoteKind};
+use crate::vote::{Reevaluated, Verdict, Vote, VoteKind};
 
 impl Party {
     pub(super) fn trace(&self, event: &str, data: Value) {
@@ -36,7 +36,7 @@ impl Party {
         );
     }
 
-    fn remember(&self, vote: &Vote, verdict: &str) {
+    pub(super) fn remember(&self, vote: &Vote, verdict: &str) {
         let t = vote.tally();
         let kind = match vote.kind {
             VoteKind::Channel { .. } => "channel",
@@ -130,63 +130,6 @@ impl Party {
         let mut st = self.lock();
         self.system_message(&mut st, key, &[("kind", kind)], Some("channel_vote_end"));
         accept && applied
-    }
-
-    pub fn on_proposal(&self, payload: &Value) {
-        let id = payload["id"].as_str().unwrap_or_default().to_string();
-        let kind = payload["kind"].as_str().unwrap_or_default().to_string();
-        if id.is_empty() || !matches!(kind.as_str(), "switchToBackup" | "returnToPrimary" | "switchProvider") {
-            return;
-        }
-        {
-            let st = self.lock();
-            if let Some(open) = st.vote.as_ref() {
-                if matches!(&open.kind, VoteKind::Provider { proposal_id, .. } if *proposal_id == id) {
-                    return;
-                }
-                drop(st);
-                let _ = self.live.proposal(&id, false);
-                return;
-            }
-        }
-        let viewers = self.fetch_presence().unwrap_or_default();
-        let present = people(&viewers);
-        let now = self.now();
-        let mut st = self.lock();
-        if st.vote.is_some() {
-            drop(st);
-            let _ = self.live.proposal(&id, false);
-            return;
-        }
-        st.vote_counter += 1;
-        let vote = Vote::open(Opening {
-            id: st.vote_counter,
-            kind: VoteKind::Provider { proposal_id: id, proposal_kind: kind.clone() },
-            label: &kind,
-            note: "",
-            requester: None,
-            present: &present,
-            now,
-            seconds: self.vote_seconds(),
-        });
-        let alone = vote.required.is_empty();
-        st.vote = Some(vote);
-        if alone {
-            let vote = st.vote.take();
-            drop(st);
-            if let Some(v) = vote {
-                self.finalize(v);
-            }
-            return;
-        }
-        let key = match kind.as_str() {
-            "switchToBackup" => "party.vote.providerOpened.switchToBackup",
-            "switchProvider" => "party.vote.providerOpened.switchProvider",
-            _ => "party.vote.providerOpened.returnToPrimary",
-        };
-        let seconds = self.vote_seconds().to_string();
-        self.system_message(&mut st, key, &[("seconds", &seconds)], None);
-        self.publish_vote(&mut st);
     }
 
     pub(super) fn reevaluate_vote(&self) {

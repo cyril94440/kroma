@@ -124,6 +124,55 @@ async fn switch_provider_refuses_by_reason_asks_for_a_vote_with_others_and_switc
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn switch_provider_goes_at_once_when_the_stream_crashed_and_delivers_nothing() {
+    let rig = rig();
+    load(&rig);
+    healthy(&rig).await;
+    viewers(&rig, &["u1", "u2"]);
+    {
+        let mut inner = rig.live.lock();
+        inner.restarts = 1;
+        inner.kbps = 0.0;
+    }
+
+    let reply = ask(&rig, "switchProvider", json!({ "provider": "backup", "requestedBy": "u1", "reason": "it errors" })).await;
+
+    assert_eq!(reply, json!({ "Ok": { "switched": true, "provider": "backup", "error": null } }));
+    assert!(rig.live.sent_on("live.proposal").is_empty());
+    rig.live.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn switch_provider_still_asks_a_vote_when_a_crashed_stream_flows_again() {
+    let rig = rig();
+    load(&rig);
+    healthy(&rig).await;
+    viewers(&rig, &["u1", "u2"]);
+    rig.live.lock().restarts = 1;
+
+    let reply = ask(&rig, "switchProvider", json!({ "provider": "backup", "requestedBy": "u1", "reason": "it errored" })).await;
+
+    assert_eq!(reply["Ok"]["error"], "voteRequired");
+    rig.live.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_health_view_reports_trouble_as_soon_as_a_crashed_stream_is_silent() {
+    let rig = rig();
+    load(&rig);
+    healthy(&rig).await;
+    assert!(!rig.live.status().health.trouble);
+    {
+        let mut inner = rig.live.lock();
+        inner.restarts = 1;
+        inner.kbps = 0.0;
+    }
+
+    assert!(rig.live.status().health.trouble);
+    rig.live.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn switch_provider_with_a_channel_id_moves_to_that_very_channel_under_the_same_vote_rule() {
     let rig = rig();
     load(&rig);

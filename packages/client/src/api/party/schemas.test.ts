@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  Card,
   ChatMessage,
+  Ideas,
   PartyEvent,
   PartyState,
   PollView,
@@ -122,13 +124,99 @@ describe('the party events', () => {
       { type: 'party.sync.golive', seq: 9 },
       { type: 'party.sync.finesync', seq: 10 },
       { type: 'party.sync.kicked', reason: 'requested', count: 0 },
+      { type: 'party.ideas', seq: 11, ideas: [] },
     ];
 
     for (const event of events) expect(PartyEvent.safeParse(event).success).toBe(true);
   });
 
-  it('refuses a topic it does not model, ideas included', () => {
+  it('refuses a topic it does not model', () => {
     expect(PartyEvent.safeParse({ type: 'party.unknown', seq: 1 }).success).toBe(false);
-    expect(PartyEvent.safeParse({ type: 'party.ideas', seq: 1, ideas: [] }).success).toBe(false);
+    expect(PartyEvent.safeParse({ type: 'party.voice.roster', seq: 1 }).success).toBe(false);
+  });
+});
+
+describe('ideas and cards', () => {
+  it('reads the ideas box with its statuses and tolerates one the build does not know', () => {
+    const ideas = Ideas.parse({
+      ideas: [
+        {
+          id: 'i1',
+          ts: 1,
+          genre: 'bug',
+          text: 'no sound',
+          status: 'inProgress',
+          reply: null,
+          author: { userId: 'mamie', name: 'mamie' },
+          updatedAt: 2,
+        },
+        {
+          id: 'i2',
+          ts: 3,
+          genre: 'wish',
+          text: 'x',
+          status: 'later',
+          author: { userId: 'papi', name: 'papi' },
+        },
+      ],
+    });
+
+    expect(ideas.ideas.map((i) => [i.genre, i.status])).toEqual([
+      ['bug', 'inProgress'],
+      ['other', 'received'],
+    ]);
+  });
+
+  it('reads the three cards of the closed catalogue as the module validates them', () => {
+    const cards = [
+      {
+        kind: 'table',
+        title: 'Classement Ligue 1',
+        columns: ['#', 'Club', 'Pts'],
+        rows: [
+          ['1', 'PSG', 28],
+          ['2', 'Lens', 25],
+        ],
+        note: 'après la 11e journée',
+        live: {
+          rows: [
+            { live: true, outcome: 'win', move: 1 },
+            { live: false, outcome: null, move: 0 },
+          ],
+          points_col: 2,
+        },
+      },
+      {
+        kind: 'chart',
+        title: 'Débit du flux (1 h)',
+        style: 'line',
+        unit: 'kb/s',
+        points: [
+          { label: '20:00', value: 3800 },
+          { label: '20:10', value: 3650 },
+        ],
+      },
+      {
+        kind: 'match',
+        home: 'PSG',
+        away: 'Liverpool',
+        competition: 'Ligue des champions',
+        start: 1_793_300_400,
+        score: '1 - 0',
+        status: 'live',
+        channel: 'Canal+ Foot',
+        action: { id: 'watch', label: 'Mettre cette chaîne' },
+      },
+    ];
+
+    expect(cards.map((card) => Card.safeParse(card).success)).toEqual([true, true, true]);
+  });
+
+  it('refuses a card outside the catalogue and a watch action that is not watch', () => {
+    expect(Card.safeParse({ kind: 'html' }).success).toBe(false);
+    expect(
+      Card.safeParse({ kind: 'match', home: 'a', away: 'b', action: { id: 'delete', label: 'x' } })
+        .success,
+    ).toBe(false);
   });
 });

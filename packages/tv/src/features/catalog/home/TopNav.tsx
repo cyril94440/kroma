@@ -18,6 +18,7 @@ import { useAuth } from '#tv/app/providers/auth';
 import { useConnection } from '#tv/app/providers/connection';
 import { useNav } from '#tv/app/router';
 import { useNavEntries } from '#tv/shared/nav/navEntries';
+import { usePillFocus } from '#tv/features/catalog/home/usePillFocus';
 import { CastRemotes } from '#tv/features/cast/CastRemotes';
 import { ConnectionStatus } from '#tv/features/catalog/home/connection-status';
 import { KromaMark, WallClock } from '#tv/shared/ui';
@@ -40,6 +41,8 @@ export function TvTopNav({ active }: Readonly<{ active?: NavKey }>) {
   const { user } = useAuth();
   const { client, online } = useConnection();
   const entries = useNavEntries();
+  const pillKey = entries.map((entry) => entry.key).join();
+  const keep = usePillFocus(pillKey);
 
   return (
     <Box absolute left={0} right={0} top={0} z={10} px={64} py={32}>
@@ -68,12 +71,13 @@ export function TvTopNav({ active }: Readonly<{ active?: NavKey }>) {
           </Box>
         </FocusSlot>
         <NavPill.Root
-          key={entries.map((entry) => entry.key).join()}
+          key={pillKey}
           size="tv"
           label={t('nav.menu')}
         >
           <NavPill.Backdrop amount={16} />
           <NavPill.Item
+            {...keep('home')}
             icon="home"
             label={t('nav.home')}
             active={active === 'home'}
@@ -81,6 +85,7 @@ export function TvTopNav({ active }: Readonly<{ active?: NavKey }>) {
           />
           {entries.map((entry) => (
             <NavPill.Item
+              {...keep(entry.key)}
               key={entry.key}
               icon={entry.icon}
               label={t(entry.label)}
@@ -89,30 +94,35 @@ export function TvTopNav({ active }: Readonly<{ active?: NavKey }>) {
             />
           ))}
           <NavPill.Item
+            {...keep('films')}
             icon="movie"
             label={t('nav.films')}
             active={active === 'films'}
             onPress={() => nav.reset('grid', { kind: 'films' })}
           />
           <NavPill.Item
+            {...keep('series')}
             icon="device-tv"
             label={t('nav.series')}
             active={active === 'series'}
             onPress={() => nav.reset('grid', { kind: 'series' })}
           />
           <NavPill.Item
+            {...keep('genres')}
             icon="category"
             label={t('nav.genres')}
             active={active === 'genres'}
             onPress={() => nav.reset('genres')}
           />
           <NavPill.Item
+            {...keep('mylist')}
             icon="bookmark"
             label={t('nav.myList')}
             active={active === 'mylist'}
             onPress={() => nav.reset('grid', { kind: 'mylist' })}
           />
           <NavPill.Item
+            {...keep('search')}
             icon="search"
             label={t('nav.search')}
             active={active === 'search'}

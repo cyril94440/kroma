@@ -20,6 +20,7 @@ mod govern;
 mod ideas;
 mod govern_flow;
 mod polls;
+mod provider_vote;
 mod presence;
 mod snapshot;
 mod syncing;

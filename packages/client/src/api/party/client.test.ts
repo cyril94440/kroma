@@ -53,5 +53,73 @@ describe('the party endpoints', () => {
       path: '/module/tv.kroma.party/react',
       body: { id: 'a-1', emoji: 'x' },
     },
+    {
+      name: 'ideas',
+      call: (c) => swallow(c.party.ideas()),
+      method: 'GET',
+      path: '/module/tv.kroma.party/ideas',
+    },
+    {
+      name: 'submitIdea',
+      call: (c) => swallow(c.party.submitIdea('bug', 'no sound')),
+      method: 'POST',
+      path: '/module/tv.kroma.party/ideas',
+      body: { genre: 'bug', text: 'no sound' },
+    },
+    {
+      name: 'beat',
+      call: (c) =>
+        swallow(
+          c.party.beat({ enabled: true, delay: 3, paused: false, pinned: false, blocked: false }),
+        ),
+      method: 'POST',
+      path: '/module/tv.kroma.party/sync/beat',
+      body: { enabled: true, delay: 3, paused: false, pinned: false, blocked: false },
+    },
+    {
+      name: 'fineDone',
+      call: (c) => swallow(c.party.fineDone({ ms: 12, seeks: 2, abandoned: false, solo: true })),
+      method: 'POST',
+      path: '/module/tv.kroma.party/sync/fine-done',
+      body: { ms: 12, seeks: 2, abandoned: false, solo: true },
+    },
+    {
+      name: 'recalibration',
+      call: (c) =>
+        swallow(c.party.recalibration({ gap: 2.5, target: 12, arrival: false, blocked: false })),
+      method: 'POST',
+      path: '/module/tv.kroma.party/sync/recalibration',
+      body: { gap: 2.5, target: 12, arrival: false, blocked: false },
+    },
+    {
+      name: 'stats',
+      call: (c) =>
+        swallow(
+          c.party.stats({
+            buffer: 4.5,
+            bandwidthKbps: 0,
+            stalls: 0,
+            rebufferMs: 0,
+            dropped: 0,
+            resolution: '',
+            playing: true,
+            delay: 12.3,
+            paused: false,
+          }),
+        ),
+      method: 'POST',
+      path: '/module/tv.kroma.party/stats',
+      body: {
+        buffer: 4.5,
+        bandwidthKbps: 0,
+        stalls: 0,
+        rebufferMs: 0,
+        dropped: 0,
+        resolution: '',
+        playing: true,
+        delay: 12.3,
+        paused: false,
+      },
+    },
   ])('$name', checkEndpoint);
 });

@@ -1,10 +1,15 @@
 import { BEHIND_LIVE_SECONDS, canRebuild, STALL_RECOVERY_MS } from '@kromatv/core';
+import type { SyncSource } from '@kromatv/core/react';
 import { useVideoPlayer, type VideoPlayer } from 'expo-video';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { stopNativePlayer } from '#mobile/player/engine/shutdown';
 import { usePlaybackOwner } from '#mobile/player/playback-owner';
 
 const WATCHDOG_MS = 500;
+
+function applyRate(player: VideoPlayer, rate: number): void {
+  player.playbackRate = rate;
+}
 
 interface LiveEngine {
   player: VideoPlayer;
@@ -13,6 +18,7 @@ interface LiveEngine {
   failed: boolean;
   behind: boolean;
   frameTimeMs(): number | null;
+  sync: RefObject<SyncSource>;
   goLive(): void;
   togglePlay(): void;
   shutdown(): void;
@@ -110,5 +116,34 @@ export function useLiveEngine(url: string | null): LiveEngine {
 
   const frameTimeMs = useCallback(() => player.currentLiveTimestamp, [player]);
 
-  return { player, playing, waiting, failed, behind, frameTimeMs, goLive, togglePlay, shutdown };
+  const sync = useMemo<RefObject<SyncSource>>(
+    () => ({
+      current: {
+        frameTimeMs: () => player.currentLiveTimestamp,
+        isReady: () => player.status === 'readyToPlay',
+        bufferAheadMs: () => Math.max(0, player.bufferedPosition - player.currentTime) * 1000,
+        moveRange: () => null,
+        goLive: () => {
+          const offset = player.currentOffsetFromLive;
+          if (offset !== null && offset > 0) player.seekBy(offset);
+        },
+        seekByMs: (deltaMs) => player.seekBy(deltaMs / 1000),
+        setRate: (rate) => applyRate(player, rate),
+      },
+    }),
+    [player],
+  );
+
+  return {
+    player,
+    playing,
+    waiting,
+    failed,
+    behind,
+    frameTimeMs,
+    sync,
+    goLive,
+    togglePlay,
+    shutdown,
+  };
 }

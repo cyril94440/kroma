@@ -45,6 +45,8 @@ mod it_live;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_ops;
 #[cfg(all(test, not(target_family = "wasm")))]
+mod it_proposal_wire;
+#[cfg(all(test, not(target_family = "wasm")))]
 mod it_robust;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_scan;

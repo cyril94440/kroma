@@ -1,30 +1,43 @@
 import type { ChatMessage } from '@kromatv/client/party';
-import { Box, Button, Text } from '@kromatv/ui/kit';
+import { Box, Button, Field, Text } from '@kromatv/ui/kit';
 import { useState } from 'react';
-import { TextInput } from 'react-native';
 import { useT } from '#mobile/lib/i18n';
+import { LiveCard } from '#mobile/live/cards/LiveCard';
 
-function Line({ message }: Readonly<{ message: ChatMessage }>) {
+function Line({
+  message,
+  onWatch,
+}: Readonly<{ message: ChatMessage; onWatch: (channel: string) => void }>) {
   return (
-    <Box row gap={8}>
-      {message.kind === 'system' ? null : (
-        <Text variant="meta" color={message.kind === 'agent' ? 'accentText' : 'textMuted'}>
-          {message.name}
+    <Box gap={8}>
+      <Box row gap={8}>
+        {message.kind === 'system' ? null : (
+          <Text variant="meta" color={message.kind === 'agent' ? 'accentText' : 'textMuted'}>
+            {message.name}
+          </Text>
+        )}
+        <Text variant="body" flex>
+          {message.text}
         </Text>
-      )}
-      <Text variant="body" flex>
-        {message.text}
-      </Text>
+      </Box>
+      <LiveCard card={message.card} onWatch={onWatch} />
     </Box>
   );
 }
 
-/** The chat under the picture, newest last, and a composer: a phone has a
- *  keyboard, so this is where the family writes. */
+/** The chat under the picture, newest last, with what Hermès is doing and a
+ *  composer: a phone has a keyboard, so this is where the family writes. */
 export function LiveChat({
   messages,
+  activity,
   onSend,
-}: Readonly<{ messages: readonly ChatMessage[]; onSend: (text: string) => void }>) {
+  onWatch,
+}: Readonly<{
+  messages: readonly ChatMessage[];
+  activity: string | null;
+  onSend: (text: string) => void;
+  onWatch: (channel: string) => void;
+}>) {
   const t = useT();
   const [draft, setDraft] = useState('');
   const shown = messages.filter((message) => message.text !== '').slice(-30);
@@ -41,18 +54,23 @@ export function LiveChat({
           {t('live.chatEmpty')}
         </Text>
       ) : (
-        shown.map((message) => <Line key={message.id} message={message} />)
+        shown.map((message) => <Line key={message.id} message={message} onWatch={onWatch} />)
       )}
+      {activity ? (
+        <Text variant="meta" color="accentText">
+          {activity}
+        </Text>
+      ) : null}
       <Box row gap={10} align="center">
         <Box flex>
-          <TextInput
+          <Field.Root
+            label={t('live.chatPlaceholder')}
+            hideLabel
             value={draft}
-            onChangeText={setDraft}
-            onSubmitEditing={send}
-            placeholder={t('live.chatPlaceholder')}
-            returnKeyType="send"
-            accessibilityLabel={t('live.chatPlaceholder')}
-          />
+            onValueChange={setDraft}
+          >
+            <Field.Input onSubmit={send} placeholder={t('live.chatPlaceholder')} />
+          </Field.Root>
         </Box>
         <Button label={t('live.send')} variant="primary" onPress={send} />
       </Box>

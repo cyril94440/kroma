@@ -128,8 +128,10 @@ with the media ticket.
 `live.status` (the full status), `live.channel` (`channel`, `provider`,
 `onBackup`, `now`, `next`, `playlist`), `live.presence` (`viewers`), `live.health`
 (`sourceKbps`, `stutter`, `black`, `frozen`, `trouble`, `state`, `lossSeconds`),
-`live.proposal` (`proposal`, `resolved`, `accepted`, `default`: `vote`, `noVote`
-or `timeout`), `live.failover` (`kind`: `failover`, `failback`, `returnIdle`,
+`live.proposal` (`{proposal: {id, kind, text, channel, createdAt, expiresAt},
+resolved}`, plus `viewers` while it is open for a vote, or `accepted` and `default`
+(`vote`, `noVote` or `timeout`) once it is resolved; `kind` is `switchToBackup`,
+`returnToPrimary` or `switchProvider`), `live.failover` (`kind`: `failover`, `failback`, `returnIdle`,
 `bothDown`, `recovered`, `noEquivalent`, `backupUnreachable`, `backupDead`,
 `noWorkingEquivalent`, `failbackRefused`, `channelDown`, `providerSwitch`,
 `primaryBack`, `trial`, `trialNotBetter`) and `live.scan` (`{id, item}` per
@@ -160,7 +162,7 @@ a fixed contract other modules code against; the others were added to them.
 | `clipBufferInfo` | `{}` | `{fromMs, toMs}`, both `null` when the buffer is empty |
 | `clipCut` | `{fromMs, toMs, name}` | `{path, durationMs}`; `path` is under the published folder; `Err`: `invalidName`, `invalidWindow`, `outOfBuffer`, `cutFailed` |
 | `restart` | `{requestedBy, reason}` | `{restarted, error}`; `error`: `noChannel`, `standby`, `streamHealthy`, `recentRestart`, `channelChanged` |
-| `switchProvider` | `{provider, channelId?, requestedBy, reason}` | `{switched, provider, error}`; `channelId` (`p:3`, `s:12`) names the exact channel of `provider` to go to instead of the best equivalent of the current one; it is probed once, then follows the same rule (alone or in trouble: at once, otherwise a vote). `error`: `unknownProvider`, `noBackup`, `noChannel`, `alreadyOn`, `primaryDown`, `notFound`, `notWorking`, `busy`, `voteRequired` (a `live.proposal` is published), and with `channelId` `unknownChannel` and `providerMismatch` |
+| `switchProvider` | `{provider, channelId?, requestedBy, reason}` | `{switched, provider, error}`; `channelId` (`p:3`, `s:12`) names the exact channel of `provider` to go to instead of the best equivalent of the current one; it is probed once, then follows the same rule (alone or in trouble: at once, otherwise a vote; the stream is in trouble when it has delivered nothing for `troubleDeadSeconds`, when it stutters or restarts while flowing, or as soon as ffmpeg has exited and nothing flows again). `error`: `unknownProvider`, `noBackup`, `noChannel`, `alreadyOn`, `primaryDown`, `notFound`, `notWorking`, `busy`, `voteRequired` (a `live.proposal` is published), and with `channelId` `unknownChannel` and `providerMismatch` |
 | `probe` | `{channelId}` | `{channelId, name, provider, alive, resolution, codec, audioCodec, fps, bitrateKbps, offAir, local, error}`; `error`: `unknownChannel`, `busy`, `liveAtThisProvider`, `standby`, `notReady` |
 | `benchmark` | `{channelIds, requestedBy}` | `{status: "started"\|"refused", id, reason, total, alreadyDone}`; `reason`: `unknownChannel`, `mixedProviders`, `noChannel`, `scanRunning` |
 | `scanResult` | `{}` | the last scan: `{id, query, running, provider, items, total}`; each item is `{number, id, name, ok, black, still, frame, frames, error, now, at}`, `at` being the ms epoch at which its capture ended |

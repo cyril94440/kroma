@@ -97,7 +97,7 @@ pub fn health_view(inner: &super::Inner) -> HealthView {
         stutter: matches!(inner.health.state, State::Degraded | State::Severe),
         black: inner.black,
         frozen: inner.frozen || inner.health.frozen,
-        trouble: inner.policy.trouble(super::now_seconds()),
+        trouble: inner.in_trouble(super::now_seconds()),
         state: inner.health.state.as_str().to_string(),
         loss_seconds: inner.health.recent_loss(),
     }
