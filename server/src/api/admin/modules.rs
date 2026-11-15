@@ -75,16 +75,7 @@ async fn list_modules(
             let unmet = crate::api::modules::unmet_of(&m, &answered);
             let removable = removable_ids.contains(&m.id);
             let stored = kroma_engine::modules::module_config(&state.settings, &m.id);
-            let config_values = m
-                .config
-                .iter()
-                .map(|f| {
-                    let value = stored.get(&f.key).cloned().unwrap_or_else(|| {
-                        f.default.clone().map(Value::from).unwrap_or(Value::Null)
-                    });
-                    (f.key.clone(), value)
-                })
-                .collect();
+            let config_values = super::modules_config::config_view(&m.config, &stored);
             let config_locales = if m.config.is_empty() {
                 BTreeMap::new()
             } else {
@@ -177,17 +168,12 @@ async fn set_config(
     Json(values): Json<BTreeMap<String, Value>>,
 ) -> Result<Response, Response> {
     super::require(&user, Permission::SettingsManage)?;
-    // Allow-list against the manifest, so a client can only write fields the module
-    // actually declares.
-    let allowed: std::collections::HashSet<String> = kroma_module_kernel::manifests(&state)
+    let fields = kroma_module_kernel::manifests(&state)
         .into_iter()
         .find(|m| m.id == id)
-        .map(|m| m.config.into_iter().map(|f| f.key).collect())
+        .map(|m| m.config)
         .unwrap_or_default();
-    let map: serde_json::Map<String, Value> = values
-        .into_iter()
-        .filter(|(k, _)| allowed.contains(k))
-        .collect();
+    let map = super::modules_config::writable_config(&fields, values);
     kroma_engine::modules::set_module_config(&state.settings, &state.db, &id, map);
     Ok(Json(json!({ "id": id, "ok": true })).into_response())
 }

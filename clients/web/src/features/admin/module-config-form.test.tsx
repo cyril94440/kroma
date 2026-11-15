@@ -67,23 +67,21 @@ it('renders a label no catalog knows exactly as the module wrote it', () => {
   expect(screen.getAllByText('Preferred region').length).toBeGreaterThan(0);
 });
 
-it('never renders a stored secret back, and an untouched secret is left out of the save', async () => {
+it('leaves an untouched stored secret out of the save, since the server only marks it', async () => {
   const fields = [
     { key: 'primaryUrl', label: 'Portal', type: 'string', secret: true },
     { key: 'agent', label: 'Agent', type: 'string' },
   ] as const;
-  const { container } = render(
+  render(
     <I18nProvider locale="en">
       <ModuleConfigForm
         moduleId="tv.kroma.live"
         fields={[...fields]}
-        values={{ primaryUrl: 'http://portal/get.php?password=hunter2', agent: 'VLC' }}
+        values={{ primaryUrl: true, agent: 'VLC' }}
         onSaved={() => {}}
       />
     </I18nProvider>,
   );
-
-  expect(container.innerHTML).not.toContain('hunter2');
 
   fireEvent.click(screen.getByText('Save'));
   await Promise.resolve();

@@ -31,6 +31,7 @@ pub struct ScanItem {
     pub frames: Vec<String>,
     pub error: Option<String>,
     pub now: Option<String>,
+    pub at: i64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -112,6 +113,7 @@ impl Live {
                 }
                 let (now, _) = super::now_next(&live.pool, candidate.channel.epg_id.as_deref(), &candidate.channel.name, super::now_ms());
                 item.now = now.map(|p| p.title);
+                item.at = super::now_ms();
                 live.emit(TOPIC_SCAN, json!({ "id": scan_id, "item": item }));
                 live.lock().scan.items.push(item);
             }

@@ -16,7 +16,7 @@ These are ESPN's unofficial, unauthenticated endpoints. They are not a documente
 
 `espnBaseUrl` (config) overrides the host for tests; the manifest only permits `site.api.espn.com`.
 
-Peers: `tv.kroma.live/control` (status, epg, resolve required; clipBufferInfo, clipCut, scanResult, benchmark optional, 404/405 means unsupported and degrades), `tv.kroma.party/room` (`say` with `as:"system"` and a card).
+Peers: `tv.kroma.live/control` (status, epg, resolve required; clipBufferInfo, clipCut, clipList, clipDelete, scanResult, benchmark optional, 404/405 means unsupported and degrades). `status.startedAt` (live 0.3.0) keys the calibration and the pronos per direct, `clipList` reconciles the stored clips with the files live still holds, `clipDelete` removes a file when its clip is dropped or deleted, `tv.kroma.party/room` (`say` with `as:"system"` and a card).
 
 ## Anti-spoiler model
 

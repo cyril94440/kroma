@@ -140,13 +140,9 @@
     "net": {
       "connect": [
         {
-          "purpose": "voice.turn",
-          "to": [
-            "rtc.live.cloudflare.com"
-          ],
-          "ports": [
-            443
-          ]
+          "purpose": "turn",
+          "to": ["rtc.live.cloudflare.com"],
+          "ports": [443]
         }
       ]
     }

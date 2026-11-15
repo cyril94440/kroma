@@ -30,11 +30,14 @@ mod portal;
 mod presence;
 mod probe;
 mod providers;
+mod publicpath;
 mod module;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_clips;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_failover;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod it_files;
 #[cfg(all(test, not(target_family = "wasm")))]
 mod it_frame;
 #[cfg(all(test, not(target_family = "wasm")))]

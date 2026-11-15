@@ -15,8 +15,8 @@ export function LiveGate({
   available,
   children,
 }: Readonly<{ client: KromaClient | null; available: boolean; children: ReactNode }>): ReactNode {
-  const { user } = useAuth();
-  const state = useLiveModules(user ? client : null);
+  const { user, ready } = useAuth();
+  const state = useLiveModules(ready && user ? client : null);
   const entries = useMemo(
     () => (available && state.modules.live ? [LIVE_ENTRY] : []),
     [available, state.modules.live],

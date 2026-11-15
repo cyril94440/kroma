@@ -30,7 +30,7 @@ const sDefinition = styles({ select: { width: CONTROL_WIDTH } });
 const KEPT_SECRET = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
 
 function hasStoredSecret(field: ConfigField, stored: unknown): boolean {
-  return field.secret === true && typeof stored === 'string' && stored !== '';
+  return field.secret === true && stored === true;
 }
 
 function initial(field: ConfigField, stored: unknown): ConfigValue {

@@ -35,6 +35,7 @@ pub struct StatusReply {
     pub next: Option<Slot>,
     pub viewers: Vec<ViewerName>,
     pub health: PointHealth,
+    pub started_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -64,6 +65,7 @@ pub fn status_reply(live: &Live) -> StatusReply {
         next: status.next,
         viewers: status.viewers.into_iter().map(|v| ViewerName { user_id: v.user_id, name: v.name }).collect(),
         health: PointHealth { source_kbps, stutter, black, frozen },
+        started_at: status.started_at,
     }
 }
 

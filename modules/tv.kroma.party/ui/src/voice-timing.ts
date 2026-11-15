@@ -16,6 +16,9 @@ export const SESSION_TIMING = {
   rosterWaitMs: 3_000,
   pendingSignalsMax: 32,
   joinRetryMs: 2_000,
+  rejoinsMax: 3,
+  rejoinWindowMs: 60_000,
+  iceRefreshMs: 6 * 3_600_000,
 } as const;
 
 export class Timers {

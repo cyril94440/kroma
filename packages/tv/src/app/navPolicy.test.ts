@@ -19,6 +19,12 @@ describe('navigation policy', () => {
     expect(resolveRedirect(GUARD, signedIn, 'report')).toBeNull();
   });
 
+  it('serves the live screen to a signed-in viewer only', () => {
+    expect(APP_SCREENS).toContain('live');
+    expect(AUTH_SCREENS).not.toContain('live');
+    expect(resolveRedirect(GUARD, signedOut, 'live')).toBe('profiles');
+  });
+
   it('sends a signed-in viewer home from an auth-only screen', () => {
     expect(resolveRedirect(GUARD, signedIn, 'connect')).toBe('home');
     expect(resolveRedirect(GUARD, signedIn, 'profiles')).toBe('home');

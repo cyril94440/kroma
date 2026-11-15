@@ -29,7 +29,12 @@ pub struct Member {
 
 impl From<&Participant> for Member {
     fn from(p: &Participant) -> Self {
-        Self { peer_id: p.peer_id.clone(), user_id: p.user_id.clone(), name: p.name.clone(), muted: p.muted }
+        Self {
+            peer_id: p.peer_id.clone(),
+            user_id: p.user_id.clone(),
+            name: p.name.clone(),
+            muted: p.muted,
+        }
     }
 }
 
@@ -96,7 +101,10 @@ impl VoiceRoom {
         if !limits::valid_device_id(req.device_id) {
             return Err(VoiceError::BadDevice);
         }
-        if !self.windows.allow(format!("join:{}", req.user_id), limits::JOINS, now) {
+        if !self
+            .windows
+            .allow(format!("join:{}", req.user_id), limits::JOINS, now)
+        {
             return Err(VoiceError::RateLimited);
         }
         let replaced = self
@@ -141,7 +149,8 @@ impl VoiceRoom {
 
     fn remove(&mut self, peer_id: &str) -> Option<Participant> {
         let at = self.peers.iter().position(|p| p.peer_id == peer_id)?;
-        self.pairs.retain(|(from, to), _| from != peer_id && to != peer_id);
+        self.pairs
+            .retain(|(from, to), _| from != peer_id && to != peer_id);
         Some(self.peers.remove(at))
     }
 
@@ -158,7 +167,13 @@ impl VoiceRoom {
         Ok(())
     }
 
-    pub fn set_muted(&mut self, user_id: &str, peer_id: &str, muted: bool, now: i64) -> Result<bool, VoiceError> {
+    pub fn set_muted(
+        &mut self,
+        user_id: &str,
+        peer_id: &str,
+        muted: bool,
+        now: i64,
+    ) -> Result<bool, VoiceError> {
         let peer = self.owned_mut(user_id, peer_id)?;
         peer.last_beat = now;
         if peer.muted == muted {
@@ -172,18 +187,36 @@ impl VoiceRoom {
         Ok(true)
     }
 
-    pub fn set_speaking(&mut self, user_id: &str, peer_id: &str, speaking: bool, now: i64) -> Result<(), VoiceError> {
-        if speaking && !self.windows.allow(format!("speaking:{peer_id}"), limits::SPEAKING, now) {
+    pub fn set_speaking(
+        &mut self,
+        user_id: &str,
+        peer_id: &str,
+        speaking: bool,
+        now: i64,
+    ) -> Result<(), VoiceError> {
+        if speaking
+            && !self
+                .windows
+                .allow(format!("speaking:{peer_id}"), limits::SPEAKING, now)
+        {
             return Err(VoiceError::RateLimited);
         }
         let peer = self.owned_mut(user_id, peer_id)?;
         peer.last_beat = now;
-        peer.speaking_until = if speaking && !peer.muted { now + limits::SPEAKING_TTL_MS } else { 0 };
+        peer.speaking_until = if speaking && !peer.muted {
+            now + limits::SPEAKING_TTL_MS
+        } else {
+            0
+        };
         Ok(())
     }
 
     pub fn speaking(&self, now: i64) -> Vec<String> {
-        self.peers.iter().filter(|p| p.speaking_until > now).map(|p| p.peer_id.clone()).collect()
+        self.peers
+            .iter()
+            .filter(|p| p.speaking_until > now)
+            .map(|p| p.peer_id.clone())
+            .collect()
     }
 
     pub fn speaking_change(&mut self, now: i64) -> Option<Vec<String>> {
@@ -195,16 +228,28 @@ impl VoiceRoom {
         Some(current)
     }
 
-    pub fn expire(&mut self, now: i64, present: Option<&BTreeSet<String>>, grace_ms: i64) -> Vec<Participant> {
+    pub fn expire(
+        &mut self,
+        now: i64,
+        present: Option<&BTreeSet<String>>,
+        grace_ms: i64,
+    ) -> Vec<Participant> {
         self.windows.prune(now);
         for p in &mut self.peers {
             let absent = p.watching && present.is_some_and(|set| !set.contains(&p.user_id));
-            p.absent_since = if absent { p.absent_since.or(Some(now)) } else { None };
+            p.absent_since = if absent {
+                p.absent_since.or(Some(now))
+            } else {
+                None
+            };
         }
         let gone: Vec<String> = self
             .peers
             .iter()
-            .filter(|p| now - p.last_beat >= limits::TTL_MS || p.absent_since.is_some_and(|at| now - at >= grace_ms))
+            .filter(|p| {
+                now - p.last_beat >= limits::TTL_MS
+                    || p.absent_since.is_some_and(|at| now - at >= grace_ms)
+            })
             .map(|p| p.peer_id.clone())
             .collect();
         let removed: Vec<Participant> = gone.iter().filter_map(|id| self.remove(id)).collect();
@@ -214,16 +259,31 @@ impl VoiceRoom {
         removed
     }
 
-    pub fn relay(&mut self, user_id: &str, from: &str, to: &str, now: i64) -> Result<Relay, VoiceError> {
+    pub fn relay(
+        &mut self,
+        user_id: &str,
+        from: &str,
+        to: &str,
+        now: i64,
+    ) -> Result<Relay, VoiceError> {
         self.owned_mut(user_id, from)?;
         if from == to {
             return Err(VoiceError::SelfSignal);
         }
-        if !self.windows.allow(format!("signal:{from}"), limits::SIGNALS, now) {
+        if !self
+            .windows
+            .allow(format!("signal:{from}"), limits::SIGNALS, now)
+        {
             return Err(VoiceError::RateLimited);
         }
-        let to_user = self.find(to).map(|p| p.user_id.clone()).ok_or(VoiceError::PeerGone)?;
-        let n = self.pairs.entry((from.to_string(), to.to_string())).or_insert(0);
+        let to_user = self
+            .find(to)
+            .map(|p| p.user_id.clone())
+            .ok_or(VoiceError::PeerGone)?;
+        let n = self
+            .pairs
+            .entry((from.to_string(), to.to_string()))
+            .or_insert(0);
         *n += 1;
         Ok(Relay { to_user, n: *n })
     }

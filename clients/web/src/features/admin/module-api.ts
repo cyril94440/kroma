@@ -22,6 +22,8 @@ import type { ModuleManifest } from '@kromatv/module-sdk';
  *  runtime admin state. */
 export interface AdminModule extends ModuleManifest {
   enabled: boolean;
+  /** By config key. A `secret` field is never sent: its value is `true` when one
+   *  is stored and `null` when not. */
   configValues: Record<string, unknown>;
   /** The module's own catalogs, by locale, sent when it declares `config`
    *  fields: a module with no frontend has no other way to reach the web

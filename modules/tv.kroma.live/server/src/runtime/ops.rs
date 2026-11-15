@@ -119,7 +119,7 @@ impl Live {
         }
     }
 
-    pub async fn switch_provider(&self, target: ProviderId, requested_by: &str, reason: &str) -> ProviderSwitch {
+    pub async fn switch_provider(&self, target: ProviderId, channel_id: Option<&str>, requested_by: &str, reason: &str) -> ProviderSwitch {
         let answer = |switched: bool, error: Option<&str>| ProviderSwitch { switched, provider: target.as_str().into(), error: error.map(str::to_string) };
         if !self.settings().has_backup() {
             return answer(false, Some("noBackup"));
@@ -132,13 +132,9 @@ impl Live {
             return answer(false, Some("primaryDown"));
         }
         self.stop_trial_marker();
-        let wanted = match self.working_equivalent(&current, target).await {
+        let wanted = match self.wanted_at(&current, target, channel_id).await {
             Ok(channel) => channel,
-            Err(reasons) => {
-                let none = self.providers.equivalents(&current, target, 1, &self.rules()).is_empty();
-                let busy = !reasons.is_empty() && reasons.iter().all(|r| r == "busy" || r == "liveAtThisProvider");
-                return answer(false, Some(if none { "notFound" } else if busy { "busy" } else { "notWorking" }));
-            }
+            Err(error) => return answer(false, Some(error)),
         };
         let event = self.providers.catalogue(current.provider).is_event_channel(&current.name);
         let (alone, trouble) = {
@@ -154,6 +150,25 @@ impl Live {
         match self.propose_channel("switchProvider", &wanted, if event { "unverifiedMultiplex" } else { "requested" }).await {
             super::actions::Proposed::Applied => answer(true, None),
             _ => answer(false, Some("voteRequired")),
+        }
+    }
+
+    async fn wanted_at(&self, current: &Channel, target: ProviderId, channel_id: Option<&str>) -> Result<Channel, &'static str> {
+        if let Some(reference) = channel_id {
+            let channel = self.providers.find_by_ref(reference).ok_or("unknownChannel")?;
+            if channel.provider != target {
+                return Err("providerMismatch");
+            }
+            let probed = self.quick_probe(&channel).await;
+            return if probed.alive { Ok(channel) } else if probed.busy { Err("busy") } else { Err("notWorking") };
+        }
+        match self.working_equivalent(current, target).await {
+            Ok(channel) => Ok(channel),
+            Err(reasons) => {
+                let none = self.providers.equivalents(current, target, 1, &self.rules()).is_empty();
+                let busy = !reasons.is_empty() && reasons.iter().all(|r| r == "busy" || r == "liveAtThisProvider");
+                Err(if none { "notFound" } else if busy { "busy" } else { "notWorking" })
+            }
         }
     }
 

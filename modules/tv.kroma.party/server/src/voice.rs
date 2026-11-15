@@ -5,7 +5,7 @@ mod room;
 mod signal;
 
 pub use error::VoiceError;
-pub use ice::{CloudflareTurn, IceCache, IceServer, TurnSource};
+pub use ice::{CloudflareTurn, IceCache, TurnSource};
 pub use room::{JoinRequest, VoiceRoom};
 pub use signal::Signal;
 

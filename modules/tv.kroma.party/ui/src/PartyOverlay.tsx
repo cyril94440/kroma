@@ -1,9 +1,11 @@
 import { type CSSProperties } from 'react';
 import { OverlayProps } from './sync-player';
 import { useParty } from './use-party';
+import { VoiceSpeakers } from './voice-speakers';
 import { VotePanel } from './vote-panel';
 
 const BANNER: CSSProperties = { pointerEvents: 'auto', margin: 12, maxWidth: 420 };
+const SPEAKERS: CSSProperties = { position: 'absolute', left: 12, bottom: 12 };
 const FLOATS: CSSProperties = {
   position: 'absolute',
   right: 12,
@@ -30,6 +32,9 @@ function Banner() {
           me={state.me.userId}
           now={now}
         />
+      </div>
+      <div style={SPEAKERS}>
+        <VoiceSpeakers />
       </div>
       <div style={FLOATS}>
         {model.floating.map((f) => (

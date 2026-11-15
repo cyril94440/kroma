@@ -5,6 +5,7 @@ mod codec;
 mod connections;
 mod coverage;
 mod emit;
+mod files;
 mod frame;
 mod guide;
 mod media;

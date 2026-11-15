@@ -3,7 +3,7 @@
   "schemaVersion": 3,
   "id": "tv.kroma.sport",
   "name": "Sport",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Live sport for the family television: which matches are on and where, a live match panel with line-ups and stats shown only when your own picture has caught up, predictions with a season leaderboard, standings, cards for the chat and goal clips.",
   "engines": {
     "server": ">=0.1.39"

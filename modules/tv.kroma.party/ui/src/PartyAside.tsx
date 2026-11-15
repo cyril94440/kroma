@@ -10,6 +10,7 @@ import { AsideProps, type SyncPlayer } from './sync-player';
 import { useParty } from './use-party';
 import { useSyncSession } from './use-sync-session';
 import { VotePanel } from './vote-panel';
+import { VoicePanel } from './voice-panel';
 
 function Panel({ props, player }: Readonly<{ props: AsideProps; player: SyncPlayer }>) {
   const { api, model, now } = useParty();
@@ -27,6 +28,9 @@ function Panel({ props, player }: Readonly<{ props: AsideProps; player: SyncPlay
       />
       <Box mt={16}>
         <SyncPanel session={session} group={state.sync} />
+      </Box>
+      <Box mt={16}>
+        <VoicePanel watching />
       </Box>
       <Box mt={16}>
         <ChatPanel api={api} state={state} floating={model.floating} />

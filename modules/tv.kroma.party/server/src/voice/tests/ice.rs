@@ -19,7 +19,11 @@ struct FakeTurn {
 
 impl FakeTurn {
     fn new() -> Arc<Self> {
-        Arc::new(Self { calls: AtomicUsize::new(0), fail: Mutex::new(false), seen: Mutex::new(Vec::new()) })
+        Arc::new(Self {
+            calls: AtomicUsize::new(0),
+            fail: Mutex::new(false),
+            seen: Mutex::new(Vec::new()),
+        })
     }
 
     fn calls(&self) -> usize {
@@ -30,7 +34,10 @@ impl FakeTurn {
 impl TurnSource for FakeTurn {
     fn mint(&self, key_id: &str, api_token: &str, _ttl_s: u32) -> Result<Vec<IceServer>> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        self.seen.lock().unwrap().push((key_id.into(), api_token.into()));
+        self.seen
+            .lock()
+            .unwrap()
+            .push((key_id.into(), api_token.into()));
         if *self.fail.lock().unwrap() {
             return Err(anyhow!("HTTP 500"));
         }
@@ -59,14 +66,27 @@ fn defaults_to_the_public_stun_server_alone() {
 
     let servers = serve(&host, &FakeTurn::new(), &cache, NOW);
 
-    assert_eq!(servers, vec![IceServer { urls: vec![DEFAULT_STUN.into()], username: None, credential: None }]);
+    assert_eq!(
+        servers,
+        vec![IceServer {
+            urls: vec![DEFAULT_STUN.into()],
+            username: None,
+            credential: None
+        }]
+    );
 }
 
 #[test]
 fn serves_the_configured_stun_and_static_turn_with_their_credentials() {
     let host = StubHost::with_db("ice")
-        .with_config("voiceStunUrls", json!("stun:a.example:3478, stun:b.example:3478"))
-        .with_config("voiceTurnUrls", json!("turn:t.example:3478 turns:t.example:5349"))
+        .with_config(
+            "voiceStunUrls",
+            json!("stun:a.example:3478, stun:b.example:3478"),
+        )
+        .with_config(
+            "voiceTurnUrls",
+            json!("turn:t.example:3478 turns:t.example:5349"),
+        )
         .with_config("voiceTurnUsername", json!("family"))
         .with_config("voiceTurnCredential", json!("static-secret"));
     let cache = Mutex::new(IceCache::default());
@@ -74,8 +94,14 @@ fn serves_the_configured_stun_and_static_turn_with_their_credentials() {
     let servers = serve(&host, &FakeTurn::new(), &cache, NOW);
 
     assert_eq!(servers.len(), 2);
-    assert_eq!(servers[0].urls, vec!["stun:a.example:3478", "stun:b.example:3478"]);
-    assert_eq!(servers[1].urls, vec!["turn:t.example:3478", "turns:t.example:5349"]);
+    assert_eq!(
+        servers[0].urls,
+        vec!["stun:a.example:3478", "stun:b.example:3478"]
+    );
+    assert_eq!(
+        servers[1].urls,
+        vec!["turn:t.example:3478", "turns:t.example:5349"]
+    );
     assert_eq!(servers[1].username.as_deref(), Some("family"));
     assert_eq!(servers[1].credential.as_deref(), Some("static-secret"));
 }
@@ -83,7 +109,10 @@ fn serves_the_configured_stun_and_static_turn_with_their_credentials() {
 #[test]
 fn ignores_urls_that_are_not_ice_schemes() {
     let host = StubHost::with_db("ice")
-        .with_config("voiceStunUrls", json!("http://evil.example, javascript:alert(1)"))
+        .with_config(
+            "voiceStunUrls",
+            json!("http://evil.example, javascript:alert(1)"),
+        )
         .with_config("voiceTurnUrls", json!("file:///etc/passwd"));
     let cache = Mutex::new(IceCache::default());
 
@@ -104,7 +133,10 @@ fn minted_cloudflare_credentials_replace_the_static_list_and_are_cached() {
     assert_eq!(first, second);
     assert_eq!(first[0].credential.as_deref(), Some("minted-secret"));
     assert_eq!(turn.calls(), 1);
-    assert_eq!(turn.seen.lock().unwrap()[0], ("key-1".to_string(), "token-1".to_string()));
+    assert_eq!(
+        turn.seen.lock().unwrap()[0],
+        ("key-1".to_string(), "token-1".to_string())
+    );
 }
 
 #[test]

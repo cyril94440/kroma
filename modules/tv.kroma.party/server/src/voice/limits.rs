@@ -13,9 +13,18 @@ pub struct Rate {
     pub window_ms: i64,
 }
 
-pub const SIGNALS: Rate = Rate { count: 240, window_ms: 10_000 };
-pub const SPEAKING: Rate = Rate { count: 10, window_ms: 1_000 };
-pub const JOINS: Rate = Rate { count: 12, window_ms: 60_000 };
+pub const SIGNALS: Rate = Rate {
+    count: 240,
+    window_ms: 10_000,
+};
+pub const SPEAKING: Rate = Rate {
+    count: 10,
+    window_ms: 1_000,
+};
+pub const JOINS: Rate = Rate {
+    count: 12,
+    window_ms: 60_000,
+};
 
 #[derive(Debug, Default)]
 pub struct Windows {
@@ -34,12 +43,16 @@ impl Windows {
     }
 
     pub fn prune(&mut self, now: i64) {
-        self.hits.retain(|_, w| w.last().is_some_and(|t| now - t < 60_000));
+        self.hits
+            .retain(|_, w| w.last().is_some_and(|t| now - t < 60_000));
     }
 }
 
 pub fn valid_token(s: &str) -> bool {
-    !s.is_empty() && s.len() <= MAX_TOKEN_BYTES && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    !s.is_empty()
+        && s.len() <= MAX_TOKEN_BYTES
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
 pub fn valid_device_id(s: &str) -> bool {

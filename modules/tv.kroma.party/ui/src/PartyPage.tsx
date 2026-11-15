@@ -7,6 +7,7 @@ import { PresencePanel } from './presence-panel';
 import { SwitchPanel } from './switch-panel';
 import { useParty } from './use-party';
 import { VotePanel } from './vote-panel';
+import { VoicePanel } from './voice-panel';
 
 export default function PartyPage() {
   const t = useT();
@@ -32,6 +33,9 @@ export default function PartyPage() {
             me={state.me.userId}
             now={now}
           />
+          <Box mt={20}>
+            <VoicePanel watching={false} />
+          </Box>
           <Box mt={20}>
             <SwitchPanel api={api} admin={state.me.admin} />
           </Box>

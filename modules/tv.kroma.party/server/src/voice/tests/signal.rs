@@ -5,45 +5,90 @@ use super::super::limits::{MAX_CANDIDATE_BYTES, MAX_SDP_BYTES};
 use super::super::signal::{Candidate, Description, Signal, SignalKind};
 
 fn base(kind: SignalKind) -> Signal {
-    Signal { from: "a-1".into(), to: "b-1".into(), session: "s1".into(), kind, description: None, candidate: None }
+    Signal {
+        from: "a-1".into(),
+        to: "b-1".into(),
+        session: "s1".into(),
+        kind,
+        description: None,
+        candidate: None,
+    }
 }
 
 fn offer(sdp: &str) -> Signal {
-    Signal { description: Some(Description { kind: "offer".into(), sdp: sdp.into() }), ..base(SignalKind::Description) }
+    Signal {
+        description: Some(Description {
+            kind: "offer".into(),
+            sdp: sdp.into(),
+        }),
+        ..base(SignalKind::Description)
+    }
 }
 
 fn candidate(line: &str) -> Signal {
     Signal {
-        candidate: Some(Candidate { candidate: line.into(), sdp_mid: Some("0".into()), sdp_m_line_index: Some(0), username_fragment: None }),
+        candidate: Some(Candidate {
+            candidate: line.into(),
+            sdp_mid: Some("0".into()),
+            sdp_m_line_index: Some(0),
+            username_fragment: None,
+        }),
         ..base(SignalKind::Candidate)
     }
 }
 
 #[test]
 fn accepts_an_offer_an_answer_a_candidate_an_end_marker_and_a_hello() {
-    let answer = Signal { description: Some(Description { kind: "answer".into(), sdp: "v=0".into() }), ..base(SignalKind::Description) };
+    let answer = Signal {
+        description: Some(Description {
+            kind: "answer".into(),
+            sdp: "v=0".into(),
+        }),
+        ..base(SignalKind::Description)
+    };
 
     assert_eq!(offer("v=0").validate(), Ok(()));
     assert_eq!(answer.validate(), Ok(()));
-    assert_eq!(candidate("candidate:1 1 udp 1 10.0.0.1 9 typ host").validate(), Ok(()));
+    assert_eq!(
+        candidate("candidate:1 1 udp 1 10.0.0.1 9 typ host").validate(),
+        Ok(())
+    );
     assert_eq!(candidate("").validate(), Ok(()));
     assert_eq!(base(SignalKind::Hello).validate(), Ok(()));
 }
 
 #[test]
 fn refuses_a_description_that_is_empty_of_the_wrong_type_or_missing() {
-    let rollback = Signal { description: Some(Description { kind: "rollback".into(), sdp: "v=0".into() }), ..base(SignalKind::Description) };
+    let rollback = Signal {
+        description: Some(Description {
+            kind: "rollback".into(),
+            sdp: "v=0".into(),
+        }),
+        ..base(SignalKind::Description)
+    };
 
     assert_eq!(offer("").validate(), Err(VoiceError::BadSignal));
     assert_eq!(rollback.validate(), Err(VoiceError::BadSignal));
-    assert_eq!(base(SignalKind::Description).validate(), Err(VoiceError::BadSignal));
-    assert_eq!(base(SignalKind::Candidate).validate(), Err(VoiceError::BadSignal));
+    assert_eq!(
+        base(SignalKind::Description).validate(),
+        Err(VoiceError::BadSignal)
+    );
+    assert_eq!(
+        base(SignalKind::Candidate).validate(),
+        Err(VoiceError::BadSignal)
+    );
 }
 
 #[test]
 fn refuses_a_payload_that_does_not_belong_to_its_kind() {
-    let hello = Signal { candidate: candidate("x").candidate, ..base(SignalKind::Hello) };
-    let mixed = Signal { candidate: candidate("x").candidate, ..offer("v=0") };
+    let hello = Signal {
+        candidate: candidate("x").candidate,
+        ..base(SignalKind::Hello)
+    };
+    let mixed = Signal {
+        candidate: candidate("x").candidate,
+        ..offer("v=0")
+    };
 
     assert_eq!(hello.validate(), Err(VoiceError::BadSignal));
     assert_eq!(mixed.validate(), Err(VoiceError::BadSignal));

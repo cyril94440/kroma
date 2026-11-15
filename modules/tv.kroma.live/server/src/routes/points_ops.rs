@@ -19,6 +19,9 @@ pub fn routes<S: HostCtx + Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/_port/tv.kroma.live/control/snapshot", post(snapshot::<S>))
         .route("/_port/tv.kroma.live/control/clipCut", post(clip_cut::<S>))
         .route("/_port/tv.kroma.live/control/clipBufferInfo", post(clip_buffer_info::<S>))
+        .route("/_port/tv.kroma.live/control/clipList", post(clip_list::<S>))
+        .route("/_port/tv.kroma.live/control/clipDelete", post(clip_delete::<S>))
+        .route("/_port/tv.kroma.live/control/scanFrame", post(scan_frame::<S>))
         .route("/_port/tv.kroma.live/control/restart", post(restart::<S>))
         .route("/_port/tv.kroma.live/control/switchProvider", post(switch_provider::<S>))
         .route("/_port/tv.kroma.live/control/probe", post(probe::<S>))
@@ -79,6 +82,48 @@ async fn clip_buffer_info<S: HostCtx + Clone + Send + Sync + 'static>(State(host
     }).map_err(|e| e.to_string()))
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct ClipListReply {
+    pub paths: Vec<String>,
+}
+
+async fn clip_list<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S>) -> Json<Result<ClipListReply, String>> {
+    Json(live_of(&host).map(|live| ClipListReply { paths: live.clip_list() }).map_err(|e| e.to_string()))
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct PathCall {
+    path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct ClipDeleteReply {
+    pub deleted: bool,
+}
+
+async fn clip_delete<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S>, Json(call): Json<PathCall>) -> Json<Result<ClipDeleteReply, String>> {
+    let live = match live_of(&host) {
+        Ok(live) => live,
+        Err(error) => return Json(Err(error.to_string())),
+    };
+    Json(live.clip_delete(&call.path).map(|deleted| ClipDeleteReply { deleted }).map_err(|e| e.as_str().to_string()))
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanFrameReply {
+    pub jpeg_base64: String,
+}
+
+async fn scan_frame<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<S>, Json(call): Json<PathCall>) -> Json<Result<ScanFrameReply, String>> {
+    let live = match live_of(&host) {
+        Ok(live) => live,
+        Err(error) => return Json(Err(error.to_string())),
+    };
+    Json(live.scan_frame(&call.path).map(|jpeg| ScanFrameReply { jpeg_base64: STANDARD.encode(jpeg) }).map_err(|e| e.as_str().to_string()))
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 struct RestartCall {
@@ -98,6 +143,7 @@ async fn restart<S: HostCtx + Clone + Send + Sync + 'static>(State(host): State<
 #[serde(rename_all = "camelCase", default)]
 struct SwitchProviderCall {
     provider: String,
+    channel_id: Option<String>,
     requested_by: String,
     reason: String,
 }
@@ -110,7 +156,7 @@ async fn switch_provider<S: HostCtx + Clone + Send + Sync + 'static>(State(host)
     let Some(target) = ProviderId::parse(&call.provider) else {
         return Json(Ok(ProviderSwitch { switched: false, provider: call.provider, error: Some("unknownProvider".into()) }));
     };
-    Json(Ok(live.switch_provider(target, &call.requested_by, &call.reason).await))
+    Json(Ok(live.switch_provider(target, call.channel_id.as_deref().filter(|id| !id.is_empty()), &call.requested_by, &call.reason).await))
 }
 
 #[derive(Debug, Default, Deserialize)]

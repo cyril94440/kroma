@@ -1,11 +1,13 @@
-import type { LinkPeer, LinkState, PeerFactory, Send, SendResult } from './voice-peer';
+import type { LinkPeer, LinkState, PeerFactory, Send } from './voice-peer';
 import type {
+  IceCandidate,
   IceServer,
   SessionDescription,
   SignalBody,
   SignalEvent,
 } from './voice-schemas';
 import { Negotiation } from './voice-negotiation';
+import { Outbox } from './voice-outbox';
 import { LINK_TIMING, Timers } from './voice-timing';
 
 export interface LinkDeps {
@@ -43,10 +45,13 @@ export class PeerLink {
   private current: LinkState = 'connecting';
   private closed = false;
   private inbox: Promise<void> = Promise.resolve();
+  private held: IceCandidate[] | null = null;
+  private readonly outbox: Outbox;
   private readonly timers = new Timers();
 
   constructor(private readonly deps: LinkDeps) {
     this.polite = deps.self > deps.remote;
+    this.outbox = new Outbox(deps.send, (body) => body.session !== (this.session ?? 'none'));
   }
 
   get state(): LinkState {
@@ -77,6 +82,7 @@ export class PeerLink {
 
   close(): void {
     this.closed = true;
+    this.outbox.close();
     this.timers.clearAll();
     this.token = null;
     this.peer?.close();
@@ -120,7 +126,7 @@ export class PeerLink {
     const peer = this.deps.createPeer(
       {
         onCandidate: (candidate) => {
-          if (live()) void this.post({ ...this.route(), kind: 'candidate', candidate });
+          if (live()) this.candidate(candidate);
         },
         onNegotiationNeeded: () => {
           if (live()) void this.negotiate(peer);
@@ -160,7 +166,7 @@ export class PeerLink {
       this.setState('failed');
       return;
     }
-    void this.post({ ...this.route(), kind: 'hello' });
+    this.post({ ...this.route(), kind: 'hello' });
   }
 
   private recover(): void {
@@ -178,21 +184,29 @@ export class PeerLink {
     this.rebuild();
   }
 
-  private async post(body: SignalBody): Promise<SendResult> {
-    let result = await this.deps.send(body);
-    for (const wait of LINK_TIMING.sendRetryMs) {
-      if (result !== 'failed' || this.closed) break;
-      await new Promise((done) => setTimeout(done, wait));
-      result = await this.deps.send(body);
-    }
-    return result;
+  private post(body: SignalBody): void {
+    void this.outbox.push(body);
+  }
+
+  private candidate(candidate: IceCandidate): void {
+    if (this.held) this.held.push(candidate);
+    else this.post({ ...this.route(), kind: 'candidate', candidate });
+  }
+
+  private release(): void {
+    const held = this.held ?? [];
+    this.held = null;
+    for (const candidate of held) this.post({ ...this.route(), kind: 'candidate', candidate });
   }
 
   private async negotiate(peer: LinkPeer): Promise<void> {
+    this.held ??= [];
     const offer = await this.negotiation.makeOffer(peer);
-    if (!offer || this.peer !== peer) return;
-    await this.post({ ...this.route(), kind: 'description', description: offer });
-    this.armOffer(peer, offer);
+    if (offer && this.peer === peer) {
+      this.post({ ...this.route(), kind: 'description', description: offer });
+      this.armOffer(peer, offer);
+    }
+    this.release();
   }
 
   private armOffer(peer: LinkPeer, offer: SessionDescription): void {
@@ -203,7 +217,7 @@ export class PeerLink {
         return;
       }
       this.offerResends += 1;
-      void this.post({ ...this.route(), kind: 'description', description: offer });
+      this.post({ ...this.route(), kind: 'description', description: offer });
       this.armOffer(peer, offer);
     });
   }
@@ -264,7 +278,9 @@ export class PeerLink {
     }
   }
 
-  private async onDescription(message: Extract<SignalEvent, { kind: 'description' }>): Promise<void> {
+  private async onDescription(
+    message: Extract<SignalEvent, { kind: 'description' }>,
+  ): Promise<void> {
     const description = message.description;
     if (message.session !== this.session) {
       if (!this.polite || description.type !== 'offer') return;
@@ -272,12 +288,14 @@ export class PeerLink {
     }
     const peer = this.peer;
     if (!peer) return;
+    if (description.type === 'offer') this.held ??= [];
     const applied = await this.negotiation.apply(peer, description, this.polite);
     if (this.peer !== peer) return;
     if (applied === 'accepted') this.timers.clear('offer');
     const answer = this.negotiation.answer;
     if ((applied === 'answered' || applied === 'resent') && answer) {
-      void this.post({ ...this.route(), kind: 'description', description: answer });
+      this.post({ ...this.route(), kind: 'description', description: answer });
     }
+    this.release();
   }
 }

@@ -54,7 +54,10 @@ impl Signal {
         match self.kind {
             SignalKind::Description => {
                 let d = self.description.as_ref().ok_or(VoiceError::BadSignal)?;
-                if self.candidate.is_some() || !matches!(d.kind.as_str(), "offer" | "answer") || d.sdp.is_empty() {
+                if self.candidate.is_some()
+                    || !matches!(d.kind.as_str(), "offer" | "answer")
+                    || d.sdp.is_empty()
+                {
                     return Err(VoiceError::BadSignal);
                 }
                 if d.sdp.len() > MAX_SDP_BYTES {
@@ -66,7 +69,10 @@ impl Signal {
                 if self.description.is_some() {
                     return Err(VoiceError::BadSignal);
                 }
-                if c.candidate.len() > MAX_CANDIDATE_BYTES || !short(&c.sdp_mid) || !short(&c.username_fragment) {
+                if c.candidate.len() > MAX_CANDIDATE_BYTES
+                    || !short(&c.sdp_mid)
+                    || !short(&c.username_fragment)
+                {
                     return Err(VoiceError::TooLarge);
                 }
             }

@@ -150,7 +150,7 @@ a fixed contract other modules code against; the others were added to them.
 
 | Method | Call | Answer |
 | --- | --- | --- |
-| `status` | `{}` | `{state, channel, provider, now, next, viewers: [{userId, name}], health: {sourceKbps, stutter, black, frozen}}` |
+| `status` | `{}` | `{state, channel, provider, now, next, viewers: [{userId, name}], health: {sourceKbps, stutter, black, frozen}, startedAt}`; `startedAt` is the ms epoch at which the current channel's stream started (`null` in standby), the same value as `GET /status` |
 | `resolve` | `{query, limit?, provider?: "primary"\|"backup"\|null}` | `{channels: [{id, name, group, score, now, provider, event?}]}`; a reference such as `p:3` resolves to its channel |
 | `switch` | `{channelId, requestedBy, reason}` | `{switched, channel, error}` |
 | `presence` | `{}` | `{viewers: [{userId, name, since}]}` |
@@ -160,10 +160,13 @@ a fixed contract other modules code against; the others were added to them.
 | `clipBufferInfo` | `{}` | `{fromMs, toMs}`, both `null` when the buffer is empty |
 | `clipCut` | `{fromMs, toMs, name}` | `{path, durationMs}`; `path` is under the published folder; `Err`: `invalidName`, `invalidWindow`, `outOfBuffer`, `cutFailed` |
 | `restart` | `{requestedBy, reason}` | `{restarted, error}`; `error`: `noChannel`, `standby`, `streamHealthy`, `recentRestart`, `channelChanged` |
-| `switchProvider` | `{provider, requestedBy, reason}` | `{switched, provider, error}`; `error`: `unknownProvider`, `noBackup`, `noChannel`, `alreadyOn`, `primaryDown`, `notFound`, `notWorking`, `busy`, `voteRequired` (a `live.proposal` is published) |
+| `switchProvider` | `{provider, channelId?, requestedBy, reason}` | `{switched, provider, error}`; `channelId` (`p:3`, `s:12`) names the exact channel of `provider` to go to instead of the best equivalent of the current one; it is probed once, then follows the same rule (alone or in trouble: at once, otherwise a vote). `error`: `unknownProvider`, `noBackup`, `noChannel`, `alreadyOn`, `primaryDown`, `notFound`, `notWorking`, `busy`, `voteRequired` (a `live.proposal` is published), and with `channelId` `unknownChannel` and `providerMismatch` |
 | `probe` | `{channelId}` | `{channelId, name, provider, alive, resolution, codec, audioCodec, fps, bitrateKbps, offAir, local, error}`; `error`: `unknownChannel`, `busy`, `liveAtThisProvider`, `standby`, `notReady` |
 | `benchmark` | `{channelIds, requestedBy}` | `{status: "started"\|"refused", id, reason, total, alreadyDone}`; `reason`: `unknownChannel`, `mixedProviders`, `noChannel`, `scanRunning` |
-| `scanResult` | `{}` | the last scan: `{id, query, running, provider, items, total}` |
+| `scanResult` | `{}` | the last scan: `{id, query, running, provider, items, total}`; each item is `{number, id, name, ok, black, still, frame, frames, error, now, at}`, `at` being the ms epoch at which its capture ended |
+| `scanFrame` | `{path}` | `{jpegBase64}`; `path` is a `frame` or `frames` value of the last `scanResult`, nothing else; `Err`: `invalidPath`, `notFound`, `tooLarge` (over 1 MiB) |
+| `clipList` | `{}` | `{paths}`, the `path` of every clip still on disk, as `clipCut` returned it |
+| `clipDelete` | `{path}` | `{deleted}` (`false` when the clip was already gone), the clip's folder is removed with it; `Err`: `invalidPath` for anything but a `clipCut` path |
 | `history` | `{limit?}` | `{stepSeconds, points, providerEvents}`, the last `limit` points (360 by default, 1080 at most) |
 
 The JSON of every method is pinned by a test (`src/it_points.rs`, `src/it_ops.rs`).

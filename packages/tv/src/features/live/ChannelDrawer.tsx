@@ -1,6 +1,6 @@
 import type { ChannelView } from '@kromatv/client/live';
 import { useT } from '@kromatv/ui';
-import { Drawer, FocusColumn, ListRow, Text } from '@kromatv/ui/kit';
+import { Drawer, FocusColumn, ListRow, styles, Text, useStyles } from '@kromatv/ui/kit';
 import { useChannelList } from '#tv/features/live/useChannelList';
 import { useClient } from '#tv/app/router';
 
@@ -31,6 +31,8 @@ function ChannelRow({
   );
 }
 
+const sDefinition = styles({ column: { gap: 12 } });
+
 /** The channel list a zap starts from: the quick-access channels first, then
  *  every channel a page at a time. Choosing one hands it to `onPick`. */
 export function ChannelDrawer({
@@ -44,6 +46,7 @@ export function ChannelDrawer({
   onClose: () => void;
   onPick: (channel: ChannelView) => void;
 }>) {
+  const s = useStyles(sDefinition);
   const t = useT();
   const client = useClient();
   const list = useChannelList(client, open);
@@ -52,7 +55,7 @@ export function ChannelDrawer({
   return (
     <Drawer.Root open={open} onClose={onClose} title={t('live.channels')} width="md" floating>
       <Drawer.Panel>
-        <FocusColumn>
+        <FocusColumn style={s.column}>
           {list.favourites.length > 0 ? (
             <Text variant="overlineTv" color="accentText">
               {t('live.favourites')}

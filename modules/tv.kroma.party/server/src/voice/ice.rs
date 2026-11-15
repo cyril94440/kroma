@@ -14,7 +14,7 @@ const VALID_FOR_MS: i64 = MINT_TTL_S as i64 * 1000;
 const RETRY_AFTER_FAILURE_MS: i64 = 60_000;
 const MINT_SECONDS: u32 = 8;
 const MINT_BYTES: u64 = 64 * 1024;
-const PURPOSE: &str = "voice.turn";
+const PURPOSE: &str = "turn";
 const MAX_SERVERS: usize = 8;
 const SCHEMES: [&str; 4] = ["stun:", "stuns:", "turn:", "turns:"];
 
@@ -55,7 +55,10 @@ struct Minted {
 
 impl TurnSource for CloudflareTurn {
     fn mint(&self, key_id: &str, api_token: &str, ttl_s: u32) -> Result<Vec<IceServer>> {
-        if !key_id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+        if !key_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        {
             bail!("the key id is not a plain identifier");
         }
         let url = format!("https://rtc.live.cloudflare.com/v1/turn/keys/{key_id}/credentials/generate-ice-servers");
@@ -120,17 +123,30 @@ fn static_servers(host: &dyn HostCtx) -> Vec<IceServer> {
     let mut servers = Vec::new();
     let stun = urls(&host.config_str("voiceStunUrls", DEFAULT_STUN));
     if !stun.is_empty() {
-        servers.push(IceServer { urls: stun, username: None, credential: None });
+        servers.push(IceServer {
+            urls: stun,
+            username: None,
+            credential: None,
+        });
     }
     let turn = urls(&host.config_str("voiceTurnUrls", ""));
     if !turn.is_empty() {
         let text = |key: &str| Some(host.config_str(key, "")).filter(|v| !v.is_empty());
-        servers.push(IceServer { urls: turn, username: text("voiceTurnUsername"), credential: text("voiceTurnCredential") });
+        servers.push(IceServer {
+            urls: turn,
+            username: text("voiceTurnUsername"),
+            credential: text("voiceTurnCredential"),
+        });
     }
     servers
 }
 
-fn minted(host: &dyn HostCtx, turn: &dyn TurnSource, cache: &Mutex<IceCache>, now: i64) -> Option<Vec<IceServer>> {
+fn minted(
+    host: &dyn HostCtx,
+    turn: &dyn TurnSource,
+    cache: &Mutex<IceCache>,
+    now: i64,
+) -> Option<Vec<IceServer>> {
     let key_id = host.config_str("voiceCloudflareKeyId", "");
     let token = host.config_str("voiceCloudflareApiToken", "");
     if key_id.trim().is_empty() || token.trim().is_empty() {
@@ -153,7 +169,9 @@ fn minted(host: &dyn HostCtx, turn: &dyn TurnSource, cache: &Mutex<IceCache>, no
             Some(servers)
         }
         Err(_) => {
-            tracing::warn!("turn credentials could not be minted, falling back to the configured servers");
+            tracing::warn!(
+                "turn credentials could not be minted, falling back to the configured servers"
+            );
             held.retry_at = now + RETRY_AFTER_FAILURE_MS;
             held.usable(now)
         }
@@ -163,6 +181,11 @@ fn minted(host: &dyn HostCtx, turn: &dyn TurnSource, cache: &Mutex<IceCache>, no
 /// The ICE servers a participant hands to `RTCPeerConnection`. Time-limited
 /// Cloudflare credentials win over a static list, a failed mint falls back to
 /// the static list (or STUN alone), and none of it is ever logged.
-pub fn ice_servers(host: &dyn HostCtx, turn: &dyn TurnSource, cache: &Mutex<IceCache>, now: i64) -> Vec<IceServer> {
+pub fn ice_servers(
+    host: &dyn HostCtx,
+    turn: &dyn TurnSource,
+    cache: &Mutex<IceCache>,
+    now: i64,
+) -> Vec<IceServer> {
     minted(host, turn, cache, now).unwrap_or_else(|| static_servers(host))
 }

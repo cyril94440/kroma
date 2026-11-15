@@ -24,7 +24,8 @@ async fn the_status_point_answers_exactly_the_fixed_contract() {
         reply,
         json!({ "Ok": {
             "state": "paused", "channel": null, "provider": "primary", "now": null, "next": null, "viewers": [],
-            "health": { "sourceKbps": 0.0, "stutter": false, "black": false, "frozen": false }
+            "health": { "sourceKbps": 0.0, "stutter": false, "black": false, "frozen": false },
+            "startedAt": null
         } })
     );
 }
@@ -46,6 +47,9 @@ async fn the_status_point_names_who_watches_and_what_is_on() {
     assert_eq!(ok["next"]["title"], "Film du soir");
     assert!(ok["now"]["start"].as_i64().unwrap() % 1000 == 0 && ok["now"]["end"].as_i64() > ok["now"]["start"].as_i64());
     assert_eq!(ok["viewers"], json!([{ "userId": "u1", "name": "Ann" }]));
+    let started = ok["startedAt"].as_i64().unwrap();
+    assert!(started > 1_700_000_000_000 && started <= crate::runtime::now_ms());
+    assert_eq!(started, rig.live.status().started_at.unwrap());
     rig.live.shutdown();
 }
 

@@ -15,6 +15,7 @@ mod libraries;
 mod llm;
 mod logs;
 mod modules;
+mod modules_config;
 mod network;
 mod notifications;
 mod pipeline;

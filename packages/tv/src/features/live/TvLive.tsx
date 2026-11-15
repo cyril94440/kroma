@@ -120,7 +120,7 @@ export function TvLive<E extends LiveEngine>({
       <Player.Root controller={controller} flags={flags} title={title} onClose={nav.back}>
         <Player.Title>{title}</Player.Title>
         {subtitle ? <Player.Subtitle>{subtitle}</Player.Subtitle> : null}
-        {badge ? <Player.Warning>{t(`live.${badge}`)}</Player.Warning> : null}
+        {badge ? <Player.Warning>{t(`live.badge.${badge}`)}</Player.Warning> : null}
         <Player.Actions>
           <Button icon="list" label={t('live.channels')} variant="scrim" onPress={() => setPanel('channels')} />
           {modules.party ? (

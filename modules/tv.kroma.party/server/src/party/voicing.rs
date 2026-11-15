@@ -24,7 +24,10 @@ impl Party {
 
     fn voice_emit(&self, topic: &str, payload: Value) {
         #[cfg(test)]
-        self.tap.lock().unwrap().push((None, topic.to_string(), payload.clone()));
+        self.tap
+            .lock()
+            .unwrap()
+            .push((None, topic.to_string(), payload.clone()));
         self.host.publish(Event::new(topic, payload));
     }
 
@@ -60,7 +63,13 @@ impl Party {
         })
     }
 
-    pub fn voice_join(&self, who: &Actor, device_id: &str, muted: bool, watching: bool) -> Result<Value, VoiceError> {
+    pub fn voice_join(
+        &self,
+        who: &Actor,
+        device_id: &str,
+        muted: bool,
+        watching: bool,
+    ) -> Result<Value, VoiceError> {
         let now = self.now();
         let joined = self.voice_room().join(
             &JoinRequest {
@@ -142,8 +151,14 @@ impl Party {
     pub fn voice_signal(&self, user_id: &str, signal: &Signal) -> Result<u64, VoiceError> {
         signal.validate()?;
         let now = self.now();
-        let relay = self.voice_room().relay(user_id, &signal.from, &signal.to, now)?;
-        self.emit_to(&relay.to_user, "party.voice.signal", signal.payload(user_id, relay.n));
+        let relay = self
+            .voice_room()
+            .relay(user_id, &signal.from, &signal.to, now)?;
+        self.emit_to(
+            &relay.to_user,
+            "party.voice.signal",
+            signal.payload(user_id, relay.n),
+        );
         Ok(relay.n)
     }
 
@@ -154,7 +169,9 @@ impl Party {
             .present
             .as_ref()
             .map(|viewers| viewers.iter().map(|v| v.user_id.clone()).collect());
-        let removed = self.voice_room().expire(now, present.as_ref(), self.grace_ms());
+        let removed = self
+            .voice_room()
+            .expire(now, present.as_ref(), self.grace_ms());
         if !removed.is_empty() {
             tracing::info!(count = removed.len(), "voice participants expired");
         }

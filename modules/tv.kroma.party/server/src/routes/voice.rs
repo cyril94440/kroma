@@ -31,7 +31,9 @@ where
 
 fn refusal(error: VoiceError) -> Response {
     let status = match error {
-        VoiceError::BadDevice | VoiceError::SelfSignal | VoiceError::BadSignal => StatusCode::BAD_REQUEST,
+        VoiceError::BadDevice | VoiceError::SelfSignal | VoiceError::BadSignal => {
+            StatusCode::BAD_REQUEST
+        }
         VoiceError::Full => StatusCode::CONFLICT,
         VoiceError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
         VoiceError::NotJoined | VoiceError::PeerGone => StatusCode::NOT_FOUND,
