@@ -56,9 +56,11 @@ fn refusal(reason: &str) -> Value {
     json!({ "status": "refus", "raison": reason })
 }
 
-fn candidates(env: &mut ToolEnv, args: &Value, refs: &[String], query: &str) -> Result<(Vec<(String, String, String)>, String), Value> {
+type Found = Vec<(String, String, String)>;
+
+fn candidates(env: &mut ToolEnv, args: &Value, refs: &[String], query: &str) -> Result<(Found, String), Value> {
     if !refs.is_empty() {
-        let mut found: Vec<(String, String, String)> = Vec::new();
+        let mut found: Found = Vec::new();
         for reference in refs {
             let unknown = || json!({ "error": format!("référence inconnue : {reference} (scan trop ancien ?)") });
             let id = channel_ref(env, reference).ok_or_else(unknown)?;

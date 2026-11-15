@@ -117,7 +117,7 @@ fn summarise(events: &[Value]) -> Value {
                     None => counts.push((key, 1)),
                 }
             }
-            counts.sort_by(|a, b| b.1.cmp(&a.1));
+            counts.sort_by_key(|c| std::cmp::Reverse(c.1));
             json!({ "pseudo": name, "appareil": list.last().map(|e| text_of(e, "device")), "evenements": list.len(), "detail": counts.into_iter().take(8).map(|(k, n)| json!({ "evenement": k, "nombre": n })).collect::<Vec<_>>() })
         })
         .collect()

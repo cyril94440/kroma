@@ -203,7 +203,7 @@ fn find_program(env: &mut ToolEnv, args: &Value) -> Value {
         env.deps.audit("decisions", "find_program_foreign_only", json!({ "query": query, "channel": channel, "programme": title }));
         return json!({
             "ok": false, "status": "seulement_etranger", "programme": title, "chaine_etrangere": channel, "debut": clock_label(start),
-            "consigne": "Le guide ne trouve ce programme QUE sur une chaîne étrangère. Règle de la famille : diffuseur FRANÇAIS d'abord. Cherche-le en France (web_search « <programme> diffusion TV France », puis search_guide avec les noms français) ; seulement s'il n'existe aucune diffusion française : find_program(query, etrangere_ok=true), en disant que c'est une chaîne étrangère.",
+            "consigne": "Le guide ne trouve ce programme QUE sur une chaîne étrangère. Règle de la famille : diffuseur FRANÇAIS d'abord. Cherche-le en France (web_search « <programme> diffusion TV France », puis search_guide avec les noms français, ou benchmark_channels(query=<famille>, cherche='<A> - <B>') pour un multiplex sans guide) ; seulement s'il n'existe aucune diffusion française : find_program(query, etrangere_ok=true), en disant que c'est une chaîne étrangère.",
         });
     }
     if !live.is_empty() {
@@ -251,6 +251,6 @@ fn find_program(env: &mut ToolEnv, args: &Value) -> Value {
     }
     json!({
         "ok": false, "status": "not_found",
-        "suite_possible": "un multiplex (Ligue1+, DAZN…) n'a pas de guide : web_search pour savoir où passe le match, puis list_channels pour retrouver la chaîne",
+        "suite_possible": "un multiplex (Ligue1+, DAZN…) n'a pas de guide : web_search pour savoir où passe le match, puis benchmark_channels(query=<famille>, cherche='<équipe A> - <équipe B>') pour le retrouver à l'image (ou list_channels pour la chaîne)",
     })
 }

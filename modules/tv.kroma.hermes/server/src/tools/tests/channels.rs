@@ -66,7 +66,7 @@ fn force_is_forwarded_and_a_vote_instead_of_a_forced_switch_is_explained() {
 
     let out = call(&rig, "change_channel", json!({ "query": "m6", "force": true }), "Mamie");
 
-    assert_eq!(rig.room.switch_asks.lock().unwrap()[0].1, true);
+    assert!(rig.room.switch_asks.lock().unwrap()[0].1);
     assert_eq!(out["status"], "vote_open");
     assert!(out["note"].as_str().unwrap().contains("force"));
 }

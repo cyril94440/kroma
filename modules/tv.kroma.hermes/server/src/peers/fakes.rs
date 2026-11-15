@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 
 use super::{Contributors, ExternalTool, KickOutcome, Room, RoomMessage, SwitchAsk, SwitchOutcome};
 
+pub type LogsAsk = (Option<String>, u32, Option<u32>);
 pub type PollCall = (String, String, Vec<String>, Option<i64>);
 pub type ExternalCall = (String, String, Value, String, String);
 
@@ -24,7 +25,7 @@ pub struct FakeRoom {
     pub go_live_reply: Mutex<Option<Result<Value, String>>>,
     pub fine_sync_reply: Mutex<Option<Result<Value, String>>>,
     pub logs_reply: Mutex<Option<Result<Vec<Value>, String>>>,
-    pub logs_asks: Mutex<Vec<(Option<String>, u32, Option<u32>)>>,
+    pub logs_asks: Mutex<Vec<LogsAsk>>,
     pub party_calls: Mutex<Vec<(String, String)>>,
     pub switch_reply: Mutex<Option<SwitchOutcome>>,
     pub polls: Mutex<Vec<PollCall>>,
