@@ -158,5 +158,6 @@
   "party.voice.error.unavailable": "Le micro n'est pas disponible pour le moment.",
   "party.voice.error.full": "La voix est pleine.",
   "party.voice.error.rateLimited": "Trop d'essais. Patientez un instant et réessayez.",
-  "party.voice.error.failed": "Impossible de rejoindre la voix. Réessayez."
+  "party.voice.error.failed": "Impossible de rejoindre la voix. Réessayez.",
+  "party.voice.speaking": "parle"
 }

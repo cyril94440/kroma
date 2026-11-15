@@ -134,8 +134,8 @@ fn leaving_removes_the_participant_and_leaving_twice_is_harmless() {
     let mut room = room();
     let peer = join(&mut room, "mamie", "device-aaaa");
 
-    let first = room.leave("mamie", &peer);
-    let second = room.leave("mamie", &peer);
+    let first = room.leave("mamie", &peer, false, T0);
+    let second = room.leave("mamie", &peer, false, T0);
 
     assert_eq!((first, second), (Ok(true), Ok(false)));
     assert!(room.members().is_empty());
@@ -146,7 +146,7 @@ fn nobody_can_make_another_account_leave() {
     let mut room = room();
     let peer = join(&mut room, "mamie", "device-aaaa");
 
-    let refused = room.leave("papi", &peer);
+    let refused = room.leave("papi", &peer, false, T0);
 
     assert_eq!(refused, Err(VoiceError::Forbidden));
     assert_eq!(room.members().len(), 1);
@@ -301,7 +301,7 @@ fn a_signal_to_a_peer_that_left_says_peer_gone() {
     let mut room = room();
     let mamie = join(&mut room, "mamie", "device-aaaa");
     let papi = join(&mut room, "papi", "device-bbbb");
-    room.leave("papi", &papi).unwrap();
+    room.leave("papi", &papi, false, T0).unwrap();
 
     assert_eq!(
         room.relay("mamie", &mamie, &papi, T0),
@@ -391,4 +391,23 @@ fn speaking_is_rate_limited_but_silence_always_goes_through() {
     assert_eq!(accepted, 10);
     assert!(silence.is_ok());
     assert!(room.speaking(T0).is_empty());
+}
+
+#[test]
+fn a_quiet_leave_followed_by_a_return_within_the_grace_is_not_announced() {
+    let mut room = room();
+    let peer = join(&mut room, "mamie", "device-aaaa");
+    room.leave("mamie", &peer, true, T0).unwrap();
+
+    let soon = room
+        .join(&request("mamie", "device-aaaa"), T0 + 60_000)
+        .unwrap();
+    room.leave("mamie", &soon.peer_id, true, T0 + 61_000)
+        .unwrap();
+    let late = room
+        .join(&request("mamie", "device-aaaa"), T0 + 300_000)
+        .unwrap();
+
+    assert!(!soon.announce);
+    assert!(late.announce);
 }

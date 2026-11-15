@@ -46,7 +46,7 @@ async fn the_live_operation_calls_send_the_pinned_json_and_read_the_pinned_repli
             ("switchProvider", Ok(json!({ "switched": false, "provider": "backup", "error": "voteRequired" }))),
             ("probe", Ok(json!({ "channelId": "p:2", "name": "CANAL+", "provider": "primary", "alive": true, "resolution": "1920x1080", "codec": "H264", "audioCodec": "AAC", "fps": 25.0, "bitrateKbps": 5120.5, "offAir": false, "local": false, "error": null }))),
             ("benchmark", Ok(json!({ "status": "started", "id": "4", "reason": null, "total": 2, "alreadyDone": false }))),
-            ("scanResult", Ok(json!({ "id": "4", "query": "ligue1+", "running": false, "provider": "backup", "total": 2, "items": [{ "number": 3, "id": "s:3", "name": "LIGUE1+ 3", "ok": true, "black": false, "still": true, "frame": "scan-4/f_02.jpg", "frames": ["scan-4/f_01.jpg", "scan-4/f_02.jpg"], "error": null, "now": "Lens - Paris FC" }] }))),
+            ("scanResult", Ok(json!({ "id": "4", "query": "ligue1+", "running": false, "provider": "backup", "total": 2, "items": [{ "number": 3, "id": "s:3", "name": "LIGUE1+ 3", "ok": true, "black": false, "still": true, "frame": "scan-4/f_02.jpg", "frames": ["scan-4/f_01.jpg", "scan-4/f_02.jpg"], "error": null, "now": "Lens - Paris FC", "at": 1_794_000_123_000_i64 }] }))),
             ("history", Ok(json!({ "stepSeconds": 10, "points": [{ "at": 1_794_000_000, "kbps": 4100, "channel": "TF1", "provider": "primary", "health": "healthy", "loss": 0.5, "frozen": false, "black": false, "restarts": 2, "paused": false }], "providerEvents": [{ "kind": "failover", "at": 5 }] }))),
             ("scanFrame", Ok(json!({ "jpegBase64": "/9j/AA==" }))),
         ],
@@ -56,7 +56,7 @@ async fn the_live_operation_calls_send_the_pinned_json_and_read_the_pinned_repli
     let out = blocking(move || {
         (
             control.restart("u1", "gel").unwrap(),
-            control.switch_provider("backup", "u1", "saccades").unwrap(),
+            control.switch_provider("backup", None, "u1", "saccades").unwrap(),
             control.probe("p:2").unwrap(),
             control.benchmark(&["s:3".into(), "s:4".into()], "u1").unwrap(),
             control.scan_result().unwrap(),
@@ -69,7 +69,7 @@ async fn the_live_operation_calls_send_the_pinned_json_and_read_the_pinned_repli
     assert_eq!(out.1, ProviderSwitch { switched: false, provider: "backup".into(), error: Some("voteRequired".into()) });
     assert_eq!((out.2.name.as_str(), out.2.audio_codec.as_deref(), out.2.bitrate_kbps, out.2.alive), ("CANAL+", Some("AAC"), Some(5120.5), true));
     assert_eq!(out.3, BenchmarkStart { status: "started".into(), id: Some("4".into()), reason: None, total: 2, already_done: false });
-    assert_eq!((out.4.items[0].frames.len(), out.4.items[0].still, out.4.items[0].now.as_deref(), out.4.provider.as_deref()), (2, true, Some("Lens - Paris FC"), Some("backup")));
+    assert_eq!((out.4.items[0].at, out.4.items[0].frames.len(), out.4.items[0].still, out.4.items[0].now.as_deref(), out.4.provider.as_deref()), (1_794_000_123_000, 2, true, Some("Lens - Paris FC"), Some("backup")));
     assert_eq!((out.5.points[0].kbps, out.5.points[0].restarts, out.5.provider_events.len()), (4100.0, 2, 1));
     assert_eq!(out.6, "/9j/AA==");
     let calls = sent(&seen);
@@ -80,6 +80,29 @@ async fn the_live_operation_calls_send_the_pinned_json_and_read_the_pinned_repli
     assert_eq!(calls["scanResult"], json!({}));
     assert_eq!(calls["history"], json!({ "limit": 60 }));
     assert_eq!(calls["scanFrame"], json!({ "path": "scan-4/f_02.jpg" }));
+}
+
+#[tokio::test]
+async fn a_provider_switch_names_the_channel_only_when_there_is_one() {
+    let (host, seen) = answer(CONTROL, vec![("switchProvider", Ok(json!({ "switched": false, "provider": "backup", "error": "providerMismatch" })))]).await;
+    let control = PeerControl::new(host);
+
+    let out = blocking(move || (control.switch_provider("backup", Some("s:12"), "u1", "même match").unwrap(), control.switch_provider("backup", None, "u1", "").unwrap())).await;
+
+    assert_eq!(out.0.error.as_deref(), Some("providerMismatch"));
+    let bodies: Vec<Value> = seen.lock().unwrap().iter().map(|(_, b)| b.clone()).collect();
+    assert_eq!(bodies[0], json!({ "provider": "backup", "channelId": "s:12", "requestedBy": "u1", "reason": "même match" }));
+    assert_eq!(bodies[1], json!({ "provider": "backup", "requestedBy": "u1", "reason": "" }));
+}
+
+#[tokio::test]
+async fn a_scan_item_without_a_capture_time_reads_as_zero() {
+    let (host, _) = answer(CONTROL, vec![("scanResult", Ok(json!({ "id": "1", "items": [{ "id": "p:1", "name": "TF1", "ok": true }] })))]).await;
+    let control = PeerControl::new(host);
+
+    let state = blocking(move || control.scan_result().unwrap()).await;
+
+    assert_eq!(state.items[0].at, 0);
 }
 
 #[tokio::test]

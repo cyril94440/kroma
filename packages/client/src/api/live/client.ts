@@ -33,8 +33,7 @@ export default function liveApi(ctx: RequestContext) {
     favourites: () => api.get(LIVE_ROUTES.favourites, Favourites),
     beat: (companion = false) => api.post(LIVE_ROUTES.presence, { companion }, BeatAnswer),
     leave: () => api.beacon(LIVE_ROUTES.leave),
-    switchTo: (channelId: string) =>
-      api.post(LIVE_ROUTES.switchTo, { channelId }, SwitchOutcome),
+    switchTo: (channelId: string) => api.post(LIVE_ROUTES.switchTo, { channelId }, SwitchOutcome),
     playlistUrl: (playlist: string) => modulesApi(ctx).fileUrl(LIVE_MODULE, playlist),
   };
 }

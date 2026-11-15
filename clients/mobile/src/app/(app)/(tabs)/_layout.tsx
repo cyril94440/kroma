@@ -1,8 +1,11 @@
+import { useLiveModules } from '@kromatv/core/react';
 import { Icon, type IconName, useTheme } from '@kromatv/ui/kit';
 import { type BottomTabBarProps, Tabs } from 'expo-router/js-tabs';
 import type { ColorValue } from 'react-native';
 import { PillTabBar } from '#mobile/components/PillTabBar';
+import { tabOptions } from '#mobile/lib/hiddenTab';
 import { useT } from '#mobile/lib/i18n';
+import { useClient } from '#mobile/lib/session';
 
 const renderTabBar = (props: BottomTabBarProps) => <PillTabBar {...props} />;
 
@@ -11,6 +14,7 @@ const TABS = [
   { name: 'search', icon: 'search', title: 'nav.search' },
   { name: 'films', icon: 'movie', title: 'nav.films' },
   { name: 'series', icon: 'device-tv', title: 'nav.series' },
+  { name: 'live', icon: 'broadcast', title: 'nav.live' },
   { name: 'mylist', icon: 'bookmark', title: 'nav.myList' },
   { name: 'profile', icon: 'user-circle', title: 'nav.account' },
 ] as const satisfies readonly { name: string; icon: IconName; title: string }[];
@@ -27,6 +31,7 @@ const SCREENS = TABS.map((tab) => ({
 export default function TabsLayout() {
   const t = useT();
   const theme = useTheme();
+  const { modules } = useLiveModules(useClient());
   return (
     <Tabs
       tabBar={renderTabBar}
@@ -36,7 +41,15 @@ export default function TabsLayout() {
       }}
     >
       {SCREENS.map(({ name, title, tabBarIcon }) => (
-        <Tabs.Screen key={name} name={name} options={{ title: t(title), tabBarIcon }} />
+        <Tabs.Screen
+          key={name}
+          name={name}
+          options={{
+            title: t(title),
+            tabBarIcon,
+            ...tabOptions(name !== 'live' || modules.live),
+          }}
+        />
       ))}
     </Tabs>
   );

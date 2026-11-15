@@ -1,6 +1,8 @@
 import type { ChatMessage } from '@kromatv/client/party';
 import { useT } from '@kromatv/ui';
-import { Box, Drawer, FocusColumn, ListRow, Text } from '@kromatv/ui/kit';
+import { Box, Drawer, FocusColumn, ListRow, styles, Text, useStyles } from '@kromatv/ui/kit';
+
+const sDefinition = styles({ column: { gap: 14 } });
 
 const REPLIES = ['live.reply.yes', 'live.reply.no', 'live.reply.nice', 'live.reply.zap'] as const;
 
@@ -32,8 +34,9 @@ export function ChatDrawer({
   onClose: () => void;
   onReply: (text: string) => void;
 }>) {
+  const s = useStyles(sDefinition);
   const t = useT();
-  const shown = messages.filter((message) => message.text !== '').slice(-12);
+  const shown = messages.filter((message) => message.text !== '').slice(-8);
   return (
     <Drawer.Root open={open} onClose={onClose} title={t('live.chat')} width="lg" floating>
       <Drawer.Panel>
@@ -51,7 +54,7 @@ export function ChatDrawer({
         </Box>
       </Drawer.Panel>
       <Drawer.Footer>
-        <FocusColumn>
+        <FocusColumn style={s.column}>
           <Text variant="overlineTv" color="accentText">
             {t('live.quickReplies')}
           </Text>

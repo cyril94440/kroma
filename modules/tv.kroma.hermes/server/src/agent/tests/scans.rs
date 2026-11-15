@@ -12,7 +12,7 @@ pub fn backup(id: &str, name: &str) -> Candidate {
 
 pub fn item(number: u32, id: &str, black: bool, error: Option<&str>) -> ScanItem {
     let ok = !black && error.is_none();
-    ScanItem { number: Some(number), id: id.into(), name: format!("|FR| LIGUE1+ {number}"), ok, black, still: false, frame: ok.then(|| format!("scan-1/{number}.jpg")), frames: if ok { vec![format!("scan-1/{number}.jpg")] } else { Vec::new() }, error: error.map(str::to_string), now: None }
+    ScanItem { number: Some(number), id: id.into(), name: format!("|FR| LIGUE1+ {number}"), ok, black, still: false, frame: ok.then(|| format!("scan-1/{number}.jpg")), frames: if ok { vec![format!("scan-1/{number}.jpg")] } else { Vec::new() }, error: error.map(str::to_string), now: None, at: 0 }
 }
 
 pub fn state(running: bool, items: Vec<ScanItem>) -> ScanState {
@@ -116,6 +116,7 @@ fn at_most_two_scans_per_message() {
 fn a_refused_provider_then_a_scan_then_the_right_channel_ends_in_one_vote() {
     let rig = rig_with_backup();
     *rig.control.provider.lock().unwrap() = Some(Ok(ProviderSwitch { switched: false, provider: "backup".into(), error: Some("notWorking".into()) }));
+    *rig.control.channel_provider.lock().unwrap() = Some(Ok(ProviderSwitch { switched: false, provider: "backup".into(), error: Some("voteRequired".into()) }));
     *rig.control.scans.lock().unwrap() = vec![state(false, vec![item(1, "s:1", false, None)])];
     frames(&rig, &[1]);
     live_picture(&rig);
@@ -133,7 +134,9 @@ fn a_refused_provider_then_a_scan_then_the_right_channel_ends_in_one_vote() {
     assert_eq!(fin(&rig), "terminal");
     assert_eq!(result_of(&model, 0, 0)["status"], "dead", "the failure comes back to the model instead of closing the turn");
     assert_eq!(result_of(&model, 1, 0)["groupes"][0]["meme_que_direct"], "oui");
-    assert_eq!(rig.room.switches.lock().unwrap().len(), 1);
-    assert_eq!(rig.room.switches.lock().unwrap()[0].0, "s:1");
-    assert!(rig.room.switches.lock().unwrap()[0].2.contains("même match vérifié à l'image"));
+    let asks = rig.control.provider_asks.lock().unwrap();
+    assert_eq!(asks.len(), 2);
+    assert_eq!((asks[1].0.as_str(), asks[1].1.as_deref()), ("backup", Some("s:1")));
+    assert!(asks[1].2.contains("même match vérifié à l'image"));
+    assert!(rig.room.switches.lock().unwrap().is_empty());
 }

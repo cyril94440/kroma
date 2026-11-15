@@ -141,11 +141,12 @@ impl Follow {
     fn judge(&mut self, deps: &Deps) {
         let reference = self.reference.as_ref().filter(|r| matching::has_teams(&r.reading) && r.reading.confidence >= matching::CONF_MIN);
         let target = (!self.job.search.is_empty()).then(|| matching::target_from_text(&self.job.search));
-        let captured_at = (self.job.started_at + self.finished_at) / 2;
+        let midpoint = (self.job.started_at + self.finished_at) / 2;
+        let captured: Vec<i64> = self.state.items.iter().map(|item| if item.at > 0 { item.at } else { midpoint }).collect();
         for row in self.rows.iter_mut().filter(|r| r.state == RowState::Ok) {
             let Some(reading) = row.reading.clone() else { continue };
             if let Some(reference) = reference {
-                let dt = (captured_at - reference.at) as f64 / 1000.0;
+                let dt = (captured[row.index] - reference.at) as f64 / 1000.0;
                 let (verdict, why) = matching::decide(&reference.reading, &reading, dt);
                 row.verdict = Some(verdict);
                 row.why = why;

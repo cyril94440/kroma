@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LiveListeners } from '#tv/features/live/engine/liveEngine';
+import { fakeLiveListeners } from '#tv/features/live/engine/liveEngine.fixture';
 import { ExpoLiveEngine } from './ExpoLiveEngine';
 
 const { players, FakePlayer } = vi.hoisted(() => {
@@ -55,19 +55,7 @@ vi.mock('expo-video', () => ({
   },
 }));
 
-function listeners(): LiveListeners & Record<keyof LiveListeners, ReturnType<typeof vi.fn>> {
-  return {
-    onPlay: vi.fn(),
-    onPause: vi.fn(),
-    onWaiting: vi.fn(),
-    onPlaying: vi.fn(),
-    onReady: vi.fn(),
-    onError: vi.fn(),
-    onLost: vi.fn(),
-    onAspect: vi.fn(),
-    onSurfaceChange: vi.fn(),
-  };
-}
+const listeners = fakeLiveListeners;
 
 beforeEach(() => {
   players.length = 0;

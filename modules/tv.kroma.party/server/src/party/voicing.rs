@@ -83,7 +83,7 @@ impl Party {
             now,
         )?;
         tracing::info!(replaced = joined.replaced.is_some(), "voice join");
-        if joined.replaced.is_none() {
+        if joined.announce {
             self.say_voice("party.voice.joined", &who.person.name);
         }
         self.voice_announce(true);
@@ -111,12 +111,15 @@ impl Party {
         Ok(json!({ "iceServers": self.voice_ice_servers() }))
     }
 
-    pub fn voice_leave(&self, user_id: &str, peer_id: &str) -> Result<(), VoiceError> {
+    pub fn voice_leave(&self, user_id: &str, peer_id: &str, quiet: bool) -> Result<(), VoiceError> {
         let name = self.voice_room().find(peer_id).map(|p| p.name.clone());
-        let left = self.voice_room().leave(user_id, peer_id)?;
+        let now = self.now();
+        let left = self.voice_room().leave(user_id, peer_id, quiet, now)?;
         if let (true, Some(name)) = (left, name) {
             tracing::info!("voice leave");
-            self.say_voice("party.voice.left", &name);
+            if !quiet {
+                self.say_voice("party.voice.left", &name);
+            }
             self.voice_announce(true);
         }
         Ok(())

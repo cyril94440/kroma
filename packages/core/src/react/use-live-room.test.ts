@@ -35,13 +35,26 @@ function fixture() {
     leave: vi.fn(),
   };
   const party = { state: vi.fn(async () => PARTY) };
-  const sport = { state: vi.fn(async () => { throw new Error('absent'); }) };
+  const sport = {
+    state: vi.fn(async () => {
+      throw new Error('absent');
+    }),
+  };
   const client = { live, party, sport } as unknown as LiveClient;
   const openEvents = vi.fn((next: EventHandlers) => {
     handlers = next;
     return closed;
   });
-  return { client, live, party, sport, openEvents, closed, emit: (e: { type: string }) => handlers?.onEvent(e), reopen: () => handlers?.onOpen() };
+  return {
+    client,
+    live,
+    party,
+    sport,
+    openEvents,
+    closed,
+    emit: (e: { type: string }) => handlers?.onEvent(e),
+    reopen: () => handlers?.onOpen(),
+  };
 }
 
 const ON = { live: true, party: true, sport: false };
@@ -72,7 +85,8 @@ describe('a live screen', () => {
   it('announces presence every beat and says goodbye when it stops watching', async () => {
     const f = fixture();
     const { rerender, unmount } = renderHook(
-      ({ watching }) => useLiveRoom({ client: f.client, openEvents: f.openEvents, modules: ON, watching }),
+      ({ watching }) =>
+        useLiveRoom({ client: f.client, openEvents: f.openEvents, modules: ON, watching }),
       { initialProps: { watching: true } },
     );
     await act(async () => {

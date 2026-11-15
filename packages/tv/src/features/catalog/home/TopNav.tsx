@@ -67,7 +67,11 @@ export function TvTopNav({ active }: Readonly<{ active?: NavKey }>) {
             <KromaMark size={28} />
           </Box>
         </FocusSlot>
-        <NavPill.Root key={entries.map((entry) => entry.key).join()} size="tv" label={t('nav.menu')}>
+        <NavPill.Root
+          key={entries.map((entry) => entry.key).join()}
+          size="tv"
+          label={t('nav.menu')}
+        >
           <NavPill.Backdrop amount={16} />
           <NavPill.Item
             icon="home"

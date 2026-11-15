@@ -204,44 +204,44 @@ export function TvApp({
                                     >
                                       <CompatBanner />
                                       <LiveGate client={client} available={live !== undefined}>
-                                      <ContinueProvider>
-                                        <RecommendProvider>
-                                          <MyListProvider>
-                                            <WatchedProvider>
-                                              {/* Above the router: a TV must be castable from its home
+                                        <ContinueProvider>
+                                          <RecommendProvider>
+                                            <MyListProvider>
+                                              <WatchedProvider>
+                                                {/* Above the router: a TV must be castable from its home
                             screen, not only from the player. */}
-                                              <CastReceiverProvider
-                                                client={client}
-                                                lan={lan}
-                                                name={name}
-                                                identity={identity}
-                                              >
-                                                {/* Also above the router: the beacon has to be up on
-                              whichever gate screen the TV is showing. */}
-                                                <HandoffBeaconProvider
+                                                <CastReceiverProvider
                                                   client={client}
                                                   lan={lan}
                                                   name={name}
                                                   identity={identity}
                                                 >
-                                                  {/* A television cannot use React Native's <Modal>: its
+                                                  {/* Also above the router: the beacon has to be up on
+                              whichever gate screen the TV is showing. */}
+                                                  <HandoffBeaconProvider
+                                                    client={client}
+                                                    lan={lan}
+                                                    name={name}
+                                                    identity={identity}
+                                                  >
+                                                    {/* A television cannot use React Native's <Modal>: its
                               view controller never receives a press from a remote
                               (see @kromatv/ui lib/overlay-host). */}
-                                                  <OverlayHost>
-                                                    <TvRouterGuard />
-                                                    {/* Above the router so notices survive a screen
+                                                    <OverlayHost>
+                                                      <TvRouterGuard />
+                                                      {/* Above the router so notices survive a screen
                                 change; they never take focus. */}
-                                                    <Toaster
-                                                      position="top-right"
-                                                      inset={TOAST_INSET}
-                                                    />
-                                                  </OverlayHost>
-                                                </HandoffBeaconProvider>
-                                              </CastReceiverProvider>
-                                            </WatchedProvider>
-                                          </MyListProvider>
-                                        </RecommendProvider>
-                                      </ContinueProvider>
+                                                      <Toaster
+                                                        position="top-right"
+                                                        inset={TOAST_INSET}
+                                                      />
+                                                    </OverlayHost>
+                                                  </HandoffBeaconProvider>
+                                                </CastReceiverProvider>
+                                              </WatchedProvider>
+                                            </MyListProvider>
+                                          </RecommendProvider>
+                                        </ContinueProvider>
                                       </LiveGate>
                                     </CrashBoundary>
                                   </LocaleProvider>

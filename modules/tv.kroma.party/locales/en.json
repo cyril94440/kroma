@@ -158,5 +158,6 @@
   "party.voice.error.unavailable": "The microphone is not available right now.",
   "party.voice.error.full": "The voice chat is full.",
   "party.voice.error.rateLimited": "Too many attempts. Wait a moment and try again.",
-  "party.voice.error.failed": "Could not join the voice chat. Try again."
+  "party.voice.error.failed": "Could not join the voice chat. Try again.",
+  "party.voice.speaking": "speaking"
 }

@@ -42,6 +42,7 @@ impl From<&Participant> for Member {
 pub struct Joined {
     pub peer_id: String,
     pub replaced: Option<String>,
+    pub announce: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,6 +68,7 @@ pub struct VoiceRoom {
     pairs: BTreeMap<(String, String), u64>,
     windows: Windows,
     announced_speaking: Vec<String>,
+    quiet_leaves: BTreeMap<String, i64>,
 }
 
 impl VoiceRoom {
@@ -78,6 +80,7 @@ impl VoiceRoom {
             pairs: BTreeMap::new(),
             windows: Windows::default(),
             announced_speaking: Vec::new(),
+            quiet_leaves: BTreeMap::new(),
         }
     }
 
@@ -132,14 +135,32 @@ impl VoiceRoom {
             speaking_until: 0,
         });
         self.revision += 1;
-        Ok(Joined { peer_id, replaced })
+        let returning = self
+            .quiet_leaves
+            .remove(req.user_id)
+            .is_some_and(|at| now - at < limits::RETURN_GRACE_MS);
+        let announce = replaced.is_none() && !returning;
+        Ok(Joined {
+            peer_id,
+            replaced,
+            announce,
+        })
     }
 
-    pub fn leave(&mut self, user_id: &str, peer_id: &str) -> Result<bool, VoiceError> {
+    pub fn leave(
+        &mut self,
+        user_id: &str,
+        peer_id: &str,
+        quiet: bool,
+        now: i64,
+    ) -> Result<bool, VoiceError> {
         match self.find(peer_id) {
             None => Ok(false),
             Some(p) if p.user_id != user_id => Err(VoiceError::Forbidden),
             Some(_) => {
+                if quiet {
+                    self.quiet_leaves.insert(user_id.to_string(), now);
+                }
                 self.remove(peer_id);
                 self.revision += 1;
                 Ok(true)

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { adoptParty as adopt, applyPartyEvent as applyEvent, EMPTY_PARTY as EMPTY, expireFloating, HISTORY_MAX, type PartyModel as Model } from './party-state';
+import {
+  adoptParty as adopt,
+  applyPartyEvent as applyEvent,
+  EMPTY_PARTY as EMPTY,
+  expireFloating,
+  HISTORY_MAX,
+  type PartyModel as Model,
+} from './party-state';
 import type { ChatMessage, PartyEvent, PartyState } from '@kromatv/client/party';
 
 const message = (id: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({

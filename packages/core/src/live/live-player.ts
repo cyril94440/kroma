@@ -45,3 +45,9 @@ export function wantsNativeHls(support: { mse: boolean; nativeHls: boolean }): b
 export function latencyOf(playingDate: number | null, now: number): number | null {
   return playingDate === null ? null : Math.max(0, (now - playingDate) / 1000);
 }
+
+export const MAX_REBUILDS = 3;
+
+export function canRebuild(rebuilds: number): boolean {
+  return rebuilds < MAX_REBUILDS;
+}

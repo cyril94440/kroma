@@ -1,9 +1,8 @@
-import { BEHIND_LIVE_SECONDS, type MoveRange, STALL_RECOVERY_MS } from '@kromatv/core';
+import { BEHIND_LIVE_SECONDS, canRebuild, type MoveRange, STALL_RECOVERY_MS } from '@kromatv/core';
 import { createVideoPlayer, type VideoPlayer } from 'expo-video';
 import type { LiveEngine, LiveListeners } from '#tv/features/live/engine/liveEngine';
 
 const WATCHDOG_MS = 500;
-const MAX_REBUILDS = 3;
 const READY_STATUS = 'readyToPlay';
 
 /** A live stream on expo-video's platform player (AVPlayer on Apple TV and
@@ -53,7 +52,7 @@ export class ExpoLiveEngine implements LiveEngine {
   }
 
   private failed(): void {
-    if (this.rebuilds >= MAX_REBUILDS) {
+    if (!canRebuild(this.rebuilds)) {
       this.listeners.onError();
       return;
     }

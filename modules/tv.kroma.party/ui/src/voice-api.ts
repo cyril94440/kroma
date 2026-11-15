@@ -70,7 +70,7 @@ export function createVoiceApi(api: ModuleApi): VoiceApi {
     leave: async (peerId) => {
       await guarded(api.post('/voice/leave', { peerId }, Ok));
     },
-    leaveOnUnload: (peerId) => api.beacon('/voice/leave', { peerId }),
+    leaveOnUnload: (peerId) => api.beacon('/voice/leave', { peerId, quiet: true }),
     beat: async (peerId) => {
       try {
         return (await api.post('/voice/beat', { peerId }, BeatAnswer)).revision;

@@ -1,7 +1,9 @@
 import type { VoteView } from '@kromatv/client/party';
 import { voteOf, voteWaiting } from '@kromatv/core';
 import { useT } from '@kromatv/ui';
-import { Drawer, FocusColumn, ListRow, Text } from '@kromatv/ui/kit';
+import { Drawer, FocusColumn, ListRow, styles, Text, useStyles } from '@kromatv/ui/kit';
+
+const sDefinition = styles({ column: { gap: 14 } });
 
 /** A zapping vote, answered with the remote: For or Against. The requester
  *  never votes on their own request, so for them the drawer is never opened. */
@@ -18,14 +20,21 @@ export function VoteDrawer({
   onAnswer: (approve: boolean) => void;
   onClose: () => void;
 }>) {
+  const s = useStyles(sDefinition);
   const t = useT();
   const mine = vote ? voteOf(vote, userId) : null;
   const seconds = vote ? Math.max(0, Math.ceil((vote.endsAt - now) / 1000)) : 0;
   return (
-    <Drawer.Root open={vote !== null} onClose={onClose} title={t('live.voteTitle')} width="md" floating>
+    <Drawer.Root
+      open={vote !== null}
+      onClose={onClose}
+      title={t('live.voteTitle')}
+      width="md"
+      floating
+    >
       <Drawer.Panel>
         {vote ? (
-          <FocusColumn>
+          <FocusColumn style={s.column}>
             <Text variant="headingTv">
               {t('live.voteBy', { name: vote.by?.name ?? '', channel: vote.label })}
             </Text>

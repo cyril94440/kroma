@@ -7,30 +7,29 @@ export interface LiveModulesState {
   ready: boolean;
 }
 
-/** Asks the server which live-TV modules it runs. Until the answer arrives, and
- *  when it never does, every module reads as absent, so a screen gated on it
- *  never shows for a server that has not said it can. */
+type Client = Pick<KromaClient, 'modules'>;
+
 const ABSENT: LiveModulesState = { modules: NO_LIVE_MODULES, ready: false };
 
-export function useLiveModules(client: Pick<KromaClient, 'modules'> | null): LiveModulesState {
-  const [state, setState] = useState<LiveModulesState>(ABSENT);
+/** Asks the server which live-TV modules it runs. Until the answer arrives, for
+ *  another client than the one that answered, and when it never does, every
+ *  module reads as absent, so a screen gated on it never shows for a server
+ *  that has not said it can. */
+export function useLiveModules(client: Client | null): LiveModulesState {
+  const [answer, setAnswer] = useState<{ client: Client; state: LiveModulesState } | null>(null);
   useEffect(() => {
-    if (!client) {
-      setState(ABSENT);
-      return;
-    }
+    if (!client) return;
     let cancelled = false;
+    const settle = (state: LiveModulesState) => {
+      if (!cancelled) setAnswer({ client, state });
+    };
     client.modules.list().then(
-      (list) => {
-        if (!cancelled) setState({ modules: liveModules(list), ready: true });
-      },
-      () => {
-        if (!cancelled) setState({ modules: NO_LIVE_MODULES, ready: true });
-      },
+      (list) => settle({ modules: liveModules(list), ready: true }),
+      () => settle({ modules: NO_LIVE_MODULES, ready: true }),
     );
     return () => {
       cancelled = true;
     };
   }, [client]);
-  return state;
+  return client && answer?.client === client ? answer.state : ABSENT;
 }

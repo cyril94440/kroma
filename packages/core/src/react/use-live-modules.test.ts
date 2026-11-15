@@ -8,9 +8,14 @@ const asClient = (list: () => Promise<unknown>) =>
 
 describe('which live modules the server runs', () => {
   it('reads none until the server has answered', () => {
-    const { result } = renderHook(() => useLiveModules(asClient(() => new Promise(() => undefined))));
+    const { result } = renderHook(() =>
+      useLiveModules(asClient(() => new Promise(() => undefined))),
+    );
 
-    expect(result.current).toEqual({ modules: { live: false, party: false, sport: false }, ready: false });
+    expect(result.current).toEqual({
+      modules: { live: false, party: false, sport: false },
+      ready: false,
+    });
   });
 
   it('reads the enabled ones from the module list', async () => {

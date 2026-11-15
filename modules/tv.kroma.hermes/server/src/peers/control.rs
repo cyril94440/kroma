@@ -103,7 +103,7 @@ pub trait Control: Send + Sync {
         Err(super::not_offered())
     }
 
-    fn switch_provider(&self, _provider: &str, _requested_by: &str, _reason: &str) -> Result<ProviderSwitch> {
+    fn switch_provider(&self, _provider: &str, _channel_id: Option<&str>, _requested_by: &str, _reason: &str) -> Result<ProviderSwitch> {
         Err(super::not_offered())
     }
 
@@ -182,8 +182,12 @@ impl Control for PeerControl {
         self.ask("restart", &json!({ "requestedBy": requested_by, "reason": reason }))
     }
 
-    fn switch_provider(&self, provider: &str, requested_by: &str, reason: &str) -> Result<ProviderSwitch> {
-        self.ask("switchProvider", &json!({ "provider": provider, "requestedBy": requested_by, "reason": reason }))
+    fn switch_provider(&self, provider: &str, channel_id: Option<&str>, requested_by: &str, reason: &str) -> Result<ProviderSwitch> {
+        let mut body = json!({ "provider": provider, "requestedBy": requested_by, "reason": reason });
+        if let Some(id) = channel_id {
+            body["channelId"] = json!(id);
+        }
+        self.ask("switchProvider", &body)
     }
 
     fn probe(&self, channel_id: &str) -> Result<Probe> {

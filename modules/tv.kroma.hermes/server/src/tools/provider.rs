@@ -55,22 +55,17 @@ fn flag_multiplex(mut out: Value, candidate: &Option<Candidate>, target: &str) -
     out
 }
 
-fn by_target(env: &mut ToolEnv, status: &Status, target: &'static str, force: bool) -> Value {
-    let user = env.message.user_id.clone();
-    let now_on = current(env, status);
-    let result = env.deps.control.switch_provider(target, &user, &format!("switch_provider demandé par {}", env.message.name));
-    env.deps.audit("decisions", "switch_provider", json!({ "user": user, "target": target, "force": force, "result": format!("{result:?}") }));
+fn outcome(env: &mut ToolEnv, result: anyhow::Result<ProviderSwitch>, label: &str) -> Result<(Value, Option<String>), Value> {
     let ProviderSwitch { switched, error, .. } = match result {
         Ok(r) => r,
         Err(e) => {
             if method_missing(env, "switchProvider", &e) {
-                return failure("changement de fournisseur indisponible : le module live ne le propose pas");
+                return Err(failure("changement de fournisseur indisponible : le module live ne le propose pas"));
             }
-            return failure(&format!("changement de fournisseur impossible : {e:#}"));
+            return Err(failure(&format!("changement de fournisseur impossible : {e:#}")));
         }
     };
-    let label = provider_fr(target);
-    let mut out = match error.as_deref() {
+    let out = match error.as_deref() {
         None if !switched => json!({ "ok": false, "status": "refused", "raison": "changement de fournisseur refusé" }),
         None => {
             env.ctx.diffusion_done = true;
@@ -87,7 +82,21 @@ fn by_target(env: &mut ToolEnv, status: &Status, target: &'static str, force: bo
         Some("notFound") => json!({ "ok": false, "status": "not_found", "raison": format!("cette chaîne n'existe pas chez le fournisseur {label}") }),
         Some("notWorking") => json!({ "ok": false, "status": "dead", "raison": format!("la chaîne ne répond pas chez le fournisseur {label} en ce moment (testée à l'instant) : on reste comme on est") }),
         Some("busy") => json!({ "ok": false, "status": "occupe", "raison": format!("les connexions de test vers le fournisseur {label} sont toutes prises (une recherche est en cours) : redemande dans une minute") }),
+        Some("unknownChannel") => json!({ "ok": false, "status": "ref_inconnue", "raison": "cette chaîne n'est plus au catalogue : redemande-la ou relance une recherche" }),
+        Some("providerMismatch") => json!({ "ok": false, "status": "mauvais_fournisseur", "raison": format!("cette chaîne n'est pas chez le fournisseur {label}") }),
         Some(other) => json!({ "ok": false, "status": "refused", "raison": other }),
+    };
+    Ok((out, error))
+}
+
+fn by_target(env: &mut ToolEnv, status: &Status, target: &'static str, force: bool) -> Value {
+    let user = env.message.user_id.clone();
+    let now_on = current(env, status);
+    let result = env.deps.control.switch_provider(target, None, &user, &format!("switch_provider demandé par {}", env.message.name));
+    env.deps.audit("decisions", "switch_provider", json!({ "user": user, "target": target, "force": force, "result": format!("{result:?}") }));
+    let (mut out, error) = match outcome(env, result, provider_fr(target)) {
+        Ok(done) => done,
+        Err(refusal) => return refusal,
     };
     if matches!(error.as_deref(), Some("notFound" | "notWorking" | "voteRequired")) {
         out = flag_multiplex(out, &now_on, target);
@@ -128,7 +137,27 @@ fn by_ref(env: &mut ToolEnv, status: &Status, reference: &str, force: bool) -> V
     let checked = judged.as_ref().is_some_and(|j| j.verdict == Verdict::Yes);
     let note = format!("fournisseur {} : {} ({})", provider_fr(&picked.provider), picked.name, if checked { "même match vérifié à l'image" } else { "non vérifié à l'image" });
     env.deps.audit("decisions", "switch_provider_ref", json!({ "channel": picked.name, "verified": checked, "force": force }));
-    let mut out = request_channel(env, &id, &picked.name, &note, force);
+    let target = match picked.provider.as_str() {
+        "primary" => "primary",
+        "backup" => "backup",
+        _ if status.provider == "backup" => "primary",
+        _ => "backup",
+    };
+    let user = env.message.user_id.clone();
+    let result = env.deps.control.switch_provider(target, Some(&id), &user, &note);
+    env.deps.audit("decisions", "switch_provider_ref_ask", json!({ "user": user, "channel": id, "provider": target, "result": format!("{result:?}") }));
+    let mut out = match result {
+        Err(e) if method_missing(env, "switchProvider", &e) => request_channel(env, &id, &picked.name, &note, force),
+        result => match outcome(env, result, provider_fr(target)) {
+            Ok((mut out, _)) => {
+                if force {
+                    out["note_force"] = json!("le passage en force n'existe pas pour un simple changement de fournisseur : la règle (seul, souci constaté, sinon vote) s'applique");
+                }
+                out
+            }
+            Err(refusal) => return refusal,
+        },
+    };
     out["verifie_a_l_image"] = json!(checked);
     out
 }

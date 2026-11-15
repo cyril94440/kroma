@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HtmlLiveEngine } from '#tv/features/live/browser/HtmlLiveEngine';
-import type { LiveListeners } from '#tv/features/live/engine/liveEngine';
+import { fakeLiveListeners } from '#tv/features/live/engine/liveEngine.fixture';
 
 const hls = vi.hoisted(() => ({
   supported: true,
@@ -36,19 +36,7 @@ vi.mock('hls.js', () => ({
   },
 }));
 
-function listeners(): LiveListeners & Record<keyof LiveListeners, ReturnType<typeof vi.fn>> {
-  return {
-    onPlay: vi.fn(),
-    onPause: vi.fn(),
-    onWaiting: vi.fn(),
-    onPlaying: vi.fn(),
-    onReady: vi.fn(),
-    onError: vi.fn(),
-    onLost: vi.fn(),
-    onAspect: vi.fn(),
-    onSurfaceChange: vi.fn(),
-  };
-}
+const listeners = fakeLiveListeners;
 
 function video() {
   const element = document.createElement('video');
@@ -64,7 +52,13 @@ const opened = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 beforeEach(() => {
   hls.supported = true;
   hls.handlers.clear();
-  for (const fn of [hls.startLoad, hls.recoverMediaError, hls.loadSource, hls.attachMedia, hls.destroy])
+  for (const fn of [
+    hls.startLoad,
+    hls.recoverMediaError,
+    hls.loadSource,
+    hls.attachMedia,
+    hls.destroy,
+  ])
     fn.mockClear();
 });
 afterEach(() => vi.useRealTimers());

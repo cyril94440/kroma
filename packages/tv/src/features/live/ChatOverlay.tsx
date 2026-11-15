@@ -23,8 +23,20 @@ export function ChatOverlay({
   now,
 }: Readonly<{ messages: readonly ChatMessage[]; floating: readonly Floating[]; now: number }>) {
   const lines = recentMessages(messages, now);
+  if (lines.length === 0 && floating.length === 0) return null;
   return (
-    <Box absolute left={64} bottom={220} w={720} gap={10} pointerEvents="none" z={12}>
+    <Box
+      absolute
+      left={64}
+      bottom={220}
+      w={720}
+      gap={10}
+      p={20}
+      radius="lg"
+      bg="black/60"
+      pointerEvents="none"
+      z={12}
+    >
       {lines.map((message) => (
         <ChatLine key={message.id} message={message} />
       ))}

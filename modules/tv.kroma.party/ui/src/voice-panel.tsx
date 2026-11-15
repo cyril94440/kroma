@@ -38,9 +38,12 @@ function Roster({ view }: Readonly<{ view: VoiceView }>) {
               size={18}
               color={speaking ? 'accent' : 'textDim'}
             />
-            <Text variant="label" data-speaking={speaking}>
-              {member.name}
-            </Text>
+            <Text variant="label">{member.name}</Text>
+            {speaking ? (
+              <Text variant="meta" color="accent">
+                {t('party.voice.speaking')}
+              </Text>
+            ) : null}
             {member.peerId === view.peerId ? <Badge>{t('party.voice.you')}</Badge> : null}
             {link === 'connecting' ? (
               <Text variant="meta" color="textDim">

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { baseMatch } from './match.fixture';
 import { SportState, type SportEventMessage } from '@kromatv/client/sport';
-import { adoptSport as adopt, applySportEvent as applyEvent, EMPTY_SPORT as EMPTY } from './sport-state';
+import {
+  adoptSport as adopt,
+  applySportEvent as applyEvent,
+  EMPTY_SPORT as EMPTY,
+} from './sport-state';
 
 const state = (seq: number) =>
   SportState.parse({

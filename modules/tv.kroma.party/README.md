@@ -74,7 +74,7 @@ A mesh of browser to browser audio connections, as in the source product: every 
 | --- | --- | --- |
 | `GET voice/state` | | `{revision, now, participants: [{peerId, userId, name, muted}], speaking: [peerId], max}` |
 | `POST voice/join` | `{deviceId, muted, watching}` | `{peerId, revision, participants, speaking, iceServers, beatSeconds, expireSeconds}`; `409 full`, `429 rateLimited`, `400 badDevice` |
-| `POST voice/leave` | `{peerId}` | `{ok}` |
+| `POST voice/leave` | `{peerId, quiet?}` | `{ok}`; `quiet` (sent when a page unloads) skips the chat line, and a return within 3 minutes is not announced either |
 | `POST voice/beat` | `{peerId}` | `{ok, revision}`, or `404 notJoined` when the module forgot the peer |
 | `POST voice/mute` | `{peerId, muted}` | `{ok}` |
 | `POST voice/speaking` | `{peerId, speaking}` | `{ok}`; at most 10 `true` a second per peer |

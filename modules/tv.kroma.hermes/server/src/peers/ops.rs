@@ -56,6 +56,7 @@ pub struct ScanItem {
     pub frames: Vec<String>,
     pub error: Option<String>,
     pub now: Option<String>,
+    pub at: i64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

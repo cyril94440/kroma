@@ -16,6 +16,7 @@ pub struct FakeControl {
     pub snapshot: Reply<Snapshot>,
     pub restart: Reply<Restart>,
     pub provider: Reply<ProviderSwitch>,
+    pub channel_provider: Reply<ProviderSwitch>,
     pub probe: Reply<Probe>,
     pub benchmark: Reply<BenchmarkStart>,
     pub scans: Mutex<Vec<ScanState>>,
@@ -29,6 +30,7 @@ pub struct FakeControl {
     pub probe_ids: Mutex<Vec<String>>,
     pub benchmark_ids: Mutex<Vec<Vec<String>>>,
     pub history_limits: Mutex<Vec<u32>>,
+    pub provider_asks: Mutex<Vec<(String, Option<String>, String)>>,
 }
 
 impl FakeControl {
@@ -91,9 +93,13 @@ impl Control for FakeControl {
         answer(&self.restart)
     }
 
-    fn switch_provider(&self, provider: &str, requested_by: &str, _reason: &str) -> Result<ProviderSwitch> {
+    fn switch_provider(&self, provider: &str, channel_id: Option<&str>, requested_by: &str, reason: &str) -> Result<ProviderSwitch> {
         self.note("switchProvider", &format!("{provider}:{requested_by}"));
-        answer(&self.provider)
+        self.provider_asks.lock().unwrap().push((provider.into(), channel_id.map(str::to_string), reason.into()));
+        match (channel_id, self.channel_provider.lock().unwrap().is_some()) {
+            (Some(_), true) => answer(&self.channel_provider),
+            _ => answer(&self.provider),
+        }
     }
 
     fn probe(&self, channel_id: &str) -> Result<Probe> {

@@ -193,7 +193,7 @@ fn muting_and_leaving_each_announce_a_new_roster() {
 
     rig.party.voice_mute("mamie", &peer, true).unwrap();
     rig.party.voice_mute("mamie", &peer, true).unwrap();
-    rig.party.voice_leave("mamie", &peer).unwrap();
+    rig.party.voice_leave("mamie", &peer, false).unwrap();
 
     let rosters = rig.events("party.voice.roster");
     assert_eq!(rosters.len(), 3);
@@ -311,7 +311,18 @@ fn leaving_says_so_in_the_chat_but_a_reload_replacing_the_entry_stays_silent() {
     join(&rig, "Mamie", "device-aaaa");
     let again = join(&rig, "Mamie", "device-aaaa");
 
-    rig.party.voice_leave("mamie", &again).unwrap();
+    rig.party.voice_leave("mamie", &again, false).unwrap();
 
     assert_eq!(rig.keys(), vec!["party.voice.joined", "party.voice.left"]);
+}
+
+#[test]
+fn a_page_unload_leaves_without_a_chat_line_and_the_return_is_not_announced_again() {
+    let rig = rig();
+    let first = join(&rig, "Mamie", "device-aaaa");
+
+    rig.party.voice_leave("mamie", &first, true).unwrap();
+    join(&rig, "Mamie", "device-aaaa");
+
+    assert_eq!(rig.keys(), vec!["party.voice.joined"]);
 }

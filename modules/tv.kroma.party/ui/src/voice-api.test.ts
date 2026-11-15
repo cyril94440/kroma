@@ -55,7 +55,7 @@ describe('createVoiceApi', () => {
 
     voice.leaveOnUnload('a-1');
 
-    expect(beacon).toHaveBeenCalledWith('/voice/leave', { peerId: 'a-1' });
+    expect(beacon).toHaveBeenCalledWith('/voice/leave', { peerId: 'a-1', quiet: true });
   });
 
   it.each([

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LIVE_HLS_CONFIG,
+  canRebuild,
   isBehindLive,
   latencyOf,
   liveRecoveryFor,
@@ -44,5 +45,11 @@ describe('the live edge', () => {
   it('measures the latency of the frame on screen against the clock', () => {
     expect(latencyOf(1000, 9000)).toBe(8);
     expect(latencyOf(null, 9000)).toBeNull();
+  });
+});
+
+describe('rebuilding a player', () => {
+  it('rebuilds three times and then gives up', () => {
+    expect([0, 1, 2, 3].map(canRebuild)).toEqual([true, true, true, false]);
   });
 });

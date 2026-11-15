@@ -91,14 +91,21 @@ struct PeerBody {
     peer_id: String,
 }
 
+#[derive(Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct LeaveBody {
+    peer_id: String,
+    quiet: bool,
+}
+
 async fn leave<S: HostCtx + Clone>(
     State(host): State<S>,
     Extension(party): Extension<Arc<Party>>,
     AuthUser(user): AuthUser,
-    Json(body): Json<PeerBody>,
+    Json(body): Json<LeaveBody>,
 ) -> Result<Response, Response> {
     let who = actor(&host, &user)?;
-    work(move || party.voice_leave(&who.person.user_id, &body.peer_id))
+    work(move || party.voice_leave(&who.person.user_id, &body.peer_id, body.quiet))
         .await?
         .map(|()| ok())
         .map_err(refusal)

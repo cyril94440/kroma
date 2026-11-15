@@ -148,7 +148,9 @@ export class HtmlLiveEngine implements LiveEngine {
     const playing = this.hls?.playingDate;
     if (playing) return playing.getTime();
     const start = (this.video as WithStartDate).getStartDate?.().getTime();
-    return start === undefined || Number.isNaN(start) ? null : start + this.video.currentTime * 1000;
+    return start === undefined || Number.isNaN(start)
+      ? null
+      : start + this.video.currentTime * 1000;
   }
   bufferAheadMs(): number {
     const { buffered, currentTime } = this.video;

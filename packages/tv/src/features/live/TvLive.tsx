@@ -107,8 +107,14 @@ export function TvLive<E extends LiveEngine>({
     [client, poll, t],
   );
 
-  const voteOpen = vote !== null && vote.id !== dismissedVote && vote.by?.userId !== me && me !== '' && !(me in vote.votes);
-  const pollOpen = poll !== null && poll.id !== dismissedPoll && !voteOpen && me !== '' && !(me in poll.votes);
+  const voteOpen =
+    vote !== null &&
+    vote.id !== dismissedVote &&
+    vote.by?.userId !== me &&
+    me !== '' &&
+    !(me in vote.votes);
+  const pollOpen =
+    poll !== null && poll.id !== dismissedPoll && !voteOpen && me !== '' && !(me in poll.votes);
   const closePanel = useCallback(() => setPanel(null), []);
   const badge = status ? liveBadges(status)[0] : undefined;
   const title = status?.channel?.name ?? t('nav.live');
@@ -122,15 +128,35 @@ export function TvLive<E extends LiveEngine>({
         {subtitle ? <Player.Subtitle>{subtitle}</Player.Subtitle> : null}
         {badge ? <Player.Warning>{t(`live.badge.${badge}`)}</Player.Warning> : null}
         <Player.Actions>
-          <Button icon="list" label={t('live.channels')} variant="scrim" onPress={() => setPanel('channels')} />
+          <Button
+            icon="list"
+            label={t('live.channels')}
+            variant="scrim"
+            onPress={() => setPanel('channels')}
+          />
           {modules.party ? (
-            <Button icon="message" label={t('live.chat')} variant="scrim" onPress={() => setPanel('chat')} />
+            <Button
+              icon="message"
+              label={t('live.chat')}
+              variant="scrim"
+              onPress={() => setPanel('chat')}
+            />
           ) : null}
           {modules.party ? (
-            <Button icon="mood-smile" label={t('live.reactions')} variant="scrim" onPress={() => setPanel('reactions')} />
+            <Button
+              icon="mood-smile"
+              label={t('live.reactions')}
+              variant="scrim"
+              onPress={() => setPanel('reactions')}
+            />
           ) : null}
           {modules.sport && match ? (
-            <Button icon="ball-football" label={t('live.match')} variant="scrim" onPress={() => setPanel('match')} />
+            <Button
+              icon="ball-football"
+              label={t('live.match')}
+              variant="scrim"
+              onPress={() => setPanel('match')}
+            />
           ) : null}
         </Player.Actions>
         <Player.Transport tileAt={noStoryboard} />

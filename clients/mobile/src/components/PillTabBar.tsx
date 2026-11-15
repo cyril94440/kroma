@@ -4,6 +4,7 @@ import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CastMiniBar } from '#mobile/components/cast/CastMiniBar';
+import { isHiddenTab } from '#mobile/lib/hiddenTab';
 
 const GLYPH = 24;
 
@@ -34,6 +35,7 @@ export function PillTabBar({
           {Platform.OS === 'ios' ? <NavPill.Backdrop amount={15} /> : null}
           {state.routes.map((route, index) => {
             const { options } = descriptors[route.key];
+            if (isHiddenTab(options)) return null;
             const focused = state.index === index;
             const label = options.title ?? route.name;
             const onPress = () => {

@@ -12,12 +12,7 @@ import {
   expireFloating,
   type PartyModel,
 } from '../live/party-state';
-import {
-  adoptSport,
-  applySportEvent,
-  EMPTY_SPORT,
-  type SportModel,
-} from '../live/sport-state';
+import { adoptSport, applySportEvent, EMPTY_SPORT, type SportModel } from '../live/sport-state';
 import type { OpenEvents } from './live-events';
 
 export const SAFETY_REFRESH_MS = 30_000;
@@ -128,7 +123,8 @@ export function useLiveRoom({ client, openEvents, modules, watching }: LiveRoomO
           if (raw.type.startsWith('live.')) setStatus((current) => applyLiveEvent(current, raw));
           if (modules.party && raw.type.startsWith('party.')) {
             const parsed = PartyEvent.safeParse(raw);
-            if (parsed.success) setParty((model) => applyPartyEvent(model, parsed.data, Date.now()));
+            if (parsed.success)
+              setParty((model) => applyPartyEvent(model, parsed.data, Date.now()));
           }
           if (modules.sport && raw.type.startsWith('sport.')) {
             const parsed = SportEventMessage.safeParse(raw);
